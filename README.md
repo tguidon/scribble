@@ -42,7 +42,7 @@ The agent receives your screenshots, mark positions, and comments in one feedbac
 
 The agent runs the skill only after an explicit request. The launcher sends an authenticated request to the local server. If the server responds, the launcher reuses it. If no server process is running, it starts one in the background. If a recorded process is still alive but does not respond, the launcher asks you to retry or stop that process before restarting.
 
-The latest unfinished draft resumes automatically. After submission, the next skill request opens a new session on the same server. The server remains available for later sessions.
+The latest unfinished draft resumes automatically. After submission, the next skill request recovers any feedback the agent has not acknowledged. The agent reads the bundle and images, then marks it as read with `ack --session ID`. Reading with `wait` or `feedback` alone does not clear it. Once all submissions are acknowledged, the next request opens a new session on the same server. The server remains available for later sessions.
 
 Scribble saves drafts and screenshots in `.scribble/` in your project. A browser backup stores unsaved edits to marks and messages. Saved work remains available after the agent or server stops.
 
@@ -103,11 +103,12 @@ For an installed skill, use `node /absolute/path/to/skills/scribble/scripts/scri
 | Command | Behavior |
 | --- | --- |
 | `start --detach --no-open` | Start or reuse the server and return the session URL as JSON |
-| `start --new` | Create a separate draft on the existing server |
+| `start --new` | Create a separate draft without clearing unread feedback |
 | `start --session ID` | Open a saved draft or submission |
 | `wait --session ID --timeout 60` | Wait for submission, with exit code 2 on timeout |
 | `feedback --session ID` | Read a saved submission |
-| `status` | Show the latest session and recorded server process |
+| `ack --session ID` | Mark submitted feedback as read after inspecting its images |
+| `status` | Show the latest session, unread feedback, and recorded server process |
 
 Common flags are `--dir PATH`, `--port NUMBER`, and `--title TEXT`. The default port is 0, which selects an available port. Background server logs are in `.scribble/server.log`.
 

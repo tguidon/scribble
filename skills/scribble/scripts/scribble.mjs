@@ -15,6 +15,7 @@ import {
   atomicJson,
 } from "./lib/store.mjs";
 import { startServer } from "./lib/app.mjs";
+import { pendingFeedback, acknowledgeFeedback } from "./lib/handoff.mjs";
 const cli = fileURLToPath(import.meta.url);
 const packageRoot = resolve(dirname(cli), "..");
 const delay = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -79,7 +80,16 @@ async function main() {
           }
         : null,
       server: server && alive(server.pid) ? server : null,
+      pendingFeedback: await pendingFeedback(root),
     });
+    return;
+  }
+  if (command === "ack") {
+    if (!values.session)
+      throw new Error(
+        "Use ack --session ID after reading the feedback and images.",
+      );
+    print(await acknowledgeFeedback(root, values.session));
     return;
   }
   if (command === "wait" || command === "feedback") {
@@ -113,6 +123,13 @@ async function main() {
   return values.child ? start() : withStartLock(root, start);
 }
 async function start() {
+  if (!values.child && !values.new && !values.session) {
+    const pending = await pendingFeedback(root);
+    if (pending.length) {
+      print({ action: "read-feedback", pendingFeedback: pending });
+      return;
+    }
+  }
   const existing = await readJson(join(root, "server.json")).catch(() => null);
   if (existing && alive(existing.pid)) {
     const link = new URL(existing.url);

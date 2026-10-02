@@ -51,7 +51,7 @@ test("copied skill starts without dependencies; concurrent launchers reuse and r
   assert.equal(status.session.id, resumed.sessionId);
 });
 
-test("wait returns the durable bundle and the next invocation creates fresh feedback", async (t) => {
+test("unread feedback survives reads and restarts until explicitly acknowledged", async (t) => {
   const root = await mkdtemp(join(tmpdir(), "scribble-handoff-"));
   const cli = resolve("bin/scribble.mjs");
   let pid;
@@ -96,8 +96,40 @@ test("wait returns the durable bundle and the next invocation creates fresh feed
   const bundle = await waiting;
   assert.equal(bundle.feedback.sessionId, first.sessionId);
   assert.equal(bundle.feedback.images.length, 1);
+  const unread = await run("start", "--detach", "--no-open");
+  assert.equal(unread.action, "read-feedback");
+  assert.equal(unread.pendingFeedback[0].sessionId, first.sessionId);
+  assert.equal((await run("status")).pendingFeedback.length, 1);
+  await run("feedback", "--session", first.sessionId);
+  assert.equal(
+    (await run("start", "--detach", "--no-open")).action,
+    "read-feedback",
+  );
+  const separate = await run("start", "--detach", "--no-open", "--new");
+  assert.notEqual(separate.sessionId, first.sessionId);
+  assert.equal(
+    (await run("start", "--detach", "--no-open")).pendingFeedback.length,
+    1,
+  );
+  await assert.rejects(
+    run("ack", "--session", separate.sessionId),
+    /not been sent/,
+  );
+  await assert.rejects(run("ack"), /Use ack --session/);
+  process.kill(pid, "SIGTERM");
+  await new Promise((r) => setTimeout(r, 400));
+  assert.equal(
+    (await run("start", "--detach", "--no-open")).action,
+    "read-feedback",
+  );
+  const original = await readFile(bundle.bundlePath, "utf8");
+  await run("ack", "--session", first.sessionId);
+  await run("ack", "--session", first.sessionId);
+  assert.equal(await readFile(bundle.bundlePath, "utf8"), original);
+  assert.deepEqual((await run("status")).pendingFeedback, []);
   const next = await run("start", "--detach", "--no-open");
-  assert.equal(next.pid, first.pid);
+  pid = next.pid;
+  assert.equal(next.sessionId, separate.sessionId);
   assert.notEqual(next.sessionId, first.sessionId);
   assert.equal(
     (await run("feedback", "--session", first.sessionId)).feedback.images
