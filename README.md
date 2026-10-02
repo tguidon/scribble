@@ -40,7 +40,7 @@ The agent receives your screenshots, mark positions, and comments in one feedbac
 
 ## Sessions and saved drafts
 
-The agent runs the skill only after an explicit request. The launcher sends an authenticated request to the local server. If the server responds, the launcher reuses it. If no server process is running, it starts one in the background. If a recorded process is still alive but does not respond, the launcher asks you to retry or stop that process before restarting.
+The agent runs the skill only after an explicit request. The launcher sends an authenticated request to the local server. If the server responds and runs the installed version, the launcher reuses it. If its version differs, the launcher requests an authenticated shutdown and starts the installed version on the same port. If no server process is running, it starts one in the background. If a recorded process is still alive but does not respond, the launcher asks you to retry or stop that process before restarting.
 
 The latest unfinished draft resumes automatically. After submission, the next skill request recovers any feedback the agent has not acknowledged. The agent reads the bundle and images, then marks it as read with `ack --session ID`. Reading with `wait` or `feedback` alone does not clear it. Once all submissions are acknowledged, the next request opens a new session on the same server. The server remains available for later sessions.
 
@@ -108,13 +108,27 @@ For an installed skill, use `node /absolute/path/to/skills/scribble/scripts/scri
 | `wait --session ID --timeout 60` | Wait for submission, with exit code 2 on timeout |
 | `feedback --session ID` | Read a saved submission |
 | `ack --session ID` | Mark submitted feedback as read after inspecting its images |
-| `status` | Show the latest session, unread feedback, and recorded server process |
+| `status` | Show the latest session, unread feedback, and recorded server version and process |
+| `stop` | Shut down the authenticated server and preserve saved feedback |
+| `--version` | Print the installed version |
 
 Common flags are `--dir PATH`, `--port NUMBER`, and `--title TEXT`. The default port is 0, which selects an available port. Background server logs are in `.scribble/server.log`.
 
 If separate agents need independent sessions, use a separate `--dir` for each agent.
 
-To stop the server, use your process manager with the server PID from the launcher. Saved feedback remains on disk.
+### Stop or update
+
+Before stopping or updating, wait for **Draft saved** in open browser tabs.
+
+```sh
+node bin/scribble.mjs stop
+```
+
+For an installed skill, use its absolute script path as described above. Pass the same `--dir` if you use custom storage. Repeating `stop` is safe. Saved drafts and submissions remain on disk.
+
+To update the skill, run `npx skills add tguidon/scribble` again. The next launch compares versions and restarts the server when needed. The restart keeps the same port, so browser backups remain on the same origin. Reload open tabs after the restart to load the updated app.
+
+Servers from before versioning was added need a one-time manual stop. The launcher reports the PID; inspect that process before stopping it with your process manager. The launcher does not stop a process it cannot authenticate.
 
 Agent sandboxes can require permission to open a local port or start a background process.
 

@@ -13,6 +13,7 @@ import {
 import { imageKind, validateDraft } from "./validation.mjs";
 import { draftBytes, MAX_DRAFT_BYTES, DRAFT_TOO_LARGE } from "./limits.mjs";
 import { acquireServerLease } from "./lock.mjs";
+import { VERSION, SERVER_PROTOCOL } from "./version.mjs";
 const appRoot = fileURLToPath(new URL("../../", import.meta.url));
 const mime = {
   ".html": "text/html",
@@ -76,6 +77,23 @@ export async function startServer({
   };
   let vite;
   let server;
+  const instanceId = randomUUID();
+  let closing;
+  const close = () => {
+    if (!closing)
+      closing = (async () => {
+        await vite?.close();
+        const timer = setTimeout(() => server.closeAllConnections(), 5000);
+        try {
+          await new Promise((resolve) => server.close(resolve));
+          await Promise.all([...queues.values()]);
+          await release();
+        } finally {
+          clearTimeout(timer);
+        }
+      })();
+    return closing;
+  };
   try {
     vite = dev
       ? await (
@@ -141,7 +159,24 @@ export async function startServer({
         };
         await authenticate();
         if (req.method === "GET" && url.pathname === "/api/health")
-          return reply(res, 200, { pid: process.pid, sessionId: id });
+          return reply(res, 200, {
+            pid: process.pid,
+            sessionId: id,
+            version: VERSION,
+            protocol: SERVER_PROTOCOL,
+            instanceId,
+          });
+        if (req.method === "POST" && url.pathname === "/api/shutdown") {
+          if (req.headers["x-scribble-instance"] !== instanceId)
+            fail(
+              409,
+              "The server instance changed. Retry with its current identity.",
+            );
+          reply(res, 200, { stopping: true });
+          setImmediate(() => close().catch(console.error));
+          return;
+        }
+        if (closing) fail(503, "Scribble is restarting. Retry shortly.");
         // Receive slow bodies before acquiring the session's write queue.
         const upload = req.method === "POST" && url.pathname === "/api/images";
         const input = upload
@@ -313,6 +348,7 @@ export async function startServer({
           }
           fail(404, "Not found.");
         };
+        if (closing) fail(503, "Scribble is restarting. Retry shortly.");
         if (req.method === "GET") await operate();
         else await serialize(id, operate);
       } catch (error) {
@@ -339,6 +375,9 @@ export async function startServer({
       url,
       sessionId: session.id,
       root,
+      version: VERSION,
+      protocol: SERVER_PROTOCOL,
+      instanceId,
     };
     await mkdir(root, { recursive: true, mode: 0o700 });
     await atomicJson(join(root, "server.json"), info);
@@ -346,11 +385,7 @@ export async function startServer({
       server,
       url,
       session: publicSession(session),
-      close: async () => {
-        await vite?.close();
-        await new Promise((resolve) => server.close(resolve));
-        await release();
-      },
+      close,
       info,
     };
   } catch (error) {

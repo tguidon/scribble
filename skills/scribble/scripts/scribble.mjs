@@ -17,6 +17,8 @@ import {
 import { startServer } from "./lib/app.mjs";
 import { pendingFeedback, acknowledgeFeedback } from "./lib/handoff.mjs";
 import { excludeStorage } from "./lib/git-exclude.mjs";
+import { VERSION, SERVER_PROTOCOL } from "./lib/version.mjs";
+import { serverHealth, stopServer } from "./lib/lifecycle.mjs";
 const cli = fileURLToPath(import.meta.url);
 const packageRoot = resolve(dirname(cli), "..");
 const delay = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -34,6 +36,7 @@ const { values, positionals } = parseArgs({
     "no-open": { type: "boolean" },
     new: { type: "boolean" },
     help: { type: "boolean" },
+    version: { type: "boolean" },
     timeout: { type: "string" },
   },
 });
@@ -62,9 +65,51 @@ function print(value) {
   process.stdout.write(JSON.stringify(value, null, 2) + "\n");
 }
 async function main() {
+  if (values.version || command === "version") {
+    console.log(VERSION);
+    return;
+  }
   if (values.help || command === "help") {
-    console.log(
-      `Scribble — show your agent what you mean.\n\n  scribble start [--detach] [--no-open] [--new] [--session ID]\n  scribble wait [--session ID] [--timeout SECONDS]\n  scribble feedback [--session ID]\n  scribble status\n\nOptions: --dir PATH (default .scribble in this project), --port NUMBER, --title TEXT\nUse npm run build before starting. Install with npx skills add <repository> --skill scribble.\nDrafts and submitted bundles remain on disk when the server stops.`,
+    console.log(`Scribble ${VERSION} — show your agent what you mean.
+
+  scribble start [--detach] [--no-open] [--new] [--session ID]
+  scribble wait --session ID [--timeout SECONDS]
+  scribble feedback --session ID
+  scribble ack --session ID
+  scribble stop
+  scribble status
+  scribble --version
+
+Install: npx skills add tguidon/scribble
+Installed skills include the app and server. Node.js 22+ is required; no build is needed.
+Run with: node /absolute/path/to/skills/scribble/scripts/scribble.mjs COMMAND
+In this repository: node bin/scribble.mjs COMMAND
+
+Options: --dir PATH (default .scribble in this project), --port NUMBER,
+         --title TEXT, --timeout SECONDS (wait only; default 3600).
+Use the same --dir for every command when choosing custom storage.
+
+start recovers unread feedback before opening a draft. Read each bundle and its
+images, then use ack to mark it as read. --new bypasses recovery without clearing it.
+wait exits with code 2 on timeout. feedback rereads a submission without acknowledging it.
+start reuses a matching server or restarts an older version on the same port.
+stop shuts down the authenticated server. Drafts and submissions remain on disk.
+Before an upgrade or stop, wait for Draft saved in open browser tabs. Reload after upgrading.
+Update an installation with: npx skills add tguidon/scribble
+Developers changing the UI in this repository must run npm run build before committing.`);
+    return;
+  }
+  if (command === "stop") {
+    print(
+      await withStartLock(root, async () =>
+        stopServer(
+          root,
+          await readJson(join(root, "server.json")).catch((error) => {
+            if (error.code === "ENOENT") return null;
+            throw error;
+          }),
+        ),
+      ),
     );
     return;
   }
@@ -121,6 +166,9 @@ async function main() {
     }
   }
   if (command !== "start") throw new Error(`Unknown command: ${command}`);
+  const port = Number(values.port || 0);
+  if (!Number.isInteger(port) || port < 0 || port > 65535)
+    throw new Error("Port must be an integer from 0 to 65535.");
   return values.child ? start() : withStartLock(root, start);
 }
 async function start() {
@@ -134,18 +182,9 @@ async function start() {
   }
   const existing = await readJson(join(root, "server.json")).catch(() => null);
   if (existing && alive(existing.pid)) {
+    const health = await serverHealth(existing);
     const link = new URL(existing.url);
-    const params = new URLSearchParams(link.hash.slice(1));
-    const healthy = await fetch(`${link.origin}/api/health`, {
-      headers: {
-        Authorization: `Bearer ${params.get("token")}`,
-        "X-Scribble-Session": existing.sessionId,
-      },
-      signal: AbortSignal.timeout(1500),
-    })
-      .then((r) => r.ok)
-      .catch(() => false);
-    if (healthy) {
+    if (health.version === VERSION && health.protocol === SERVER_PROTOCOL) {
       let resumed = values.session
         ? await loadSession(root, values.session)
         : !values.new && (await latestSession(root));
@@ -162,9 +201,9 @@ async function start() {
       print(info);
       return;
     }
-    throw new Error(
-      "The recorded Scribble process is still running but did not pass its health check. Retry shortly, or stop that process before restarting Scribble.",
-    );
+    await stopServer(root, existing);
+    // Keep the browser origin stable so local unsaved backups remain available.
+    if (values.port === undefined) values.port = String(existing.port);
   }
   let session = values.session
     ? await loadSession(root, values.session)
@@ -226,7 +265,9 @@ async function start() {
     throw new Error("Port must be an integer from 0 to 65535.");
   if (!values.dev)
     await access(join(packageRoot, "app/index.html")).catch(() => {
-      throw new Error("Build the browser app first: npm run build");
+      throw new Error(
+        "The bundled browser app is missing. Reinstall with npx skills add tguidon/scribble. For a source checkout, run npm run build.",
+      );
     });
   const app = await startServer({ root, session, port, dev: values.dev });
   print(app.info);
