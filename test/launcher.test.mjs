@@ -50,3 +50,58 @@ test("copied skill starts without dependencies; concurrent launchers reuse and r
   const status = await run("status");
   assert.equal(status.session.id, resumed.sessionId);
 });
+
+test("wait returns the durable bundle and the next invocation creates fresh feedback", async (t) => {
+  const root = await mkdtemp(join(tmpdir(), "scribble-handoff-"));
+  const cli = resolve("bin/scribble.mjs");
+  let pid;
+  t.after(async () => {
+    if (pid) {
+      try {
+        process.kill(pid, "SIGTERM");
+      } catch {}
+    }
+    await new Promise((r) => setTimeout(r, 200));
+    await rm(root, { recursive: true, force: true });
+  });
+  const run = async (...args) =>
+    JSON.parse(
+      (await exec(process.execPath, [cli, ...args, "--dir", root])).stdout,
+    );
+  const first = await run("start", "--detach", "--no-open");
+  pid = first.pid;
+  const url = new URL(first.url);
+  const params = new URLSearchParams(url.hash.slice(1));
+  const headers = {
+    Authorization: `Bearer ${params.get("token")}`,
+    "X-Scribble-Session": first.sessionId,
+  };
+  const png = Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=",
+    "base64",
+  );
+  const draft = await (
+    await fetch(`${url.origin}/api/images?width=1&height=1&name=one.png`, {
+      method: "POST",
+      headers,
+      body: png,
+    })
+  ).json();
+  const waiting = run("wait", "--session", first.sessionId, "--timeout", "5");
+  await fetch(`${url.origin}/api/submit`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ revision: draft.revision }),
+  });
+  const bundle = await waiting;
+  assert.equal(bundle.feedback.sessionId, first.sessionId);
+  assert.equal(bundle.feedback.images.length, 1);
+  const next = await run("start", "--detach", "--no-open");
+  assert.equal(next.pid, first.pid);
+  assert.notEqual(next.sessionId, first.sessionId);
+  assert.equal(
+    (await run("feedback", "--session", first.sessionId)).feedback.images
+      .length,
+    1,
+  );
+});

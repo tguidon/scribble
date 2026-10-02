@@ -317,7 +317,7 @@ kbd {
   font-size: 10px;
   gap: 5px;
   border-radius: 8px;
-  color: #787165;
+  color: #70685c;
   flex-shrink: 0;
 }
 .add-screenshot:hover {
@@ -328,7 +328,7 @@ kbd {
   display: flex;
   gap: 9px;
   align-items: center;
-  color: #797365;
+  color: #70685c;
   font-size: 10px;
   line-height: 1.5;
   padding: 20px 4px 0;
@@ -416,6 +416,8 @@ kbd {
   stroke-width: 3px;
 }
 .annotation.selected .mark-badge {
+  transform-box: fill-box;
+  transform-origin: center;
   animation: pin-pop 180ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 .empty-canvas {
@@ -464,7 +466,7 @@ kbd {
   text-wrap: balance;
 }
 .empty-canvas h1 span {
-  color: #807769;
+  color: #70685c;
 }
 .empty-canvas p {
   color: #767065;
@@ -497,7 +499,7 @@ kbd {
 }
 .file-hint {
   font-size: 10px;
-  color: #81796d;
+  color: #70685c;
   margin-top: 15px;
 }
 .text-button {
@@ -578,7 +580,7 @@ kbd {
   justify-content: space-between;
   gap: 12px;
   font-size: 10px;
-  color: #80786b;
+  color: #70685c;
 }
 .zoom-controls {
   display: flex;
@@ -641,7 +643,7 @@ kbd {
 }
 .comments-empty {
   padding: 39px 23px;
-  color: #898173;
+  color: #70685c;
 }
 .comments-empty > svg {
   margin-bottom: 15px;
@@ -663,7 +665,7 @@ kbd {
   gap: 9px;
   margin-top: 25px;
   font-size: 10px;
-  color: #80796c;
+  color: #70685c;
 }
 .annotation-example > span:first-child {
   display: grid;
@@ -691,7 +693,7 @@ kbd {
   align-items: center;
   gap: 9px;
   font-size: 11px;
-  color: #787165;
+  color: #70685c;
   margin-bottom: 10px;
 }
 .comment-number {
@@ -706,7 +708,7 @@ kbd {
 }
 .delete-mark {
   margin-left: auto;
-  color: #898174;
+  color: #70685c;
 }
 .comment textarea {
   width: 100%;
@@ -728,7 +730,7 @@ kbd {
   outline: none;
 }
 .comment textarea::placeholder {
-  color: #7d786d;
+  color: #70685c;
 }
 .overall {
   padding: 20px 22px 19px;
@@ -745,7 +747,7 @@ kbd {
 }
 .overall label span {
   font-size: 10px;
-  color: #8a8173;
+  color: #70685c;
   font-weight: 400;
 }
 .overall textarea {
@@ -762,7 +764,7 @@ kbd {
   line-height: 1.7;
 }
 .overall textarea::placeholder {
-  color: #81786b;
+  color: #70685c;
 }
 .send-summary {
   display: flex;
@@ -770,7 +772,7 @@ kbd {
   justify-content: space-between;
   margin: 18px 0 11px;
   font-size: 10px;
-  color: #82796a;
+  color: #70685c;
 }
 .send-summary svg {
   visibility: hidden;
@@ -789,7 +791,7 @@ kbd {
   font-size: 9px;
   display: block;
   text-align: center;
-  color: #82796a;
+  color: #70685c;
   margin-top: 10px;
 }
 .app-footer {
@@ -800,7 +802,7 @@ kbd {
   justify-content: space-between;
   border-top: 1px solid var(--line);
   background: var(--panel);
-  color: #847b6d;
+  color: #70685c;
   font-size: 9px;
   flex-shrink: 0;
 }
@@ -1008,9 +1010,11 @@ kbd {
 @keyframes pin-pop {
   from {
     opacity: 0.6;
+    transform: scale(0.72);
   }
   to {
     opacity: 1;
+    transform: scale(1);
   }
 }
 @keyframes pulse {

@@ -71,9 +71,13 @@ export function Canvas({
   }, [image?.id]);
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
-      if ((e.target as HTMLElement).matches("input,textarea,[contenteditable]"))
+      if (
+        (e.target as Element).closest(
+          "button,a,input,textarea,select,[contenteditable],[role=button]",
+        )
+      )
         return;
-      if (e.code === "Space") {
+      if (e.code === "Space" && viewport.current?.contains(e.target as Node)) {
         e.preventDefault();
         setSpace(true);
       }
@@ -145,6 +149,7 @@ export function Canvas({
       if (!(event.target as Element).closest(".annotation")) onSelect(null);
       return;
     }
+    svg.current?.focus({ preventScroll: true });
     const p = point(event);
     const mark: Annotation = {
       id: crypto.randomUUID(),

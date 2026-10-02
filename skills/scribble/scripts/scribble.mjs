@@ -137,7 +137,8 @@ async function start() {
     if (healthy) {
       let resumed = values.session
         ? await loadSession(root, values.session)
-        : !values.new && (await latestSession(root, true));
+        : !values.new && (await latestSession(root));
+      if (!values.session && resumed?.status === "submitted") resumed = null;
       if (!resumed) resumed = await createSession(root, values.title);
       const info = {
         ...existing,
@@ -153,7 +154,8 @@ async function start() {
   }
   let session = values.session
     ? await loadSession(root, values.session)
-    : !values.new && (await latestSession(root, true));
+    : !values.new && (await latestSession(root));
+  if (!values.session && session?.status === "submitted") session = null;
   if (!session) session = await createSession(root, values.title);
   const dir = sessionDir(root, session.id);
   // Recover a crash between writing the submission marker and updating session metadata.

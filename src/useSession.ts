@@ -205,7 +205,12 @@ export function useSession() {
         localStorage.removeItem(key);
       });
     } catch (e) {
-      setError((e as Error).message);
+      // A dropped response may follow a successful durable submission.
+      const recovered = await loadSession().catch(() => undefined);
+      if (recovered?.status === "submitted") {
+        update(recovered);
+        localStorage.removeItem(key);
+      } else setError((e as Error).message);
     } finally {
       setBusy(false);
     }

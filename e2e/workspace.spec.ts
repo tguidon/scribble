@@ -121,7 +121,8 @@ test("complete visual feedback flow, recovery, and responsive layout", async ({
     page.getByRole("textbox", { name: "Comment for mark 4" }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Delete mark 4" }).click();
-  await page.getByRole("button", { name: "Send to agent" }).click();
+  await page.getByRole("button", { name: "Send to agent" }).focus();
+  await page.keyboard.press("Space");
   await expect(
     page.getByRole("heading", { name: "Point made." }),
   ).toBeVisible();
@@ -186,13 +187,11 @@ test("multiple uploads, invalid files, removal, keyboard pin and retryable save 
   await expect(
     page.getByRole("button", { name: "Open Second.png" }),
   ).toHaveCount(0);
-  await page
-    .getByLabel("Upload screenshots")
-    .setInputFiles({
-      name: "bad.svg",
-      mimeType: "image/svg+xml",
-      buffer: Buffer.from("<svg/>"),
-    });
+  await page.getByLabel("Upload screenshots").setInputFiles({
+    name: "bad.svg",
+    mimeType: "image/svg+xml",
+    buffer: Buffer.from("<svg/>"),
+  });
   await expect(page.getByRole("alert")).toContainText(
     "choose a PNG, JPEG, or WebP",
   );
@@ -204,4 +203,40 @@ test("multiple uploads, invalid files, removal, keyboard pin and retryable save 
   await expect(
     page.getByRole("textbox", { name: "Comment for mark 1" }),
   ).toHaveValue("Keep this draft through a connection failure.");
+});
+
+test("Space activates native upload and toolbar buttons", async ({ page }) => {
+  const chooser = page.waitForEvent("filechooser");
+  await page
+    .getByRole("button", { name: "Add screenshots", exact: true })
+    .focus();
+  await page.keyboard.press("Space");
+  await chooser;
+  await page.getByRole("button", { name: "Try an example" }).click();
+  await expect(page.locator(".image-stage")).toBeVisible();
+  await page.getByRole("button", { name: "Arrow (A)" }).focus();
+  await page.keyboard.press("Space");
+  await expect(page.getByRole("button", { name: "Arrow (A)" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await page.locator(".image-stage").focus();
+  await page.keyboard.down("Space");
+  await expect(page.locator(".viewport")).toHaveClass(/tool-pan/);
+  await page.keyboard.up("Space");
+});
+
+test("a lost submission response still recovers the saved receipt", async ({
+  page,
+}) => {
+  await page.getByRole("button", { name: "Try an example" }).click();
+  await expect(page.locator(".image-stage")).toBeVisible();
+  await page.route("**/api/submit", async (route) => {
+    await route.fetch();
+    await route.abort();
+  });
+  await page.getByRole("button", { name: "Send to agent" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Point made." }),
+  ).toBeVisible();
 });
