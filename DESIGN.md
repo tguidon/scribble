@@ -30,32 +30,40 @@ colors:
 typography:
   headline:
     fontFamily: "-apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif"
-    fontSize: "30px"
+    fontSize: "1.875rem"
     fontWeight: 650
     lineHeight: 1.24
     letterSpacing: "-0.9px"
   title:
     fontFamily: "-apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif"
-    fontSize: "16px"
+    fontSize: "1.25rem"
     fontWeight: 650
     letterSpacing: "-0.3px"
   body:
     fontFamily: "-apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif"
-    fontSize: "12px"
+    fontSize: "1rem"
     fontWeight: 400
     lineHeight: 1.6
   label:
     fontFamily: "-apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif"
-    fontSize: "11px"
+    fontSize: "0.875rem"
     fontWeight: 400
   button:
     fontFamily: "-apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif"
-    fontSize: "12px"
-    fontWeight: 550
+    fontSize: "1rem"
+    fontWeight: 600
   annotation:
     fontFamily: "-apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif"
-    fontSize: "12px"
+    fontSize: "14px"
     fontWeight: 700
+  brand:
+    fontFamily: "-apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif"
+    fontSize: "1.8125rem"
+    fontWeight: 750
+  receipt:
+    fontFamily: "-apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif"
+    fontSize: "2.625rem"
+    fontWeight: 650
 rounded:
   key: "4px"
   count: "5px"
@@ -110,7 +118,7 @@ components:
     backgroundColor: "{colors.count-surface}"
     textColor: "{colors.count-ink}"
     rounded: "{rounded.count}"
-    height: "19px"
+    height: "24px"
   comment-row:
     backgroundColor: "{colors.panel}"
     padding: "17px 22px 16px"
@@ -124,7 +132,7 @@ components:
     textColor: "{colors.white}"
     typography: "{typography.annotation}"
     rounded: "{rounded.circle}"
-    size: "24px"
+    size: "28px"
 ---
 # Design System: Scribble
 
@@ -173,28 +181,23 @@ The sidecar's eight-step OKLCH ramps are generated inspection aids. They are not
 
 ## Typography
 
-**Body and interface font:** the native system sans stack in the frontmatter. There is no external font dependency or separate display family.
+The native system sans family remains the sole typeface. No font download is required. The root uses `100%` so browser font preferences apply, and named CSS roles use rem units.
 
-**Character:** compact, direct, and readable. Expressiveness comes from the pencil, dot registration, and marks, while text remains restrained.
+- **Reading text:** 1rem (16px at the default browser setting), weight 400, with 1.6 line height. Comments, overall feedback, and explanatory paragraphs share this role.
+- **Labels and metadata:** 0.875rem (14px), the smallest application text. Filenames, status, hints, counts, shortcuts, and footer text retain this size on mobile. Labels use weight 600 when they introduce a group.
+- **Section titles:** 1.25rem (20px), weight 650. Feedback and shortcut headings have a clear step above body text.
+- **Page headings:** 1.875rem (30px), weight 650, with restrained negative tracking. The wordmark keeps its 1.8125rem (29px), weight 750 treatment. The receipt heading keeps its 2.625rem (42px) scale.
+- **Actions:** 1rem (16px), weight 600. Secondary text actions use the label role.
 
-### Hierarchy
+Prose outside the rails is limited to 50–60ch where space permits. The narrow feedback rail naturally has shorter lines; empty feedback copy can use its full width up to 48ch. Repeated roles do not shrink at responsive breakpoints. Width, wrapping, spacing, and scrolling accommodate larger text instead.
 
-- **Headline:** empty-state heading; balanced lines and tight tracking. Responsive sizes are 34px above 1600px, 27px at or below 1150px, 29px at or below 850px, and 27px at or below 440px.
-- **Title:** the feedback rail heading. The help heading is 15px.
-- **Body:** annotation comment text. Supporting explanatory paragraphs use 12px with a 1.8 line height; the overall textarea uses 11px with a 1.7 line height.
-- **Label:** tool-adjacent and comment metadata. Smaller 10px text serves filenames, counts, and summaries; tiny footer text is incidental to the task.
-- **Button:** primary upload and send controls.
-- **Annotation:** bold, centered badge numbers with consistent apparent size during zoom.
-
-The base root size is 14px. Numeric counts and zoom values use tabular numerals. The wordmark is 29px at weight 750, shrinking to 27px on mobile. The receipt heading is a one-off 42px confirmation treatment, not a reusable display type token.
-
-**The Numbered Mark Rule.** Keep the mark number and ink consistent between the image and its comment. Badges and annotation strokes retain their screen size as the image zooms.
+**The Numbered Mark Rule.** Keep the mark number and ink consistent between the image and its comment. SVG badge text remains 14 screen pixels and scales inversely with image zoom. Comment badges use the matching label role. Screenshot content, including the fictional example, has its own typography and is not part of this application scale.
 
 ## Layout
 
-The desktop application fills the viewport height with a minimum height of 650px. A 77px header and 33px footer bound three working columns: 158px screenshot rail, flexible canvas, and 322px feedback rail. Comments scroll independently; the overall-message form stays at the bottom of its rail.
+The desktop application fills the viewport height with a minimum height of 700px. A 77px header and a footer at least 40px tall bound three working columns: 176px screenshot rail, flexible canvas, and 360px feedback rail. Comments scroll independently; the overall-message form stays at the bottom of its rail.
 
-At widths up to 1150px the rail widths become 124px and 286px and the dock compacts. At 1600px and above they become 180px and 350px. At 850px and below the layout becomes a vertical stack: horizontal screenshot strip, 570px canvas, feedback, and submission. The header becomes 65px; the footer becomes 37px. At 440px and below the canvas row is 505px and the dock can wrap.
+At widths up to 1150px the rail widths become 160px and 340px and the dock compacts. At 1600px and above they become 192px and 380px. At 980px and below the layout becomes a vertical stack: horizontal screenshot strip, 570px canvas, feedback, and submission. The header has a 65px minimum height; header and footer content can wrap. At 440px and below the canvas row is 505px and the dock can wrap.
 
 The canvas dot grid repeats every 18px. A centered floating dock sits 65px above the canvas bottom on desktop, 53px on mobile, and 48px at the smallest breakpoint. The image transform is centered horizontally and anchored at 43% of the available viewport height. Screenshot and comment spacing is compact, with larger clear space around the image.
 
@@ -221,7 +224,7 @@ Lucide icons render as SVG strokes. The logo's pencil is tilted by nine degrees 
 
 ### Buttons
 
-Primary actions are compact cobalt rectangles with white text, a 43px minimum height, and a nine-pixel radius. Hover and pressed states darken the fill. The mobile send action grows to 46px. Secondary controls use cream, a thin line border, and an eight-pixel radius. Text buttons remain light and gain cobalt text on hover.
+Primary actions are compact cobalt rectangles with white text, a 46px minimum height, and a nine-pixel radius. Hover and pressed states darken the fill. Secondary controls use cream, a thin line border, and an eight-pixel radius. Text buttons remain light and gain cobalt text on hover.
 
 Buttons, links, and textareas use a three-pixel cobalt focus outline offset by three pixels. Most disabled buttons use 0.4 opacity; disabled Send uses an opaque warm gray treatment. Never infer a saved or sent state from a decorative color alone.
 
@@ -239,11 +242,11 @@ Comments are flush rows in the feedback rail, separated by thin rules. They are 
 
 ### Inputs / Fields
 
-Individual comment fields are transparent at rest, with 12px text and a 1.6 line height. Focus adds a white background, pale blue border, and inset horizontal padding. The overall field uses the cream panel fill, warm border, eight-pixel radius, 11px text, and a 1.7 line height. Both resize vertically within capped heights; placeholders use the repaired dark muted tone.
+Individual comment fields are transparent at rest, with 16px text and a 1.6 line height. Focus adds a white background, pale blue border, and inset horizontal padding. The overall field uses the cream panel fill, warm border, eight-pixel radius, 16px text, and a 1.6 line height. Both resize vertically within capped heights; placeholders use the repaired dark muted tone.
 
 ### Numbered Annotations
 
-Pins, arrows, rectangles, and freehand strokes share colored circular number badges. Badge radius is 12 screen pixels, annotation stroke width is three screen pixels, and number text is 12 screen pixels regardless of zoom. Selection adds a translucent white halo. Keyboard focus darkens the badge stroke and adds a soft drop shadow. Enter and Space select marks; ordinary buttons retain native keyboard activation. Space-to-pan is scoped to the canvas viewport and excludes interactive controls.
+Pins, arrows, rectangles, and freehand strokes share colored circular number badges. Badge radius is 14 screen pixels, annotation stroke width is three screen pixels, and number text is 14 screen pixels regardless of zoom. Selection adds a translucent white halo. Keyboard focus darkens the badge stroke and adds a soft drop shadow. Enter and Space select marks; ordinary buttons retain native keyboard activation. Space-to-pan is scoped to the canvas viewport and excludes interactive controls.
 
 The shipped `pin-pop` animation scales from 0.72 to 1 while changing opacity from 0.6 to 1 over 180ms. Selected SVG badges use a centered fill-box transform origin. The receipt uses the same pop over 300ms. Save activity pulses opacity. Color transitions take 160ms with `ease`. Reduced-motion preference disables animations and transitions.
 

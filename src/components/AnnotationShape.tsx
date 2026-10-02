@@ -15,7 +15,7 @@ export function AnnotationShape({
   const first = mark.points[0];
   const last = mark.points.at(-1)!;
   const stroke = 3 / scale;
-  const radius = 12 / scale;
+  const radius = 14 / scale;
   const path = mark.points
     .map((p, i) => `${i ? "L" : "M"} ${p.x} ${p.y}`)
     .join(" ");
@@ -52,7 +52,7 @@ export function AnnotationShape({
         <circle
           cx={badge.x}
           cy={badge.y}
-          r={18 / scale}
+          r={20 / scale}
           fill="white"
           opacity=".85"
         />
@@ -96,7 +96,7 @@ export function AnnotationShape({
         fill="white"
         textAnchor="middle"
         dominantBaseline="central"
-        fontSize={12 / scale}
+        fontSize={14 / scale}
         fontWeight="700"
         pointerEvents="none"
       >

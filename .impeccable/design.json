@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-10-02T05:21:23.419063+00:00",
+  "generatedAt": "2026-10-02T17:02:39.836243+00:00",
   "title": "Design System: Scribble",
   "extensions": {
     "colorMeta": {
@@ -362,15 +362,15 @@
       },
       "title": {
         "displayName": "Title",
-        "purpose": "Feedback rail heading."
+        "purpose": "Feedback and shortcut section headings."
       },
       "body": {
         "displayName": "Body",
-        "purpose": "Annotation comments."
+        "purpose": "Comments, overall feedback, and explanatory paragraphs; 16px at the default browser font setting."
       },
       "label": {
         "displayName": "Label",
-        "purpose": "Supporting interface metadata."
+        "purpose": "Labels, hints, status, and metadata; 14px minimum at the default browser font setting, including mobile."
       },
       "button": {
         "displayName": "Button",
@@ -379,6 +379,14 @@
       "annotation": {
         "displayName": "Annotation",
         "purpose": "Fixed apparent-size mark number."
+      },
+      "brand": {
+        "displayName": "Wordmark",
+        "purpose": "Existing Scribble wordmark treatment."
+      },
+      "receipt": {
+        "displayName": "Receipt",
+        "purpose": "Existing submission confirmation heading."
       }
     },
     "shadows": [
@@ -441,7 +449,7 @@
       },
       {
         "name": "stack-max",
-        "value": "850px"
+        "value": "980px"
       },
       {
         "name": "small-max",
@@ -456,7 +464,7 @@
       "refersTo": "button-primary",
       "description": "Upload or submit one batch.",
       "html": "<button class=\"ds-primary\">Send to agent</button>",
-      "css": ".ds-primary{font-family:-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;cursor:pointer;transition:background-color 160ms ease,color 160ms ease,border-color 160ms ease;display:inline-flex;align-items:center;justify-content:center;gap:9px;border:0;background:var(--blue,#3456c4);color:#fff;font-size:12px;font-weight:550;border-radius:9px;min-height:43px;padding:0 18px}.ds-primary:hover:not(:disabled){background:#2747ae}.ds-primary:active:not(:disabled){background:#203c99}.ds-primary:focus-visible{outline:3px solid var(--blue,#3456c4);outline-offset:3px;}.ds-primary:disabled{background:#dcdcd5;color:#69665e;cursor:not-allowed}@media(prefers-reduced-motion:reduce){button,a,textarea{transition:none!important;animation:none!important}}"
+      "css": ".ds-primary{font-family:-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;cursor:pointer;transition:background-color 160ms ease,color 160ms ease,border-color 160ms ease;display:inline-flex;align-items:center;justify-content:center;gap:9px;border:0;background:var(--blue,#3456c4);color:#fff;font-size:1rem;font-weight:600;border-radius:9px;min-height:46px;padding:0 18px}.ds-primary:hover:not(:disabled){background:#2747ae}.ds-primary:active:not(:disabled){background:#203c99}.ds-primary:focus-visible{outline:3px solid var(--blue,#3456c4);outline-offset:3px;}.ds-primary:disabled{background:#dcdcd5;color:#69665e;cursor:not-allowed}@media(prefers-reduced-motion:reduce){button,a,textarea{transition:none!important;animation:none!important}}"
     },
     {
       "name": "Secondary action",
@@ -464,7 +472,7 @@
       "refersTo": "button-secondary",
       "description": "A supporting recovery action.",
       "html": "<button class=\"ds-secondary\">Try again</button>",
-      "css": ".ds-secondary{font-family:-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;cursor:pointer;transition:background-color 160ms ease,color 160ms ease,border-color 160ms ease;font-size:14px;border:1px solid var(--line,#e3dfd5);background:var(--panel,#fdfcf8);color:var(--ink,#34322e);border-radius:8px;padding:10px 18px}.ds-secondary:hover{background:#ede8de}.ds-secondary:focus-visible{outline:3px solid var(--blue,#3456c4);outline-offset:3px;}@media(prefers-reduced-motion:reduce){button,a,textarea{transition:none!important;animation:none!important}}"
+      "css": ".ds-secondary{font-family:-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;cursor:pointer;transition:background-color 160ms ease,color 160ms ease,border-color 160ms ease;font-size:1rem;border:1px solid var(--line,#e3dfd5);background:var(--panel,#fdfcf8);color:var(--ink,#34322e);border-radius:8px;padding:10px 18px}.ds-secondary:hover{background:#ede8de}.ds-secondary:focus-visible{outline:3px solid var(--blue,#3456c4);outline-offset:3px;}@media(prefers-reduced-motion:reduce){button,a,textarea{transition:none!important;animation:none!important}}"
     },
     {
       "name": "Text action",
@@ -472,7 +480,7 @@
       "refersTo": "button-text",
       "description": "A quiet example entry.",
       "html": "<button class=\"ds-text\">Try an example <svg width=\"19\" height=\"19\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M7 17 17 7M7 7h10v10\"/></svg></button>",
-      "css": ".ds-text{font-family:-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;cursor:pointer;transition:background-color 160ms ease,color 160ms ease,border-color 160ms ease;display:inline-flex;align-items:center;gap:8px;border:0;background:none;padding:5px;font-size:11px;color:#696357}.ds-text:hover{color:var(--blue,#3456c4)}.ds-text:focus-visible{outline:3px solid var(--blue,#3456c4);outline-offset:3px;}.ds-text svg{width:14px;height:14px}@media(prefers-reduced-motion:reduce){button,a,textarea{transition:none!important;animation:none!important}}"
+      "css": ".ds-text{font-family:-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;cursor:pointer;transition:background-color 160ms ease,color 160ms ease,border-color 160ms ease;display:inline-flex;align-items:center;gap:8px;border:0;background:none;padding:5px;font-size:0.875rem;color:#696357}.ds-text:hover{color:var(--blue,#3456c4)}.ds-text:focus-visible{outline:3px solid var(--blue,#3456c4);outline-offset:3px;}.ds-text svg{width:14px;height:14px}@media(prefers-reduced-motion:reduce){button,a,textarea{transition:none!important;animation:none!important}}"
     },
     {
       "name": "Selected tool",
@@ -488,7 +496,7 @@
       "refersTo": "input-overall",
       "description": "A larger instruction shared across screenshots.",
       "html": "<textarea class=\"ds-overall\" aria-label=\"The bigger picture\" placeholder=\"What are we working toward? Add any overall direction...\"></textarea>",
-      "css": ".ds-overall{font-family:-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;cursor:pointer;transition:background-color 160ms ease,color 160ms ease,border-color 160ms ease;cursor:text;width:100%;min-height:94px;max-height:180px;resize:vertical;border:1px solid #ded8cd;border-radius:8px;padding:11px;background:var(--panel,#fdfcf8);color:#4d473e;font-size:11px;line-height:1.7;caret-color:var(--blue,#3456c4)}.ds-overall::placeholder{color:#70685c}.ds-overall:focus-visible{outline:3px solid var(--blue,#3456c4);outline-offset:3px;}@media(prefers-reduced-motion:reduce){button,a,textarea{transition:none!important;animation:none!important}}"
+      "css": ".ds-overall{font-family:-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;cursor:pointer;transition:background-color 160ms ease,color 160ms ease,border-color 160ms ease;cursor:text;width:100%;min-height:104px;max-height:180px;resize:vertical;border:1px solid #ded8cd;border-radius:8px;padding:11px;background:var(--panel,#fdfcf8);color:#4d473e;font-size:1rem;line-height:1.6;caret-color:var(--blue,#3456c4)}.ds-overall::placeholder{color:#70685c}.ds-overall:focus-visible{outline:3px solid var(--blue,#3456c4);outline-offset:3px;}@media(prefers-reduced-motion:reduce){button,a,textarea{transition:none!important;animation:none!important}}"
     },
     {
       "name": "Count badge",
@@ -496,7 +504,7 @@
       "refersTo": "count",
       "description": "Noninteractive quantity badge.",
       "html": "<span class=\"ds-count\">3</span>",
-      "css": ".ds-count{font-family:-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;font-size:10px;font-weight:600;color:#736e65;background:#e9e5dc;border-radius:5px;min-width:19px;height:19px;display:inline-flex;align-items:center;justify-content:center;font-variant-numeric:tabular-nums}@media(prefers-reduced-motion:reduce){button,a,textarea{transition:none!important;animation:none!important}}"
+      "css": ".ds-count{font-family:-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;font-size:0.875rem;font-weight:600;color:#736e65;background:#e9e5dc;border-radius:5px;min-width:24px;height:24px;padding-inline:4px;display:inline-flex;align-items:center;justify-content:center;font-variant-numeric:tabular-nums}@media(prefers-reduced-motion:reduce){button,a,textarea{transition:none!important;animation:none!important}}"
     },
     {
       "name": "Selected comment row",
@@ -504,7 +512,7 @@
       "refersTo": "comment-row-selected",
       "description": "A numbered comment connected to the selected image mark.",
       "html": "<section class=\"ds-comment\"><div class=\"ds-comment-heading\"><button class=\"ds-comment-number\" aria-label=\"Select mark 1\">1</button><span>Pin</span></div><textarea class=\"ds-comment-field\" aria-label=\"Comment for mark 1\">Give the heading a little more breathing room.</textarea></section>",
-      "css": ".ds-comment{font-family:-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;background:#f0f3fc;padding:17px 22px 16px;border-bottom:1px solid var(--line,#e3dfd5)}.ds-comment-heading{display:flex;align-items:center;gap:9px;font-size:11px;color:#70685c;margin-bottom:10px}.ds-comment-number{font-family:-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;cursor:pointer;transition:background-color 160ms ease,color 160ms ease,border-color 160ms ease;border:0;display:grid;place-items:center;width:23px;height:23px;border-radius:50%;background:#c94b35;color:white;font-size:11px;font-weight:650;padding:0}.ds-comment-number:focus-visible{outline:3px solid var(--blue,#3456c4);outline-offset:3px;}.ds-comment-field{font-family:-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;cursor:pointer;transition:background-color 160ms ease,color 160ms ease,border-color 160ms ease;cursor:text;width:100%;resize:vertical;min-height:72px;max-height:240px;background:transparent;border:1px solid transparent;line-height:1.6;font-size:12px;color:#45403a;border-radius:5px;padding:5px 0;caret-color:var(--blue,#3456c4)}.ds-comment-field:focus{border-color:#c4cfea;background:#fff;padding:5px 7px;outline:none}.ds-comment-field::placeholder{color:#70685c}@media(prefers-reduced-motion:reduce){button,a,textarea{transition:none!important;animation:none!important}}"
+      "css": ".ds-comment{font-family:-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;background:#f0f3fc;padding:17px 22px 16px;border-bottom:1px solid var(--line,#e3dfd5)}.ds-comment-heading{display:flex;align-items:center;gap:9px;font-size:0.875rem;color:#70685c;margin-bottom:10px}.ds-comment-number{font-family:-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;cursor:pointer;transition:background-color 160ms ease,color 160ms ease,border-color 160ms ease;border:0;display:grid;place-items:center;width:28px;height:28px;border-radius:50%;background:#c94b35;color:white;font-size:0.875rem;font-weight:650;padding:0}.ds-comment-number:focus-visible{outline:3px solid var(--blue,#3456c4);outline-offset:3px;}.ds-comment-field{font-family:-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;cursor:pointer;transition:background-color 160ms ease,color 160ms ease,border-color 160ms ease;cursor:text;width:100%;resize:vertical;min-height:88px;max-height:240px;background:transparent;border:1px solid transparent;line-height:1.6;font-size:1rem;color:#45403a;border-radius:5px;padding:5px 0;caret-color:var(--blue,#3456c4)}.ds-comment-field:focus{border-color:#c4cfea;background:#fff;padding:5px 7px;outline:none}.ds-comment-field::placeholder{color:#70685c}@media(prefers-reduced-motion:reduce){button,a,textarea{transition:none!important;animation:none!important}}"
     },
     {
       "name": "Screenshot navigation",
@@ -512,14 +520,14 @@
       "refersTo": "screenshot-navigation",
       "description": "A selected preview within the image rail; inline placeholder represents session image content.",
       "html": "<nav class=\"ds-nav\" aria-label=\"Screenshots\"><button class=\"ds-thumb\" aria-label=\"Select screenshot\" aria-current=\"true\"><span class=\"ds-preview\"><svg width=\"19\" height=\"19\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><rect x=\"3\" y=\"3\" width=\"18\" height=\"18\" rx=\"2\"/><circle cx=\"9\" cy=\"9\" r=\"2\"/><path d=\"m21 15-5-5L5 21\"/></svg><span class=\"ds-image-number\">1</span></span><span class=\"ds-filename\">Screenshot.png</span></button></nav>",
-      "css": ".ds-nav{background:#f4f1e9;padding:23px 14px 18px;width:130px}.ds-thumb{font-family:-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;cursor:pointer;transition:background-color 160ms ease,color 160ms ease,border-color 160ms ease;width:100%;display:flex;flex-direction:column;gap:8px;align-items:stretch;border:0;padding:0;background:none}.ds-preview{position:relative;aspect-ratio:1.35;border:2px solid var(--blue,#3456c4);background:#e8edfc;border-radius:8px;display:flex;align-items:center;justify-content:center;padding:4px;color:var(--blue,#3456c4)}.ds-thumb:hover .ds-preview{background:#e3e8f4}.ds-image-number{position:absolute;bottom:5px;left:5px;background:var(--blue,#3456c4);color:white;font-size:10px;width:18px;height:18px;border-radius:4px;display:grid;place-items:center}.ds-filename{text-align:left;font-size:10px;font-weight:600;color:var(--blue,#3456c4);overflow:hidden;white-space:nowrap;text-overflow:ellipsis}.ds-thumb:focus-visible{outline:3px solid var(--blue,#3456c4);outline-offset:3px;}@media(prefers-reduced-motion:reduce){button,a,textarea{transition:none!important;animation:none!important}}"
+      "css": ".ds-nav{background:#f4f1e9;padding:23px 14px 18px;width:176px}.ds-thumb{font-family:-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;cursor:pointer;transition:background-color 160ms ease,color 160ms ease,border-color 160ms ease;width:100%;display:flex;flex-direction:column;gap:8px;align-items:stretch;border:0;padding:0;background:none}.ds-preview{position:relative;aspect-ratio:1.35;border:2px solid var(--blue,#3456c4);background:#e8edfc;border-radius:8px;display:flex;align-items:center;justify-content:center;padding:4px;color:var(--blue,#3456c4)}.ds-thumb:hover .ds-preview{background:#e3e8f4}.ds-image-number{position:absolute;bottom:5px;left:5px;background:var(--blue,#3456c4);color:white;font-size:0.875rem;width:24px;height:24px;border-radius:4px;display:grid;place-items:center}.ds-filename{text-align:left;font-size:0.875rem;font-weight:600;color:var(--blue,#3456c4);overflow:hidden;white-space:nowrap;text-overflow:ellipsis}.ds-thumb:focus-visible{outline:3px solid var(--blue,#3456c4);outline-offset:3px;}@media(prefers-reduced-motion:reduce){button,a,textarea{transition:none!important;animation:none!important}}"
     },
     {
       "name": "Annotation badge",
       "kind": "custom",
       "refersTo": "annotation-badge",
       "description": "A focused selectable mark at its nominal screen size.",
-      "html": "<svg class=\"ds-mark\" width=\"60\" height=\"60\" viewBox=\"0 0 60 60\"><g role=\"button\" tabindex=\"0\" aria-label=\"Mark 1: Pin\"><circle cx=\"30\" cy=\"30\" r=\"18\" fill=\"white\" opacity=\".85\"/><circle class=\"ds-badge\" cx=\"30\" cy=\"30\" r=\"12\" fill=\"#c94b35\" stroke=\"white\" stroke-width=\"2\"/><text x=\"30\" y=\"30\" fill=\"white\" text-anchor=\"middle\" dominant-baseline=\"central\" font-size=\"12\" font-weight=\"700\">1</text></g></svg>",
+      "html": "<svg class=\"ds-mark\" width=\"60\" height=\"60\" viewBox=\"0 0 60 60\"><g role=\"button\" tabindex=\"0\" aria-label=\"Mark 1: Pin\"><circle cx=\"30\" cy=\"30\" r=\"20\" fill=\"white\" opacity=\".85\"/><circle class=\"ds-badge\" cx=\"30\" cy=\"30\" r=\"14\" fill=\"#c94b35\" stroke=\"white\" stroke-width=\"2\"/><text x=\"30\" y=\"30\" fill=\"white\" text-anchor=\"middle\" dominant-baseline=\"central\" font-size=\"14\" font-weight=\"700\">1</text></g></svg>",
       "css": ".ds-mark{font-family:-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;overflow:visible}.ds-mark g{cursor:pointer}.ds-mark g:focus-visible{outline:none;filter:drop-shadow(0 2px 4px #242d7440)}.ds-mark g:focus-visible .ds-badge{stroke:#34322e;stroke-width:3px}.ds-mark text{pointer-events:none}@media(prefers-reduced-motion:reduce){button,a,textarea{transition:none!important;animation:none!important}} .ds-badge{transform-box:fill-box;transform-origin:center;animation:ds-pin-pop 180ms cubic-bezier(0.16,1,0.3,1)}@keyframes ds-pin-pop{from{opacity:.6;transform:scale(.72)}to{opacity:1;transform:scale(1)}}@media(prefers-reduced-motion:reduce){.ds-badge{animation:none!important}}"
     }
   ],
