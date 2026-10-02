@@ -5,8 +5,11 @@ import { randomUUID, randomBytes } from "node:crypto";
 export const safeId = (id) =>
   typeof id === "string" && /^[a-zA-Z0-9-]{1,80}$/.test(id);
 export async function atomicJson(path, value) {
+  await atomicText(path, JSON.stringify(value, null, 2));
+}
+export async function atomicText(path, text) {
   const temp = `${path}.${randomUUID()}.tmp`;
-  await writeFile(temp, JSON.stringify(value, null, 2), { mode: 0o600 });
+  await writeFile(temp, text, { mode: 0o600 });
   await rename(temp, path);
 }
 export async function readJson(path) {

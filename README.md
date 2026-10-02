@@ -28,10 +28,10 @@ Add `--global` to install across projects. The [skills CLI documentation](https:
 
 ### Test a fixed release
 
-To install the initial `0.0.1` release:
+To install the `0.0.2` release:
 
 ```sh
-npx skills add https://github.com/tguidon/scribble/tree/v0.0.1/skills/scribble
+npx skills add https://github.com/tguidon/scribble/tree/v0.0.2/skills/scribble
 ```
 
 This uses the skills CLI’s [direct repository path format](https://github.com/vercel-labs/skills#source-formats). Use a release tag to keep tests on a fixed version; the shorter install command follows the repository’s default branch.
@@ -121,8 +121,9 @@ For an installed skill, use `node /absolute/path/to/skills/scribble/scripts/scri
 | `start --detach --no-open` | Start or reuse the server and return the session URL as JSON |
 | `start --new` | Create a separate draft without clearing unread feedback |
 | `start --session ID` | Open a saved draft or submission |
-| `wait --session ID --timeout 60` | Wait for submission, with exit code 2 on timeout |
-| `feedback --session ID` | Read a saved submission |
+| `wait --session ID --timeout 60` | Wait for submission and return a feedback brief, with exit code 2 on timeout |
+| `feedback --session ID` | Read a saved submission as a feedback brief |
+| `feedback --session ID --full` | Read the full JSON, including every drawing point; also supported by `wait` |
 | `ack --session ID` | Mark submitted feedback as read after inspecting its images |
 | `status` | Show the latest session, unread feedback, and recorded server version and process |
 | `stop` | Shut down the authenticated server and preserve saved feedback |
@@ -150,7 +151,19 @@ Agent sandboxes can require permission to open a local port or start a backgroun
 
 ## Feedback format
 
-Each session contains `session.json` and original screenshots in `images/`. Submission creates a `feedback.json` file that remains unchanged. The CLI returns this file path and its JSON contents.
+Each session contains `session.json` and original screenshots in `images/`. Submission creates a `feedback.json` file that remains unchanged.
+
+By default, `wait` and `feedback` generate a Markdown brief in `feedback.md` and return its text, its path, and the full JSON path. This also works for older submissions. The brief puts the overall request first, followed by each screenshot and its numbered marks. It includes:
+
+- Original image paths, dimensions, and exact comments.
+- Mark locations and bounds in pixels and percentages of the image size.
+- Arrow starts, tips, and directions.
+- Freehand bounds and an approximate outline of at most 16 points, with its maximum point deviation in pixels. Full drawing points stay in the JSON.
+- The smallest rectangle containing each pin or arrow tip, including its boundary.
+
+Region labels describe the mark's bounds center within a 3 × 3 image grid. Spatial relationships describe geometry; they do not infer a requested change. The agent still inspects the original images. No images are rendered or sent to an external service to create the brief.
+
+Use `--full` with `wait` or `feedback` to return the original JSON instead of the brief.
 
 The feedback bundle contains:
 

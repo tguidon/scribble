@@ -19,6 +19,7 @@ import { pendingFeedback, acknowledgeFeedback } from "./lib/handoff.mjs";
 import { excludeStorage } from "./lib/git-exclude.mjs";
 import { VERSION, SERVER_PROTOCOL } from "./lib/version.mjs";
 import { serverHealth, stopServer } from "./lib/lifecycle.mjs";
+import { writeFeedbackBrief } from "./lib/brief.mjs";
 const cli = fileURLToPath(import.meta.url);
 const packageRoot = resolve(dirname(cli), "..");
 const delay = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -37,6 +38,7 @@ const { values, positionals } = parseArgs({
     new: { type: "boolean" },
     help: { type: "boolean" },
     version: { type: "boolean" },
+    full: { type: "boolean" },
     timeout: { type: "string" },
   },
 });
@@ -73,8 +75,8 @@ async function main() {
     console.log(`Scribble ${VERSION} — show your agent what you mean.
 
   scribble start [--detach] [--no-open] [--new] [--session ID]
-  scribble wait --session ID [--timeout SECONDS]
-  scribble feedback --session ID
+  scribble wait --session ID [--timeout SECONDS] [--full]
+  scribble feedback --session ID [--full]
   scribble ack --session ID
   scribble stop
   scribble status
@@ -92,6 +94,8 @@ Use the same --dir for every command when choosing custom storage.
 start recovers unread feedback before opening a draft. Read each bundle and its
 images, then use ack to mark it as read. --new bypasses recovery without clearing it.
 wait exits with code 2 on timeout. feedback rereads a submission without acknowledging it.
+wait and feedback return a Markdown brief with image paths and computed geometry.
+The brief is saved as feedback.md. --full returns the original JSON, including all drawing points.
 start reuses a matching server or restarts an older version on the same port.
 stop shuts down the authenticated server. Drafts and submissions remain on disk.
 Before an upgrade or stop, wait for Draft saved in open browser tabs. Reload after upgrading.
@@ -147,11 +151,18 @@ Developers changing the UI in this repository must run npm run build before comm
       throw new Error("Timeout must be a nonnegative number of seconds.");
     const start = Date.now();
     while (true) {
-      try {
-        print({ bundlePath: path, feedback: await readJson(path) });
+      const feedback = await readJson(path).catch((error) => {
+        if (error.code === "ENOENT") return null;
+        throw error;
+      });
+      if (feedback) {
+        const summary = await writeFeedbackBrief(feedback, dirname(path));
+        print(
+          values.full
+            ? { bundlePath: path, feedback }
+            : { sessionId: feedback.sessionId, bundlePath: path, ...summary },
+        );
         return;
-      } catch (e) {
-        if (e.code !== "ENOENT") throw e;
       }
       if (command === "feedback")
         throw new Error("Feedback has not been sent yet. Use scribble wait.");

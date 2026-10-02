@@ -94,8 +94,9 @@ test("unread feedback survives reads and restarts until explicitly acknowledged"
     body: JSON.stringify({ revision: draft.revision }),
   });
   const bundle = await waiting;
-  assert.equal(bundle.feedback.sessionId, first.sessionId);
-  assert.equal(bundle.feedback.images.length, 1);
+  assert.equal(bundle.sessionId, first.sessionId);
+  assert.match(bundle.brief, /Screenshot 1/);
+  assert.equal(await readFile(bundle.briefPath, "utf8"), bundle.brief);
   const unread = await run("start", "--detach", "--no-open");
   assert.equal(unread.action, "read-feedback");
   assert.equal(unread.pendingFeedback[0].sessionId, first.sessionId);
@@ -132,8 +133,8 @@ test("unread feedback survives reads and restarts until explicitly acknowledged"
   assert.equal(next.sessionId, separate.sessionId);
   assert.notEqual(next.sessionId, first.sessionId);
   assert.equal(
-    (await run("feedback", "--session", first.sessionId)).feedback.images
-      .length,
+    (await run("feedback", "--session", first.sessionId, "--full")).feedback
+      .images.length,
     1,
   );
 });
