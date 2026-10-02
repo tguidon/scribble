@@ -6,6 +6,8 @@ Scribble is a local browser canvas for visual feedback to Codex and Claude Code.
 
 No account, hosted backend, or model API key is required.
 
+![Scribble showing a screenshot marked with a pin, an arrow, and a rectangle, with comments and the Send to agent button alongside it.](docs/images/scribble.png)
+
 ## Install
 
 Scribble requires **Node.js 22 or newer**. The skill includes the browser app and server. No separate build or dependency installation is required.
