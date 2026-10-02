@@ -1,0 +1,567 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-02T05:21:23.419063+00:00",
+  "title": "Design System: Scribble",
+  "extensions": {
+    "colorMeta": {
+      "blue": {
+        "role": "primary",
+        "displayName": "Blue",
+        "tonalRamp": [
+          "oklch(15.0% 0.1763 266.7)",
+          "oklch(26.4% 0.1763 266.7)",
+          "oklch(37.9% 0.1763 266.7)",
+          "oklch(49.3% 0.1763 266.7)",
+          "oklch(60.7% 0.1763 266.7)",
+          "oklch(72.1% 0.1763 266.7)",
+          "oklch(83.6% 0.1763 266.7)",
+          "oklch(95.0% 0.1763 266.7)"
+        ]
+      },
+      "blue-light": {
+        "role": "primary",
+        "displayName": "Blue Light",
+        "tonalRamp": [
+          "oklch(15.0% 0.0212 268.4)",
+          "oklch(26.4% 0.0212 268.4)",
+          "oklch(37.9% 0.0212 268.4)",
+          "oklch(49.3% 0.0212 268.4)",
+          "oklch(60.7% 0.0212 268.4)",
+          "oklch(72.1% 0.0212 268.4)",
+          "oklch(83.6% 0.0212 268.4)",
+          "oklch(95.0% 0.0212 268.4)"
+        ]
+      },
+      "blue-hover": {
+        "role": "primary",
+        "displayName": "Blue Hover",
+        "tonalRamp": [
+          "oklch(15.0% 0.1687 266.2)",
+          "oklch(26.4% 0.1687 266.2)",
+          "oklch(37.9% 0.1687 266.2)",
+          "oklch(49.3% 0.1687 266.2)",
+          "oklch(60.7% 0.1687 266.2)",
+          "oklch(72.1% 0.1687 266.2)",
+          "oklch(83.6% 0.1687 266.2)",
+          "oklch(95.0% 0.1687 266.2)"
+        ]
+      },
+      "blue-active": {
+        "role": "primary",
+        "displayName": "Blue Active",
+        "tonalRamp": [
+          "oklch(15.0% 0.1557 266.3)",
+          "oklch(26.4% 0.1557 266.3)",
+          "oklch(37.9% 0.1557 266.3)",
+          "oklch(49.3% 0.1557 266.3)",
+          "oklch(60.7% 0.1557 266.3)",
+          "oklch(72.1% 0.1557 266.3)",
+          "oklch(83.6% 0.1557 266.3)",
+          "oklch(95.0% 0.1557 266.3)"
+        ]
+      },
+      "paper": {
+        "role": "neutral",
+        "displayName": "Paper",
+        "tonalRamp": [
+          "oklch(15.0% 0.0098 87.5)",
+          "oklch(26.4% 0.0098 87.5)",
+          "oklch(37.9% 0.0098 87.5)",
+          "oklch(49.3% 0.0098 87.5)",
+          "oklch(60.7% 0.0098 87.5)",
+          "oklch(72.1% 0.0098 87.5)",
+          "oklch(83.6% 0.0098 87.5)",
+          "oklch(95.0% 0.0098 87.5)"
+        ]
+      },
+      "panel": {
+        "role": "neutral",
+        "displayName": "Panel",
+        "tonalRamp": [
+          "oklch(15.0% 0.0054 95.1)",
+          "oklch(26.4% 0.0054 95.1)",
+          "oklch(37.9% 0.0054 95.1)",
+          "oklch(49.3% 0.0054 95.1)",
+          "oklch(60.7% 0.0054 95.1)",
+          "oklch(72.1% 0.0054 95.1)",
+          "oklch(83.6% 0.0054 95.1)",
+          "oklch(95.0% 0.0054 95.1)"
+        ]
+      },
+      "rail": {
+        "role": "neutral",
+        "displayName": "Rail",
+        "tonalRamp": [
+          "oklch(15.0% 0.0111 89.7)",
+          "oklch(26.4% 0.0111 89.7)",
+          "oklch(37.9% 0.0111 89.7)",
+          "oklch(49.3% 0.0111 89.7)",
+          "oklch(60.7% 0.0111 89.7)",
+          "oklch(72.1% 0.0111 89.7)",
+          "oklch(83.6% 0.0111 89.7)",
+          "oklch(95.0% 0.0111 89.7)"
+        ]
+      },
+      "overall": {
+        "role": "neutral",
+        "displayName": "Overall",
+        "tonalRamp": [
+          "oklch(15.0% 0.0082 91.5)",
+          "oklch(26.4% 0.0082 91.5)",
+          "oklch(37.9% 0.0082 91.5)",
+          "oklch(49.3% 0.0082 91.5)",
+          "oklch(60.7% 0.0082 91.5)",
+          "oklch(72.1% 0.0082 91.5)",
+          "oklch(83.6% 0.0082 91.5)",
+          "oklch(95.0% 0.0082 91.5)"
+        ]
+      },
+      "line": {
+        "role": "neutral",
+        "displayName": "Line",
+        "tonalRamp": [
+          "oklch(15.0% 0.0141 88.7)",
+          "oklch(26.4% 0.0141 88.7)",
+          "oklch(37.9% 0.0141 88.7)",
+          "oklch(49.3% 0.0141 88.7)",
+          "oklch(60.7% 0.0141 88.7)",
+          "oklch(72.1% 0.0141 88.7)",
+          "oklch(83.6% 0.0141 88.7)",
+          "oklch(95.0% 0.0141 88.7)"
+        ]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Ink",
+        "tonalRamp": [
+          "oklch(15.0% 0.0075 84.6)",
+          "oklch(26.4% 0.0075 84.6)",
+          "oklch(37.9% 0.0075 84.6)",
+          "oklch(49.3% 0.0075 84.6)",
+          "oklch(60.7% 0.0075 84.6)",
+          "oklch(72.1% 0.0075 84.6)",
+          "oklch(83.6% 0.0075 84.6)",
+          "oklch(95.0% 0.0075 84.6)"
+        ]
+      },
+      "muted": {
+        "role": "neutral",
+        "displayName": "Muted",
+        "tonalRamp": [
+          "oklch(15.0% 0.0150 82.4)",
+          "oklch(26.4% 0.0150 82.4)",
+          "oklch(37.9% 0.0150 82.4)",
+          "oklch(49.3% 0.0150 82.4)",
+          "oklch(60.7% 0.0150 82.4)",
+          "oklch(72.1% 0.0150 82.4)",
+          "oklch(83.6% 0.0150 82.4)",
+          "oklch(95.0% 0.0150 82.4)"
+        ]
+      },
+      "muted-small": {
+        "role": "neutral",
+        "displayName": "Muted Small",
+        "tonalRamp": [
+          "oklch(15.0% 0.0209 78.1)",
+          "oklch(26.4% 0.0209 78.1)",
+          "oklch(37.9% 0.0209 78.1)",
+          "oklch(49.3% 0.0209 78.1)",
+          "oklch(60.7% 0.0209 78.1)",
+          "oklch(72.1% 0.0209 78.1)",
+          "oklch(83.6% 0.0209 78.1)",
+          "oklch(95.0% 0.0209 78.1)"
+        ]
+      },
+      "white": {
+        "role": "neutral",
+        "displayName": "White",
+        "tonalRamp": [
+          "oklch(15.0% 0.0000 0.0)",
+          "oklch(26.4% 0.0000 0.0)",
+          "oklch(37.9% 0.0000 0.0)",
+          "oklch(49.3% 0.0000 0.0)",
+          "oklch(60.7% 0.0000 0.0)",
+          "oklch(72.1% 0.0000 0.0)",
+          "oklch(83.6% 0.0000 0.0)",
+          "oklch(95.0% 0.0000 0.0)"
+        ]
+      },
+      "comment-active": {
+        "role": "neutral",
+        "displayName": "Comment Active",
+        "tonalRamp": [
+          "oklch(15.0% 0.0125 271.3)",
+          "oklch(26.4% 0.0125 271.3)",
+          "oklch(37.9% 0.0125 271.3)",
+          "oklch(49.3% 0.0125 271.3)",
+          "oklch(60.7% 0.0125 271.3)",
+          "oklch(72.1% 0.0125 271.3)",
+          "oklch(83.6% 0.0125 271.3)",
+          "oklch(95.0% 0.0125 271.3)"
+        ]
+      },
+      "field-line": {
+        "role": "neutral",
+        "displayName": "Field Line",
+        "tonalRamp": [
+          "oklch(15.0% 0.0163 82.8)",
+          "oklch(26.4% 0.0163 82.8)",
+          "oklch(37.9% 0.0163 82.8)",
+          "oklch(49.3% 0.0163 82.8)",
+          "oklch(60.7% 0.0163 82.8)",
+          "oklch(72.1% 0.0163 82.8)",
+          "oklch(83.6% 0.0163 82.8)",
+          "oklch(95.0% 0.0163 82.8)"
+        ]
+      },
+      "field-focus": {
+        "role": "neutral",
+        "displayName": "Field Focus",
+        "tonalRamp": [
+          "oklch(15.0% 0.0395 267.9)",
+          "oklch(26.4% 0.0395 267.9)",
+          "oklch(37.9% 0.0395 267.9)",
+          "oklch(49.3% 0.0395 267.9)",
+          "oklch(60.7% 0.0395 267.9)",
+          "oklch(72.1% 0.0395 267.9)",
+          "oklch(83.6% 0.0395 267.9)",
+          "oklch(95.0% 0.0395 267.9)"
+        ]
+      },
+      "count-surface": {
+        "role": "neutral",
+        "displayName": "Count Surface",
+        "tonalRamp": [
+          "oklch(15.0% 0.0128 86.8)",
+          "oklch(26.4% 0.0128 86.8)",
+          "oklch(37.9% 0.0128 86.8)",
+          "oklch(49.3% 0.0128 86.8)",
+          "oklch(60.7% 0.0128 86.8)",
+          "oklch(72.1% 0.0128 86.8)",
+          "oklch(83.6% 0.0128 86.8)",
+          "oklch(95.0% 0.0128 86.8)"
+        ]
+      },
+      "count-ink": {
+        "role": "neutral",
+        "displayName": "Count Ink",
+        "tonalRamp": [
+          "oklch(15.0% 0.0151 82.4)",
+          "oklch(26.4% 0.0151 82.4)",
+          "oklch(37.9% 0.0151 82.4)",
+          "oklch(49.3% 0.0151 82.4)",
+          "oklch(60.7% 0.0151 82.4)",
+          "oklch(72.1% 0.0151 82.4)",
+          "oklch(83.6% 0.0151 82.4)",
+          "oklch(95.0% 0.0151 82.4)"
+        ]
+      },
+      "coral-ink": {
+        "role": "secondary",
+        "displayName": "Coral Ink",
+        "tonalRamp": [
+          "oklch(15.0% 0.1649 32.1)",
+          "oklch(26.4% 0.1649 32.1)",
+          "oklch(37.9% 0.1649 32.1)",
+          "oklch(49.3% 0.1649 32.1)",
+          "oklch(60.7% 0.1649 32.1)",
+          "oklch(72.1% 0.1649 32.1)",
+          "oklch(83.6% 0.1649 32.1)",
+          "oklch(95.0% 0.1649 32.1)"
+        ]
+      },
+      "blue-ink": {
+        "role": "secondary",
+        "displayName": "Blue Ink",
+        "tonalRamp": [
+          "oklch(15.0% 0.1764 266.3)",
+          "oklch(26.4% 0.1764 266.3)",
+          "oklch(37.9% 0.1764 266.3)",
+          "oklch(49.3% 0.1764 266.3)",
+          "oklch(60.7% 0.1764 266.3)",
+          "oklch(72.1% 0.1764 266.3)",
+          "oklch(83.6% 0.1764 266.3)",
+          "oklch(95.0% 0.1764 266.3)"
+        ]
+      },
+      "green-ink": {
+        "role": "secondary",
+        "displayName": "Green Ink",
+        "tonalRamp": [
+          "oklch(15.0% 0.0879 163.0)",
+          "oklch(26.4% 0.0879 163.0)",
+          "oklch(37.9% 0.0879 163.0)",
+          "oklch(49.3% 0.0879 163.0)",
+          "oklch(60.7% 0.0879 163.0)",
+          "oklch(72.1% 0.0879 163.0)",
+          "oklch(83.6% 0.0879 163.0)",
+          "oklch(95.0% 0.0879 163.0)"
+        ]
+      },
+      "purple-ink": {
+        "role": "secondary",
+        "displayName": "Purple Ink",
+        "tonalRamp": [
+          "oklch(15.0% 0.1464 308.4)",
+          "oklch(26.4% 0.1464 308.4)",
+          "oklch(37.9% 0.1464 308.4)",
+          "oklch(49.3% 0.1464 308.4)",
+          "oklch(60.7% 0.1464 308.4)",
+          "oklch(72.1% 0.1464 308.4)",
+          "oklch(83.6% 0.1464 308.4)",
+          "oklch(95.0% 0.1464 308.4)"
+        ]
+      },
+      "saved-ink": {
+        "role": "secondary",
+        "displayName": "Saved Ink",
+        "tonalRamp": [
+          "oklch(15.0% 0.0312 145.1)",
+          "oklch(26.4% 0.0312 145.1)",
+          "oklch(37.9% 0.0312 145.1)",
+          "oklch(49.3% 0.0312 145.1)",
+          "oklch(60.7% 0.0312 145.1)",
+          "oklch(72.1% 0.0312 145.1)",
+          "oklch(83.6% 0.0312 145.1)",
+          "oklch(95.0% 0.0312 145.1)"
+        ]
+      },
+      "error-ink": {
+        "role": "secondary",
+        "displayName": "Error Ink",
+        "tonalRamp": [
+          "oklch(15.0% 0.1259 35.5)",
+          "oklch(26.4% 0.1259 35.5)",
+          "oklch(37.9% 0.1259 35.5)",
+          "oklch(49.3% 0.1259 35.5)",
+          "oklch(60.7% 0.1259 35.5)",
+          "oklch(72.1% 0.1259 35.5)",
+          "oklch(83.6% 0.1259 35.5)",
+          "oklch(95.0% 0.1259 35.5)"
+        ]
+      },
+      "error-surface": {
+        "role": "neutral",
+        "displayName": "Error Surface",
+        "tonalRamp": [
+          "oklch(15.0% 0.0241 47.1)",
+          "oklch(26.4% 0.0241 47.1)",
+          "oklch(37.9% 0.0241 47.1)",
+          "oklch(49.3% 0.0241 47.1)",
+          "oklch(60.7% 0.0241 47.1)",
+          "oklch(72.1% 0.0241 47.1)",
+          "oklch(83.6% 0.0241 47.1)",
+          "oklch(95.0% 0.0241 47.1)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Empty-state working instruction."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Feedback rail heading."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Annotation comments."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Supporting interface metadata."
+      },
+      "button": {
+        "displayName": "Button",
+        "purpose": "Primary action label."
+      },
+      "annotation": {
+        "displayName": "Annotation",
+        "purpose": "Fixed apparent-size mark number."
+      }
+    },
+    "shadows": [
+      {
+        "name": "floating",
+        "value": "0 8px 26px #49402a14",
+        "purpose": "Drawing dock and receipt previews."
+      },
+      {
+        "name": "image",
+        "value": "0 10px 35px #4e443d1c",
+        "purpose": "Screenshot lift."
+      },
+      {
+        "name": "help",
+        "value": "0 12px 45px #453c2926",
+        "purpose": "Temporary shortcut panel."
+      },
+      {
+        "name": "upload",
+        "value": "0 3px 7px #3456c41a",
+        "purpose": "Empty-state upload action."
+      }
+    ],
+    "motion": [
+      {
+        "name": "control-transition",
+        "value": "160ms ease",
+        "purpose": "Background, text, and border-color changes."
+      },
+      {
+        "name": "selected-mark-pop",
+        "value": "180ms cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "Scale 0.72 to 1 and opacity 0.6 to 1; SVG badges transform around the center of their fill box."
+      },
+      {
+        "name": "receipt-pop",
+        "value": "300ms cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "Confirmation scales from 0.72 to 1 while opacity fades from 0.6 to 1."
+      },
+      {
+        "name": "saving-pulse",
+        "value": "1s ease-in-out infinite alternate",
+        "purpose": "Save activity opacity 0.35 to 1."
+      },
+      {
+        "name": "reduced-motion",
+        "value": "none",
+        "purpose": "Animations and transitions disabled under prefers-reduced-motion: reduce."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "wide-min",
+        "value": "1600px"
+      },
+      {
+        "name": "compact-max",
+        "value": "1150px"
+      },
+      {
+        "name": "stack-max",
+        "value": "850px"
+      },
+      {
+        "name": "small-max",
+        "value": "440px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary action",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Upload or submit one batch.",
+      "html": "<button class=\"ds-primary\">Send to agent</button>",
+      "css": ".ds-primary{font-family:-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;cursor:pointer;transition:background-color 160ms ease,color 160ms ease,border-color 160ms ease;display:inline-flex;align-items:center;justify-content:center;gap:9px;border:0;background:var(--blue,#3456c4);color:#fff;font-size:12px;font-weight:550;border-radius:9px;min-height:43px;padding:0 18px}.ds-primary:hover:not(:disabled){background:#2747ae}.ds-primary:active:not(:disabled){background:#203c99}.ds-primary:focus-visible{outline:3px solid var(--blue,#3456c4);outline-offset:3px;}.ds-primary:disabled{background:#dcdcd5;color:#69665e;cursor:not-allowed}@media(prefers-reduced-motion:reduce){button,a,textarea{transition:none!important;animation:none!important}}"
+    },
+    {
+      "name": "Secondary action",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "A supporting recovery action.",
+      "html": "<button class=\"ds-secondary\">Try again</button>",
+      "css": ".ds-secondary{font-family:-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;cursor:pointer;transition:background-color 160ms ease,color 160ms ease,border-color 160ms ease;font-size:14px;border:1px solid var(--line,#e3dfd5);background:var(--panel,#fdfcf8);color:var(--ink,#34322e);border-radius:8px;padding:10px 18px}.ds-secondary:hover{background:#ede8de}.ds-secondary:focus-visible{outline:3px solid var(--blue,#3456c4);outline-offset:3px;}@media(prefers-reduced-motion:reduce){button,a,textarea{transition:none!important;animation:none!important}}"
+    },
+    {
+      "name": "Text action",
+      "kind": "button",
+      "refersTo": "button-text",
+      "description": "A quiet example entry.",
+      "html": "<button class=\"ds-text\">Try an example <svg width=\"19\" height=\"19\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M7 17 17 7M7 7h10v10\"/></svg></button>",
+      "css": ".ds-text{font-family:-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;cursor:pointer;transition:background-color 160ms ease,color 160ms ease,border-color 160ms ease;display:inline-flex;align-items:center;gap:8px;border:0;background:none;padding:5px;font-size:11px;color:#696357}.ds-text:hover{color:var(--blue,#3456c4)}.ds-text:focus-visible{outline:3px solid var(--blue,#3456c4);outline-offset:3px;}.ds-text svg{width:14px;height:14px}@media(prefers-reduced-motion:reduce){button,a,textarea{transition:none!important;animation:none!important}}"
+    },
+    {
+      "name": "Selected tool",
+      "kind": "button",
+      "refersTo": "button-tool-selected",
+      "description": "A toggled drawing tool.",
+      "html": "<button class=\"ds-tool\" aria-label=\"Arrow (A)\" aria-pressed=\"true\"><svg width=\"19\" height=\"19\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M7 17 17 7M7 7h10v10\"/></svg></button>",
+      "css": ".ds-tool{font-family:-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;cursor:pointer;transition:background-color 160ms ease,color 160ms ease,border-color 160ms ease;display:inline-flex;align-items:center;justify-content:center;width:36px;height:37px;padding:0;border:0;border-radius:7px;background:var(--blue-light,#eaf0ff);color:var(--blue,#3456c4)}.ds-tool:hover{background:#efede6}.ds-tool[aria-pressed=true]:hover{background:var(--blue-light,#eaf0ff)}.ds-tool:focus-visible{outline:3px solid var(--blue,#3456c4);outline-offset:3px;}@media(prefers-reduced-motion:reduce){button,a,textarea{transition:none!important;animation:none!important}}"
+    },
+    {
+      "name": "Overall feedback",
+      "kind": "input",
+      "refersTo": "input-overall",
+      "description": "A larger instruction shared across screenshots.",
+      "html": "<textarea class=\"ds-overall\" aria-label=\"The bigger picture\" placeholder=\"What are we working toward? Add any overall direction...\"></textarea>",
+      "css": ".ds-overall{font-family:-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;cursor:pointer;transition:background-color 160ms ease,color 160ms ease,border-color 160ms ease;cursor:text;width:100%;min-height:94px;max-height:180px;resize:vertical;border:1px solid #ded8cd;border-radius:8px;padding:11px;background:var(--panel,#fdfcf8);color:#4d473e;font-size:11px;line-height:1.7;caret-color:var(--blue,#3456c4)}.ds-overall::placeholder{color:#70685c}.ds-overall:focus-visible{outline:3px solid var(--blue,#3456c4);outline-offset:3px;}@media(prefers-reduced-motion:reduce){button,a,textarea{transition:none!important;animation:none!important}}"
+    },
+    {
+      "name": "Count badge",
+      "kind": "chip",
+      "refersTo": "count",
+      "description": "Noninteractive quantity badge.",
+      "html": "<span class=\"ds-count\">3</span>",
+      "css": ".ds-count{font-family:-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;font-size:10px;font-weight:600;color:#736e65;background:#e9e5dc;border-radius:5px;min-width:19px;height:19px;display:inline-flex;align-items:center;justify-content:center;font-variant-numeric:tabular-nums}@media(prefers-reduced-motion:reduce){button,a,textarea{transition:none!important;animation:none!important}}"
+    },
+    {
+      "name": "Selected comment row",
+      "kind": "card",
+      "refersTo": "comment-row-selected",
+      "description": "A numbered comment connected to the selected image mark.",
+      "html": "<section class=\"ds-comment\"><div class=\"ds-comment-heading\"><button class=\"ds-comment-number\" aria-label=\"Select mark 1\">1</button><span>Pin</span></div><textarea class=\"ds-comment-field\" aria-label=\"Comment for mark 1\">Give the heading a little more breathing room.</textarea></section>",
+      "css": ".ds-comment{font-family:-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;background:#f0f3fc;padding:17px 22px 16px;border-bottom:1px solid var(--line,#e3dfd5)}.ds-comment-heading{display:flex;align-items:center;gap:9px;font-size:11px;color:#70685c;margin-bottom:10px}.ds-comment-number{font-family:-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;cursor:pointer;transition:background-color 160ms ease,color 160ms ease,border-color 160ms ease;border:0;display:grid;place-items:center;width:23px;height:23px;border-radius:50%;background:#c94b35;color:white;font-size:11px;font-weight:650;padding:0}.ds-comment-number:focus-visible{outline:3px solid var(--blue,#3456c4);outline-offset:3px;}.ds-comment-field{font-family:-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;cursor:pointer;transition:background-color 160ms ease,color 160ms ease,border-color 160ms ease;cursor:text;width:100%;resize:vertical;min-height:72px;max-height:240px;background:transparent;border:1px solid transparent;line-height:1.6;font-size:12px;color:#45403a;border-radius:5px;padding:5px 0;caret-color:var(--blue,#3456c4)}.ds-comment-field:focus{border-color:#c4cfea;background:#fff;padding:5px 7px;outline:none}.ds-comment-field::placeholder{color:#70685c}@media(prefers-reduced-motion:reduce){button,a,textarea{transition:none!important;animation:none!important}}"
+    },
+    {
+      "name": "Screenshot navigation",
+      "kind": "nav",
+      "refersTo": "screenshot-navigation",
+      "description": "A selected preview within the image rail; inline placeholder represents session image content.",
+      "html": "<nav class=\"ds-nav\" aria-label=\"Screenshots\"><button class=\"ds-thumb\" aria-label=\"Select screenshot\" aria-current=\"true\"><span class=\"ds-preview\"><svg width=\"19\" height=\"19\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><rect x=\"3\" y=\"3\" width=\"18\" height=\"18\" rx=\"2\"/><circle cx=\"9\" cy=\"9\" r=\"2\"/><path d=\"m21 15-5-5L5 21\"/></svg><span class=\"ds-image-number\">1</span></span><span class=\"ds-filename\">Screenshot.png</span></button></nav>",
+      "css": ".ds-nav{background:#f4f1e9;padding:23px 14px 18px;width:130px}.ds-thumb{font-family:-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;cursor:pointer;transition:background-color 160ms ease,color 160ms ease,border-color 160ms ease;width:100%;display:flex;flex-direction:column;gap:8px;align-items:stretch;border:0;padding:0;background:none}.ds-preview{position:relative;aspect-ratio:1.35;border:2px solid var(--blue,#3456c4);background:#e8edfc;border-radius:8px;display:flex;align-items:center;justify-content:center;padding:4px;color:var(--blue,#3456c4)}.ds-thumb:hover .ds-preview{background:#e3e8f4}.ds-image-number{position:absolute;bottom:5px;left:5px;background:var(--blue,#3456c4);color:white;font-size:10px;width:18px;height:18px;border-radius:4px;display:grid;place-items:center}.ds-filename{text-align:left;font-size:10px;font-weight:600;color:var(--blue,#3456c4);overflow:hidden;white-space:nowrap;text-overflow:ellipsis}.ds-thumb:focus-visible{outline:3px solid var(--blue,#3456c4);outline-offset:3px;}@media(prefers-reduced-motion:reduce){button,a,textarea{transition:none!important;animation:none!important}}"
+    },
+    {
+      "name": "Annotation badge",
+      "kind": "custom",
+      "refersTo": "annotation-badge",
+      "description": "A focused selectable mark at its nominal screen size.",
+      "html": "<svg class=\"ds-mark\" width=\"60\" height=\"60\" viewBox=\"0 0 60 60\"><g role=\"button\" tabindex=\"0\" aria-label=\"Mark 1: Pin\"><circle cx=\"30\" cy=\"30\" r=\"18\" fill=\"white\" opacity=\".85\"/><circle class=\"ds-badge\" cx=\"30\" cy=\"30\" r=\"12\" fill=\"#c94b35\" stroke=\"white\" stroke-width=\"2\"/><text x=\"30\" y=\"30\" fill=\"white\" text-anchor=\"middle\" dominant-baseline=\"central\" font-size=\"12\" font-weight=\"700\">1</text></g></svg>",
+      "css": ".ds-mark{font-family:-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;overflow:visible}.ds-mark g{cursor:pointer}.ds-mark g:focus-visible{outline:none;filter:drop-shadow(0 2px 4px #242d7440)}.ds-mark g:focus-visible .ds-badge{stroke:#34322e;stroke-width:3px}.ds-mark text{pointer-events:none}@media(prefers-reduced-motion:reduce){button,a,textarea{transition:none!important;animation:none!important}} .ds-badge{transform-box:fill-box;transform-origin:center;animation:ds-pin-pop 180ms cubic-bezier(0.16,1,0.3,1)}@keyframes ds-pin-pop{from{opacity:.6;transform:scale(.72)}to{opacity:1;transform:scale(1)}}@media(prefers-reduced-motion:reduce){.ds-badge{animation:none!important}}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Working Sketchbook",
+    "overview": "Warm paper, dark ink, and compact rounded tools frame the screenshot. Cobalt identifies the main action and selected controls; four annotation inks connect marks with their matching comments. The interface is quiet enough to keep image content central.\n\nThis is a desktop-first working surface with precise numbered feedback and light sketchbook cues: a dotted canvas, a tilted pencil icon, and a small rotated empty-state tile. The shipped wordmark uses the system sans; no handwritten font is installed. The selected direction is user-pinned, and the implementation was developed code-first.",
+    "keyCharacteristics": [
+      "Warm paper with cream working panels.",
+      "Compact rounded controls and thin separators.",
+      "Cobalt selection and action; distinct colored annotation ink.",
+      "Stable numbered marks linked to comments.",
+      "Desktop rails become a stacked mobile workspace."
+    ],
+    "rules": [
+      {
+        "name": "The Cobalt Control Rule",
+        "body": "Use cobalt for primary actions, selected tools, selected screenshot borders, and keyboard focus. Annotation blue remains its own ink token.",
+        "section": "colors"
+      },
+      {
+        "name": "The Numbered Mark Rule",
+        "body": "Keep the mark number and ink consistent between the image and its comment. Badges and annotation strokes retain their screen size as the image zooms.",
+        "section": "typography"
+      },
+      {
+        "name": "The Floating Tool Rule",
+        "body": "Use soft ambient shadows for the dock, image, and temporary help panel. The permanent rails rely on warm surfaces and thin separators.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do keep screenshot content central and use the warm paper and cream panel tokens for the application frame.",
+      "Do use numbered, color-matched marks and comments; keep annotation geometry legible across zoom levels.",
+      "Do preserve visible focus, native keyboard button activation, and reduced motion support.",
+      "Do use the darker muted-small token for small labels and placeholders on paper, panel, and overall-message surfaces.",
+      "Do adapt the rails into the documented mobile stack while preserving drawing, feedback, and submission controls."
+    ],
+    "donts": [
+      "Don't copy typography or colors from uploaded screenshots or the fictional example into the application system.",
+      "Don't extend the dotted canvas texture into text-entry fields or comment rows.",
+      "Don't use annotation ink as the default application action color.",
+      "Don't add hard offset shadows or decorative card stacks to the quiet working frame."
+    ]
+  }
+}
