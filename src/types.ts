@@ -24,6 +24,7 @@ export type Session = {
   message: string;
   images: Screenshot[];
   revision: number;
+  lastSaveId?: string;
   updatedAt: string;
   submittedAt?: string;
   bundlePath?: string;

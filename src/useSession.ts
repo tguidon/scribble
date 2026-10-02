@@ -1,6 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { loadSession, request, saveDraft, sessionId, uploadImage } from "./api";
 import type { Draft, Session } from "./types";
+import {
+  draftBytes,
+  MAX_DRAFT_BYTES,
+  DRAFT_TOO_LARGE,
+} from "../skills/scribble/scripts/lib/limits.mjs";
+type Backup = { draft: Draft; revision: number; pendingSaveId?: string };
+type PendingSave = {
+  draft: Draft;
+  revision: number;
+  id: string;
+  generation: number;
+};
 const key = `scribble-draft-${sessionId}`;
 export function useSession() {
   const [session, setSession] = useState<Session>();
@@ -9,6 +21,8 @@ export function useSession() {
     "loading" | "saved" | "saving" | "offline"
   >("loading");
   const [busy, setBusy] = useState(false);
+  const [recovery, setRecovery] = useState<Backup>();
+  const pending = useRef<PendingSave | undefined>(undefined);
   const current = useRef<Session | undefined>(undefined);
   const generation = useRef(0);
   const saved = useRef(0);
@@ -24,13 +38,34 @@ export function useSession() {
     queue.current = promise.catch(() => {});
     return promise;
   }, []);
+  const backup = useCallback(() => {
+    const value = current.current;
+    if (!value) return;
+    try {
+      if (saved.current === generation.current && !pending.current)
+        localStorage.removeItem(key);
+      else
+        localStorage.setItem(
+          key,
+          JSON.stringify({
+            draft: { message: value.message, images: value.images },
+            revision: revision.current,
+            pendingSaveId: pending.current?.id,
+          } satisfies Backup),
+        );
+    } catch {
+      setError(
+        "Browser backup is full or unavailable. Keep this tab open until “Draft saved” appears.",
+      );
+    }
+  }, []);
   useEffect(() => {
     let active = true;
     loadSession()
       .then((value) => {
         if (!active) return;
         revision.current = value.revision;
-        let local: { draft: Draft; revision: number } | undefined;
+        let local: Backup | undefined;
         try {
           local = JSON.parse(localStorage.getItem(key) || "null");
         } catch {
@@ -39,16 +74,18 @@ export function useSession() {
         if (
           value.status === "draft" &&
           local &&
-          local.revision === value.revision
+          (local.revision === value.revision ||
+            (local.pendingSaveId &&
+              local.pendingSaveId === value.lastSaveId &&
+              local.revision + 1 === value.revision))
         ) {
           value = { ...value, ...local.draft };
           generation.current = 1;
         } else if (local) {
-          localStorage.removeItem(key);
-          if (value.status === "draft")
-            setError(
-              "A newer draft was saved in another tab. The latest server draft has been loaded.",
-            );
+          setRecovery(local);
+          setError(
+            "This session changed since your last save. Your unsaved draft is preserved. Download it before choosing Use saved draft.",
+          );
         }
         update(value);
         setSaveState(generation.current ? "saving" : "saved");
@@ -66,53 +103,55 @@ export function useSession() {
   const flush = useCallback(
     () =>
       enqueue(async () => {
-        const value = current.current;
-        if (
-          !value ||
-          value.status === "submitted" ||
-          saved.current === generation.current
-        )
-          return;
-        const version = generation.current;
-        setSaveState("saving");
-        try {
-          const response = await saveDraft(
-            { message: value.message, images: value.images },
-            revision.current,
-          );
-          revision.current = response.revision;
-          saved.current = version;
-          if (current.current)
+        // Retry the exact outstanding request before saving any newer edits.
+        while (
+          current.current?.status === "draft" &&
+          (pending.current || saved.current !== generation.current)
+        ) {
+          const value = current.current;
+          const operation = (pending.current ||= {
+            id: crypto.randomUUID(),
+            revision: revision.current,
+            draft: { message: value.message, images: value.images },
+            generation: generation.current,
+          });
+          backup();
+          setSaveState("saving");
+          try {
+            const response = await saveDraft(
+              operation.draft,
+              operation.revision,
+              operation.id,
+            );
+            revision.current = response.revision;
+            saved.current = operation.generation;
+            pending.current = undefined;
             update({
-              ...current.current,
+              ...current.current!,
               revision: response.revision,
               updatedAt: response.updatedAt,
             });
-          if (generation.current === version) {
-            localStorage.removeItem(key);
-            setSaveState("saved");
-          } else {
-            try {
-              localStorage.setItem(
-                key,
-                JSON.stringify({
-                  draft: {
-                    message: current.current!.message,
-                    images: current.current!.images,
-                  },
-                  revision: revision.current,
-                }),
-              );
-            } catch {
-              /* Server remains primary storage. */
+            backup();
+            if (saved.current === generation.current) {
+              setSaveState("saved");
+              setError("");
             }
+          } catch (error) {
+            // Rejected input may be corrected. Uncertain network outcomes retain the ID.
+            if (
+              error instanceof Error &&
+              "status" in error &&
+              [400, 413].includes(Number(error.status))
+            ) {
+              pending.current = undefined;
+              backup();
+            }
+            setSaveState("offline");
+            throw error;
           }
-        } catch (e) {
-          setSaveState("offline");
-          throw e;
         }
       }),
-    [enqueue, update],
+    [enqueue, update, backup],
   );
   useEffect(() => {
     if (
@@ -146,22 +185,18 @@ export function useSession() {
   const change = useCallback(
     (draft: Draft) => {
       if (!current.current || current.current.status !== "draft") return;
-      generation.current++;
-      const value = { ...current.current, ...draft };
-      update(value);
-      setSaveState("saving");
-      try {
-        localStorage.setItem(
-          key,
-          JSON.stringify({ draft, revision: revision.current }),
-        );
-      } catch {
-        setError(
-          "Browser backup is full or unavailable. Keep this tab open until “Draft saved” appears.",
-        );
+      if (recovery) return false;
+      if (draftBytes(draft) > MAX_DRAFT_BYTES) {
+        setError(DRAFT_TOO_LARGE);
+        return false;
       }
+      generation.current++;
+      update({ ...current.current, ...draft });
+      setSaveState("saving");
+      backup();
+      return true;
     },
-    [update],
+    [update, backup, recovery],
   );
   const upload = useCallback(
     async (files: File[]) => {
@@ -220,7 +255,26 @@ export function useSession() {
     error,
     setError,
     saveState,
-    busy,
+    busy: busy || !!recovery,
+    recovery,
+    downloadRecovery: () => {
+      if (!recovery) return;
+      const url = URL.createObjectURL(
+        new Blob([JSON.stringify(recovery.draft, null, 2)], {
+          type: "application/json",
+        }),
+      );
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "scribble-unsaved-draft.json";
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    },
+    useSavedDraft: () => {
+      localStorage.removeItem(key);
+      setRecovery(undefined);
+      setError("");
+    },
     change,
     upload,
     submit,

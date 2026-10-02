@@ -240,3 +240,152 @@ test("a lost submission response still recovers the saved receipt", async ({
     page.getByRole("heading", { name: "Point made." }),
   ).toBeVisible();
 });
+
+test("lost save acknowledgement retries the original save before newer edits", async ({
+  page,
+}) => {
+  let acknowledge!: () => void;
+  let committed!: () => void;
+  const committedOnServer = new Promise<void>((resolve) => {
+    committed = resolve;
+  });
+  const release = new Promise<void>((resolve) => {
+    acknowledge = resolve;
+  });
+  let intercepted = false;
+  await page.route("**/api/draft", async (route) => {
+    if (intercepted) return route.continue();
+    intercepted = true;
+    await route.fetch();
+    committed();
+    await release;
+    await route.abort();
+  });
+  const message = page.getByRole("textbox", { name: "The bigger picture" });
+  await message.fill("The first saved edit.");
+  await committedOnServer;
+  await message.fill("A newer edit written before the save acknowledgement.");
+  acknowledge();
+  await expect(page.getByText("Not saved to server")).toBeVisible();
+  await page.getByRole("button", { name: "Retry save" }).click();
+  await expect(page.getByText("Draft saved")).toBeVisible();
+  await page.reload();
+  await expect(message).toHaveValue(
+    "A newer edit written before the save acknowledgement.",
+  );
+});
+
+test("reload recovers newer edits after a lost save acknowledgement", async ({
+  page,
+}) => {
+  let first = true;
+  await page.route("**/api/draft", async (route) => {
+    if (first) {
+      first = false;
+      await route.fetch();
+    }
+    await route.abort();
+  });
+  const message = page.getByRole("textbox", { name: "The bigger picture" });
+  await message.fill("Saved on the server, acknowledgement lost.");
+  await expect(page.getByText("Not saved to server")).toBeVisible();
+  await message.fill("Keep these newer unsaved edits after reload.");
+  await expect(page.getByText("Not saved to server")).toBeVisible();
+  await page.unroute("**/api/draft");
+  page.on("dialog", (dialog) => dialog.accept());
+  await page.reload();
+  await expect(message).toHaveValue(
+    "Keep these newer unsaved edits after reload.",
+  );
+  await expect(page.getByText("Draft saved")).toBeVisible();
+  await page.reload();
+  await expect(message).toHaveValue(
+    "Keep these newer unsaved edits after reload.",
+  );
+});
+
+test("a genuine conflict preserves a downloadable backup until explicitly dismissed", async ({
+  page,
+}) => {
+  const params = new URLSearchParams(new URL(app.url).hash.slice(1));
+  const response = await page.request.put(
+    `${new URL(app.url).origin}/api/draft`,
+    {
+      headers: { Authorization: `Bearer ${params.get("token")}` },
+      data: {
+        revision: 0,
+        saveId: "another-tab",
+        message: "Saved in the other tab.",
+        images: [],
+      },
+    },
+  );
+  expect(response.ok()).toBe(true);
+  const message = page.getByRole("textbox", { name: "The bigger picture" });
+  await message.fill("My unsaved draft must survive.");
+  await expect(page.getByText("Not saved to server")).toBeVisible();
+  page.on("dialog", (dialog) => dialog.accept());
+  await page.reload();
+  await expect(
+    page.getByRole("button", { name: "Download unsaved draft" }),
+  ).toBeVisible();
+  await expect(message).toBeDisabled();
+  await page.reload();
+  const download = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Download unsaved draft" }).click();
+  const file = await (await download).path();
+  const { readFile } = await import("node:fs/promises");
+  expect(JSON.parse(await readFile(file!, "utf8")).message).toBe(
+    "My unsaved draft must survive.",
+  );
+  await page.getByRole("button", { name: "Use saved draft" }).click();
+  await expect(message).toBeEnabled();
+  await expect(message).toHaveValue("Saved in the other tab.");
+});
+
+test("an edit beyond the shared draft budget keeps the last valid draft", async ({
+  page,
+}) => {
+  const { MAX_DRAFT_BYTES, draftBytes } =
+    await import("../skills/scribble/scripts/lib/limits.mjs");
+  const params = new URLSearchParams(new URL(app.url).hash.slice(1));
+  const headers = { Authorization: `Bearer ${params.get("token")}` };
+  const origin = new URL(app.url).origin;
+  const image = Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=",
+    "base64",
+  );
+  const draft = await (
+    await page.request.post(`${origin}/api/images?width=1&height=1`, {
+      headers,
+      data: image,
+    })
+  ).json();
+  draft.images[0].annotations = Array.from({ length: 450 }, (_, n) => ({
+    id: `pin-${n}`,
+    type: "pin",
+    color: "#c94b35",
+    points: [{ x: 0.5, y: 0.5 }],
+    comment: "x".repeat(10000),
+  }));
+  let remaining = draftBytes(draft) - MAX_DRAFT_BYTES + 100;
+  for (const mark of draft.images[0].annotations) {
+    const remove = Math.min(remaining, mark.comment.length);
+    mark.comment = mark.comment.slice(remove);
+    remaining -= remove;
+  }
+  expect(
+    (
+      await page.request.put(`${origin}/api/draft`, { headers, data: draft })
+    ).ok(),
+  ).toBe(true);
+  await page.reload();
+  const message = page.getByRole("textbox", { name: "The bigger picture" });
+  await message.fill("é".repeat(100));
+  await expect(page.getByRole("alert")).toContainText("4 MB limit");
+  await expect(message).toHaveValue("");
+  await message.fill("Still fits.");
+  await expect(page.getByText("Draft saved")).toBeVisible();
+  await page.reload();
+  await expect(message).toHaveValue("Still fits.");
+});

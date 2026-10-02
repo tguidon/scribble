@@ -4,7 +4,7 @@ import { resolve, join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { mkdir, access } from "node:fs/promises";
 import { openSync, closeSync } from "node:fs";
-import { withStartLock } from "./lib/lock.mjs";
+import { withStartLock, alive } from "./lib/lock.mjs";
 import { spawn } from "node:child_process";
 import {
   createSession,
@@ -18,14 +18,6 @@ import { startServer } from "./lib/app.mjs";
 const cli = fileURLToPath(import.meta.url);
 const packageRoot = resolve(dirname(cli), "..");
 const delay = (ms) => new Promise((r) => setTimeout(r, ms));
-const alive = (pid) => {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch {
-    return false;
-  }
-};
 const { values, positionals } = parseArgs({
   allowPositionals: true,
   options: {
@@ -125,7 +117,7 @@ async function start() {
   if (existing && alive(existing.pid)) {
     const link = new URL(existing.url);
     const params = new URLSearchParams(link.hash.slice(1));
-    const healthy = await fetch(`${link.origin}/api/session`, {
+    const healthy = await fetch(`${link.origin}/api/health`, {
       headers: {
         Authorization: `Bearer ${params.get("token")}`,
         "X-Scribble-Session": existing.sessionId,
@@ -151,6 +143,9 @@ async function start() {
       print(info);
       return;
     }
+    throw new Error(
+      "The recorded Scribble process is still running but did not pass its health check. Retry shortly, or stop that process before restarting Scribble.",
+    );
   }
   let session = values.session
     ? await loadSession(root, values.session)

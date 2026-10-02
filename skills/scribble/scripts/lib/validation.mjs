@@ -1,3 +1,4 @@
+import { draftBytes, MAX_DRAFT_BYTES, DRAFT_TOO_LARGE } from "./limits.mjs";
 const types = new Set(["pin", "arrow", "rectangle", "freehand"]);
 const finite = (n) => typeof n === "number" && Number.isFinite(n);
 function check(condition, message) {
@@ -19,7 +20,7 @@ export function validateDraft(body, session) {
   );
   const imageIds = new Set();
   const markIds = new Set();
-  return {
+  const draft = {
     message: body.message,
     images: body.images.map((image) => {
       const original = session.images.find((i) => i.id === image.id);
@@ -82,6 +83,8 @@ export function validateDraft(body, session) {
       };
     }),
   };
+  check(draftBytes(draft) <= MAX_DRAFT_BYTES, DRAFT_TOO_LARGE);
+  return draft;
 }
 export function imageKind(bytes) {
   if (

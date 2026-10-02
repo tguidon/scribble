@@ -40,19 +40,20 @@ The agent receives your screenshots, mark positions, and comments in one feedbac
 
 ## Sessions and saved drafts
 
-The agent runs the skill only after an explicit request. The launcher sends an authenticated request to the local server. If the server responds, the launcher reuses it. Otherwise, it starts a server in the background.
+The agent runs the skill only after an explicit request. The launcher sends an authenticated request to the local server. If the server responds, the launcher reuses it. If no server process is running, it starts one in the background. If a recorded process is still alive but does not respond, the launcher asks you to retry or stop that process before restarting.
 
 The latest unfinished draft resumes automatically. After submission, the next skill request opens a new session on the same server. The server remains available for later sessions.
 
 Scribble saves drafts and screenshots in `.scribble/` in your project. A browser backup stores unsaved edits to marks and messages. Saved work remains available after the agent or server stops.
 
-Each project has a separate server and storage directory. A startup lock prevents duplicate servers from simultaneous requests. The server accepts connections only at `127.0.0.1`. Screenshots and feedback require a session token.
+Each project has a separate server and storage directory. A startup lock coordinates launchers. A lifetime lock gives one server ownership of the storage directory. Slow uploads do not block health checks or other sessions. The server accepts connections only at `127.0.0.1`. Screenshots and feedback require a session token.
 
 ### Recover a draft
 
 - If a save fails, select **Retry save**. Keep the tab open until **Draft saved** appears.
 - To resume a saved draft, run the skill again.
-- If another tab saves a newer draft, reload the page. Scribble does not merge conflicting edits from multiple tabs.
+- If a save response is lost, **Retry save** safely repeats that save before saving newer edits. Reloading also recovers the newer browser draft when Scribble can identify the saved request.
+- If another tab saves a conflicting draft, reload the page. Select **Download unsaved draft** to keep your local edits, then **Use saved draft** to continue with the server version. Scribble preserves the backup until you make this choice.
 
 Undo and redo apply to marks and text. They do not apply to screenshot uploads or removal. Screenshot removal excludes the image from the draft but preserves the original file on disk.
 
@@ -67,6 +68,9 @@ Undo and redo apply to marks and text. They do not apply to screenshot uploads o
 | Freehand points | 5,000 per drawing |
 | Comment length | 10,000 characters |
 | Overall message | 20,000 characters |
+| Combined draft | 4 MB of UTF-8 JSON for marks, text, and screenshot metadata; original image files are separate |
+
+If an edit would exceed the combined limit, Scribble keeps the previous valid draft and explains how to reduce it.
 
 ## Development
 

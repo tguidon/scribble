@@ -16,8 +16,11 @@ export async function request<T>(
   });
   const data = await response.json();
   if (!response.ok)
-    throw new Error(
-      data.error || "The local server could not complete that request.",
+    throw Object.assign(
+      new Error(
+        data.error || "The local server could not complete that request.",
+      ),
+      { status: response.status },
     );
   return data;
 }
@@ -25,11 +28,11 @@ export const imageUrl = (id: string) =>
   `/api/images/${id}?token=${encodeURIComponent(token)}&session=${encodeURIComponent(sessionId)}`;
 export const feedbackUrl = `/api/feedback?token=${encodeURIComponent(token)}&session=${encodeURIComponent(sessionId)}`;
 export const loadSession = () => request<Session>("/session");
-export const saveDraft = (draft: Draft, revision: number) =>
+export const saveDraft = (draft: Draft, revision: number, saveId: string) =>
   request<Session>("/draft", {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ ...draft, revision }),
+    body: JSON.stringify({ ...draft, revision, saveId }),
   });
 export async function uploadImage(file: File): Promise<Session> {
   if (!["image/png", "image/jpeg", "image/webp"].includes(file.type))

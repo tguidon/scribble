@@ -48,6 +48,10 @@ export async function latestSession(root, draftOnly = false) {
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0];
 }
 export function publicSession(session) {
-  const { token, ...data } = session;
-  return data;
+  const { token, lastSave, ...data } = session;
+  return {
+    ...data,
+    lastSaveId:
+      lastSave?.revision === session.revision ? lastSave.id : undefined,
+  };
 }

@@ -29,6 +29,9 @@ export default function App() {
     setError,
     saveState,
     busy,
+    recovery,
+    downloadRecovery,
+    useSavedDraft,
     change,
     upload,
     submit,
@@ -64,8 +67,7 @@ export default function App() {
   }, [session, currentDraft]);
   const edit = useCallback(
     (next: Draft, record = true) => {
-      if (record) checkpoint();
-      change(next);
+      if (change(next) && record) checkpoint();
     },
     [checkpoint, change],
   );
@@ -313,7 +315,13 @@ export default function App() {
         <div className="error-banner" role="alert">
           <AlertCircle size={18} />
           <span>{error}</span>
-          {saveState === "offline" && session && (
+          {recovery && (
+            <>
+              <button onClick={downloadRecovery}>Download unsaved draft</button>
+              <button onClick={useSavedDraft}>Use saved draft</button>
+            </>
+          )}
+          {!recovery && saveState === "offline" && session && (
             <button
               onClick={() => {
                 void flush()
@@ -327,6 +335,7 @@ export default function App() {
           <button
             className="icon-button"
             aria-label="Dismiss error"
+            disabled={!!recovery}
             onClick={() => setError("")}
           >
             <X size={16} />
