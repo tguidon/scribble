@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ImagePlus,
   Minus,
@@ -10,6 +10,7 @@ import {
 import type { Annotation, Point, Screenshot, Tool } from "../types";
 import { imageUrl } from "../api";
 import { AnnotationShape } from "./AnnotationShape";
+import { frameBatcher } from "../frameBatcher.mjs";
 type Props = {
   image?: Screenshot;
   tool: Tool;
@@ -40,6 +41,12 @@ export function Canvas({
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [ghost, setGhost] = useState<Annotation>();
+  const ghostUpdates = useMemo(() => frameBatcher<Annotation>(setGhost), []);
+  const clearGhost = useCallback(() => {
+    ghostUpdates.cancel();
+    setGhost(undefined);
+  }, [ghostUpdates]);
+  useEffect(() => () => ghostUpdates.cancel(), [ghostUpdates]);
   const [space, setSpace] = useState(false);
   const gesture = useRef<
     { start: Point; pan: Point; mark?: Annotation; moving: boolean } | undefined
@@ -66,9 +73,9 @@ export function Canvas({
   useEffect(() => {
     setZoom(1);
     setPan({ x: 0, y: 0 });
-    setGhost(undefined);
+    clearGhost();
     gesture.current = undefined;
-  }, [image?.id]);
+  }, [image?.id, clearGhost]);
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
       if (
@@ -83,7 +90,7 @@ export function Canvas({
       }
       if (e.key === "Escape") {
         gesture.current = undefined;
-        setGhost(undefined);
+        clearGhost();
       }
     };
     const up = (e: KeyboardEvent) => {
@@ -98,7 +105,7 @@ export function Canvas({
       window.removeEventListener("keyup", up);
       window.removeEventListener("blur", blur);
     };
-  }, []);
+  }, [clearGhost]);
   useEffect(() => {
     const element = viewport.current;
     const wheel = (event: WheelEvent) => {
@@ -160,7 +167,7 @@ export function Canvas({
     };
     viewport.current!.setPointerCapture(event.pointerId);
     gesture.current = { start: p, pan, moving: false, mark };
-    setGhost(mark);
+    ghostUpdates.schedule(mark);
     event.preventDefault();
   }
   function move(event: React.PointerEvent) {
@@ -185,12 +192,12 @@ export function Canvas({
         return;
       g.mark = { ...g.mark, points: [...g.mark.points, p] };
     } else g.mark = { ...g.mark, points: [g.start, p] };
-    setGhost(g.mark);
+    ghostUpdates.schedule(g.mark);
   }
   function finish(event: React.PointerEvent) {
     const g = gesture.current;
     gesture.current = undefined;
-    setGhost(undefined);
+    clearGhost();
     if (viewport.current?.hasPointerCapture(event.pointerId))
       viewport.current.releasePointerCapture(event.pointerId);
     if (!g?.mark) return;
@@ -224,7 +231,7 @@ export function Canvas({
         onPointerUp={finish}
         onPointerCancel={() => {
           gesture.current = undefined;
-          setGhost(undefined);
+          clearGhost();
         }}
       >
         {image ? (
@@ -273,9 +280,7 @@ export function Canvas({
                   number={i + 1}
                   scale={scale}
                   selected={selected === mark.id}
-                  onSelect={
-                    tool === "select" ? () => onSelect(mark.id) : undefined
-                  }
+                  onSelect={tool === "select" ? onSelect : undefined}
                 />
               ))}
               {ghost && (

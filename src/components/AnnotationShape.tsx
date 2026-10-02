@@ -1,5 +1,7 @@
+import { memo } from "react";
+import { annotationPath } from "../annotationPath.mjs";
 import type { Annotation } from "../types";
-export function AnnotationShape({
+export const AnnotationShape = memo(function AnnotationShape({
   mark,
   number,
   scale,
@@ -10,15 +12,13 @@ export function AnnotationShape({
   number: number;
   scale: number;
   selected?: boolean;
-  onSelect?: () => void;
+  onSelect?: (id: string) => void;
 }) {
   const first = mark.points[0];
   const last = mark.points.at(-1)!;
   const stroke = 3 / scale;
   const radius = 14 / scale;
-  const path = mark.points
-    .map((p, i) => `${i ? "L" : "M"} ${p.x} ${p.y}`)
-    .join(" ");
+  const path = mark.type === "freehand" ? annotationPath(mark.points) : "";
   const angle = Math.atan2(last.y - first.y, last.x - first.x);
   const head = 14 / scale;
   const arrow = `M ${last.x - head * Math.cos(angle - 0.5)} ${last.y - head * Math.sin(angle - 0.5)} L ${last.x} ${last.y} L ${last.x - head * Math.cos(angle + 0.5)} ${last.y - head * Math.sin(angle + 0.5)}`;
@@ -38,13 +38,13 @@ export function AnnotationShape({
       onClick={(e) => {
         if (onSelect) {
           e.stopPropagation();
-          onSelect();
+          onSelect(mark.id);
         }
       }}
       onKeyDown={(e) => {
         if (onSelect && (e.key === "Enter" || e.key === " ")) {
           e.preventDefault();
-          onSelect();
+          onSelect(mark.id);
         }
       }}
     >
@@ -104,4 +104,4 @@ export function AnnotationShape({
       </text>
     </g>
   );
-}
+});

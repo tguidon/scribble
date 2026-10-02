@@ -331,6 +331,16 @@ test("a genuine conflict preserves a downloadable backup until explicitly dismis
   ).toBeVisible();
   await expect(message).toBeDisabled();
   await page.reload();
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  await page.screenshot({
+    path: ".impeccable/review/recovery.png",
+    fullPage: true,
+  });
   const download = page.waitForEvent("download");
   await page.getByRole("button", { name: "Download unsaved draft" }).click();
   const file = await (await download).path();

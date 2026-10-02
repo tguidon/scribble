@@ -28,7 +28,7 @@ export default function App() {
     error,
     setError,
     saveState,
-    busy,
+    busy: working,
     recovery,
     downloadRecovery,
     useSavedDraft,
@@ -37,6 +37,7 @@ export default function App() {
     submit,
     flush,
   } = useSession();
+  const busy = working || !!recovery;
   const [activeId, setActiveId] = useState<string>();
   const [selected, setSelected] = useState<string | null>(null);
   const [tool, setTool] = useState<Tool>("pin");
@@ -147,7 +148,7 @@ export default function App() {
       window.removeEventListener("keydown", key);
     };
   }, [addFiles, disabled, undo, redo]);
-  const selectMark = (id: string | null) => {
+  const selectMark = useCallback((id: string | null) => {
     setSelected(id);
     if (id)
       requestAnimationFrame(() => {
@@ -157,7 +158,7 @@ export default function App() {
         field?.focus({ preventScroll: true });
         field?.scrollIntoView({ block: "nearest", behavior: "smooth" });
       });
-  };
+  }, []);
   const addMark = (mark: Annotation) => {
     if (!image || !session || disabled) return;
     if (image.annotations.length >= 500) {
@@ -332,14 +333,15 @@ export default function App() {
               Retry save
             </button>
           )}
-          <button
-            className="icon-button"
-            aria-label="Dismiss error"
-            disabled={!!recovery}
-            onClick={() => setError("")}
-          >
-            <X size={16} />
-          </button>
+          {!recovery && (
+            <button
+              className="icon-button"
+              aria-label="Dismiss error"
+              onClick={() => setError("")}
+            >
+              <X size={16} />
+            </button>
+          )}
         </div>
       )}
       {!session ? (
@@ -602,7 +604,7 @@ export default function App() {
                 disabled={!session.images.length || busy}
                 onClick={() => void submit()}
               >
-                {busy ? "Saving your feedback…" : "Send to agent"}
+                {working ? "Saving your feedback…" : "Send to agent"}
                 <Send size={16} />
               </button>
               <span className="send-hint">
@@ -633,7 +635,7 @@ export default function App() {
           <p>Add your screenshots to this canvas.</p>
         </div>
       )}
-      {busy && !submitted && (
+      {working && !submitted && (
         <div className="busy-label" role="status">
           <span className="status-dot" />
           Saving your work…

@@ -145,8 +145,17 @@ test("only one server can own a storage directory and failure releases ownership
   await assert.rejects(startServer({ root, session }), /already owns/);
   await app.close();
   await assert.rejects(startServer({ root, session, port: -1 }));
-  const replacement = await startServer({ root, session });
-  await replacement.close();
+  const contenders = await Promise.allSettled([
+    startServer({ root, session }),
+    startServer({ root, session }),
+  ]);
+  assert.equal(
+    contenders.filter((result) => result.status === "fulfilled").length,
+    1,
+  );
+  for (const result of contenders) {
+    if (result.status === "fulfilled") await result.value.close();
+  }
 });
 test("draft byte budget agrees with validation and reports a draft-specific error", async (t) => {
   const { call } = await setup(t);

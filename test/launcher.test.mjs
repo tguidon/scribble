@@ -41,7 +41,7 @@ test("copied skill starts without dependencies; concurrent launchers reuse and r
   const fresh = await run("start", "--detach", "--no-open", "--new");
   assert.equal(fresh.pid, launches[0].pid);
   assert.notEqual(fresh.sessionId, launches[0].sessionId);
-  process.kill(fresh.pid, "SIGTERM");
+  process.kill(fresh.pid, "SIGKILL");
   await new Promise((r) => setTimeout(r, 400));
   const resumed = await run("start", "--detach", "--no-open");
   pids.add(resumed.pid);

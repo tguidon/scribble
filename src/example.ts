@@ -93,8 +93,10 @@ export async function exampleFile(): Promise<File> {
     text(["Today", "Yesterday", "Sep 28"][i], 1052, y, 12, "#747b6d");
   });
   text("EXAMPLE WORKSPACE", 989, 794, 10, "#747b6d", 600);
-  const blob = await new Promise<Blob>((resolve) =>
-    canvas.toBlob((b) => resolve(b!), "image/png"),
+  // This fixed-size example should not wait for the browser's idle PNG encoder.
+  const encoded = canvas.toDataURL("image/png").split(",")[1];
+  const bytes = Uint8Array.from(atob(encoded), (character) =>
+    character.charCodeAt(0),
   );
-  return new File([blob], "Example — Fieldnotes.png", { type: "image/png" });
+  return new File([bytes], "Example — Fieldnotes.png", { type: "image/png" });
 }

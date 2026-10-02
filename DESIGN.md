@@ -195,9 +195,9 @@ Prose outside the rails is limited to 50–60ch where space permits. The narrow 
 
 ## Layout
 
-The desktop application fills the viewport height with a minimum height of 700px. A 77px header and a footer at least 40px tall bound three working columns: 176px screenshot rail, flexible canvas, and 360px feedback rail. Comments scroll independently; the overall-message form stays at the bottom of its rail.
+The desktop application fills the viewport height with a minimum height of 700px. A 77px header and a footer at least 40px tall bound three working columns: 176px screenshot rail, flexible canvas, and 360px feedback rail. Comments scroll independently; the overall-message form stays at the bottom of its rail. The workspace has a 36.5rem minimum height so error and recovery controls can extend the page without covering the form or footer. Error text and actions wrap on narrow screens.
 
-At widths up to 1150px the rail widths become 160px and 340px and the dock compacts. At 1600px and above they become 192px and 380px. At 980px and below the layout becomes a vertical stack: horizontal screenshot strip, 570px canvas, feedback, and submission. The header has a 65px minimum height; header and footer content can wrap. At 440px and below the canvas row is 505px and the dock can wrap.
+At widths up to 1150px the rail widths become 160px and 340px and the dock compacts. At 1600px and above they become 192px and 380px. At 980px and below the layout becomes a vertical stack: horizontal screenshot strip, 570px canvas, feedback, and submission. The header has a 65px minimum height; header and footer content can wrap. At 440px and below the canvas row is 505px and the dock can wrap. Empty canvases use a 650px row on mobile so the full instructions remain readable.
 
 The canvas dot grid repeats every 18px. A centered floating dock sits 65px above the canvas bottom on desktop, 53px on mobile, and 48px at the smallest breakpoint. The image transform is centered horizontally and anchored at 43% of the available viewport height. Screenshot and comment spacing is compact, with larger clear space around the image.
 

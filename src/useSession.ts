@@ -255,7 +255,7 @@ export function useSession() {
     error,
     setError,
     saveState,
-    busy: busy || !!recovery,
+    busy,
     recovery,
     downloadRecovery: () => {
       if (!recovery) return;
