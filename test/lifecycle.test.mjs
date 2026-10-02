@@ -125,3 +125,19 @@ test("stop refuses unverified process identities and legacy shutdown", async (t)
   );
   assert.equal(server.listening, true);
 });
+
+test("release metadata and the standalone CLI report the same version", async () => {
+  const pkg = JSON.parse(await readFile(resolve("package.json"), "utf8"));
+  const lock = JSON.parse(await readFile(resolve("package-lock.json"), "utf8"));
+  const bundled = JSON.parse(
+    await readFile(resolve("skills/scribble/version.json"), "utf8"),
+  );
+  const { stdout } = await exec(process.execPath, [
+    resolve("bin/scribble.mjs"),
+    "--version",
+  ]);
+  assert.equal(bundled.version, pkg.version);
+  assert.equal(lock.version, pkg.version);
+  assert.equal(lock.packages[""].version, pkg.version);
+  assert.equal(stdout.trim(), pkg.version);
+});

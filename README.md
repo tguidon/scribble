@@ -26,6 +26,16 @@ npx skills add tguidon/scribble --agent codex claude-code
 
 Add `--global` to install across projects. The [skills CLI documentation](https://github.com/vercel-labs/skills) lists all installation flags.
 
+### Test a fixed release
+
+To install the initial `0.0.1` release:
+
+```sh
+npx skills add https://github.com/tguidon/scribble/tree/v0.0.1/skills/scribble
+```
+
+This uses the skills CLI’s [direct repository path format](https://github.com/vercel-labs/skills#source-formats). Use a release tag to keep tests on a fixed version; the shorter install command follows the repository’s default branch.
+
 ## Use Scribble
 
 1. Run **`$scribble` in Codex** or **`/scribble` in Claude Code**.
@@ -93,6 +103,12 @@ Open the full session URL from the terminal. Keep the token after `#` in the URL
 The complete skill is in `skills/scribble/`. The production server uses only Node built-ins. Vite writes the browser build to `skills/scribble/app/`. The skills installer copies these files without a build step.
 
 After UI changes, run `npm run build`. Then commit the updated `skills/scribble/app/` directory with the source changes.
+
+### Publish a version
+
+Keep `package.json`, the root entries in `package-lock.json`, and `skills/scribble/version.json` on the same version. The tests check that they agree. The installed server reads the bundled version file without needing the development package.
+
+Build and test, commit the changes, then tag that commit as `vVERSION` and publish its GitHub release. Keep published tags fixed so a tagged installation remains reproducible.
 
 ## Command reference
 
