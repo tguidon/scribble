@@ -44,7 +44,7 @@ The agent runs the skill only after an explicit request. The launcher sends an a
 
 The latest unfinished draft resumes automatically. After submission, the next skill request recovers any feedback the agent has not acknowledged. The agent reads the bundle and images, then marks it as read with `ack --session ID`. Reading with `wait` or `feedback` alone does not clear it. Once all submissions are acknowledged, the next request opens a new session on the same server. The server remains available for later sessions.
 
-Scribble saves drafts and screenshots in `.scribble/` in your project. A browser backup stores unsaved edits to marks and messages. Saved work remains available after the agent or server stops.
+Scribble saves drafts and screenshots in `.scribble/` in your project. On startup, it adds the storage directory to Git’s local `info/exclude` file. This keeps screenshots, feedback, and session tokens out of new commits without changing your shared `.gitignore`. Custom storage directories inside a Git repository receive the same protection. If storage files are already tracked, startup stops and asks you to remove them from Git’s index. A browser backup stores unsaved edits to marks and messages. Saved work remains available after the agent or server stops.
 
 Each project has a separate server and storage directory. A startup lock coordinates launchers. A lifetime lock gives one server ownership of the storage directory. Slow uploads do not block health checks or other sessions. The server accepts connections only at `127.0.0.1`. Screenshots and feedback require a session token.
 

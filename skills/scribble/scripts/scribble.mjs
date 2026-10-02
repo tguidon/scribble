@@ -16,6 +16,7 @@ import {
 } from "./lib/store.mjs";
 import { startServer } from "./lib/app.mjs";
 import { pendingFeedback, acknowledgeFeedback } from "./lib/handoff.mjs";
+import { excludeStorage } from "./lib/git-exclude.mjs";
 const cli = fileURLToPath(import.meta.url);
 const packageRoot = resolve(dirname(cli), "..");
 const delay = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -123,6 +124,7 @@ async function main() {
   return values.child ? start() : withStartLock(root, start);
 }
 async function start() {
+  if (!values.child) await excludeStorage(root);
   if (!values.child && !values.new && !values.session) {
     const pending = await pendingFeedback(root);
     if (pending.length) {
