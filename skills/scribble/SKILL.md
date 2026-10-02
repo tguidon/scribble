@@ -1,5 +1,6 @@
 ---
 name: scribble
+disable-model-invocation: true
 description: Collect visual feedback from the user in a local screenshot canvas. Use when the user invokes scribble or wants to annotate screenshots with pins, arrows, rectangles, drawings, and comments for a coding task.
 ---
 
