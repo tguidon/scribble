@@ -101,7 +101,6 @@ export class WebCapture {
         await route.continue();
       });
       this.context.on("page", (page) => {
-        this.page = page;
         void this.guard(page).catch(() => page.close().catch(() => {}));
         page.on("dialog", (dialog) => dialog.dismiss().catch(() => {}));
       });

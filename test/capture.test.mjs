@@ -90,6 +90,19 @@ test("controlled webpage captures preserve navigation, scroll, viewport, and fro
   assert.notDeepEqual(first.bytes, second.bytes);
   await web.page.getByRole("link").click();
   assert.equal((await web.capture()).source.url, url + "/next");
+  // Unrelated tabs must not silently replace the explicitly opened capture page.
+  const originalPage = web.page;
+  const secondTab = await web.context.newPage();
+  await web.guard(secondTab);
+  await secondTab.goto(url + "/second-tab");
+  await secondTab.bringToFront();
+  assert.equal((await web.capture()).source.url, url + "/next");
+  await web.focus();
+  assert.equal(web.page, originalPage);
+  await originalPage.close();
+  await assert.rejects(web.capture(), /Open a webpage/);
+  await web.open({ url, width: 800, height: 600 });
+  assert.equal((await web.capture()).source.url, url + "/");
   await assert.rejects(
     web.open({ url: url + "/redirect", width: 800, height: 600 }),
     /did not open/,
@@ -101,7 +114,8 @@ test("controlled webpage captures preserve navigation, scroll, viewport, and fro
 test("simulator consumes exactly one bounded frame and detects rotation and disconnection", async (t) => {
   const root = await temp(t);
   let orientation = "portrait",
-    frameCount = 0;
+    frameCount = 0,
+    rotateDuringFrame = false;
   const url = await server(t, (req, res) => {
     if (req.url.endsWith("/config")) {
       res.end(JSON.stringify({ width: 1, height: 1, orientation }));
@@ -113,6 +127,7 @@ test("simulator consumes exactly one bounded frame and detects rotation and disc
     }
     if (req.url.endsWith("/stream.mjpeg")) {
       frameCount++;
+      if (rotateDuringFrame) orientation = "portrait";
       res.setHeader(
         "Content-Type",
         "multipart/x-mixed-replace; boundary=frame",
@@ -154,6 +169,8 @@ test("simulator consumes exactly one bounded frame and detects rotation and disc
     new URL(sim.state().previewUrl).searchParams.get("device"),
     device.id,
   );
+  rotateDuringFrame = true;
+  await assert.rejects(sim.capture(), /rotated during capture/);
   await sim.close();
   await assert.rejects(sim.capture(), /Connect a simulator/);
   await assert.rejects(sim.open({ deviceId: "bad" }), /Choose a booted/);

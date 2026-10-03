@@ -5,6 +5,7 @@ import {
   Plus,
   Scan,
   Upload,
+  Camera,
   ArrowUpRight,
 } from "lucide-react";
 import type { Annotation, Point, Screenshot, Tool } from "../types";
@@ -20,6 +21,7 @@ type Props = {
   onMark: (mark: Annotation) => void;
   onUpload: () => void;
   onExample: () => void;
+  onCapture: () => void;
   disabled: boolean;
   children: React.ReactNode;
 };
@@ -32,6 +34,7 @@ export function Canvas({
   onMark,
   onUpload,
   onExample,
+  onCapture,
   disabled,
   children,
 }: Props) {
@@ -216,7 +219,20 @@ export function Canvas({
   return (
     <section className="canvas-area" aria-label="Screenshot canvas">
       <div className="canvas-heading">
-        <span>{image ? image.name : "Your canvas"}</span>
+        <span
+          title={image?.source?.kind === "web" ? image.source.url : undefined}
+        >
+          {image ? image.name : "Your canvas"}
+          {image?.source && (
+            <span className="capture-origin">
+              {" "}
+              ·{" "}
+              {image.source.kind === "web"
+                ? "Web capture"
+                : "Simulator capture"}
+            </span>
+          )}
+        </span>
         {image && (
           <span className="image-dimensions">
             {image.width} × {image.height}
@@ -318,6 +334,14 @@ export function Canvas({
             <span className="file-hint">
               or paste with <kbd>⌘</kbd> <kbd>V</kbd> · PNG, JPG, WebP
             </span>
+            <button
+              className="text-button live-capture-empty"
+              onClick={onCapture}
+              disabled={disabled}
+            >
+              <Camera size={17} />
+              Capture a webpage or simulator
+            </button>
             <button
               className="text-button example-button"
               onClick={onExample}

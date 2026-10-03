@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { loadSession, request, saveDraft, sessionId, uploadImage } from "./api";
-import type { Draft, Session } from "./types";
+import type { CaptureKind, Draft, Session } from "./types";
 import {
   draftBytes,
   MAX_DRAFT_BYTES,
@@ -23,6 +23,9 @@ export function useSession() {
   const [busy, setBusy] = useState(false);
   const [recovery, setRecovery] = useState<Backup>();
   const pending = useRef<PendingSave | undefined>(undefined);
+  const pendingCapture = useRef<
+    { kind: CaptureKind; captureId: string } | undefined
+  >(undefined);
   const current = useRef<Session | undefined>(undefined);
   const generation = useRef(0);
   const saved = useRef(0);
@@ -225,6 +228,52 @@ export function useSession() {
     },
     [enqueue, flush, update],
   );
+  const capture = useCallback(
+    async (kind: CaptureKind) => {
+      if (recovery)
+        throw new Error(
+          "Resolve the saved draft conflict before capturing a screen.",
+        );
+      setBusy(true);
+      setError("");
+      if (pendingCapture.current?.kind !== kind)
+        pendingCapture.current = { kind, captureId: crypto.randomUUID() };
+      const operation = pendingCapture.current;
+      try {
+        await flush();
+        return await enqueue(async () => {
+          let result: Session;
+          try {
+            result = await request<Session>("/capture/snapshot", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                ...operation,
+                revision: revision.current,
+              }),
+            });
+          } catch (error) {
+            const recovered = await loadSession().catch(() => undefined);
+            if (
+              !recovered?.images.some(
+                (image) => image.id === operation.captureId,
+              )
+            )
+              throw error;
+            result = recovered;
+          }
+          revision.current = result.revision;
+          pendingCapture.current = undefined;
+          update(result);
+          setSaveState("saved");
+          return result;
+        });
+      } finally {
+        setBusy(false);
+      }
+    },
+    [enqueue, flush, update, recovery],
+  );
   const submit = useCallback(async () => {
     setBusy(true);
     setError("");
@@ -277,6 +326,7 @@ export function useSession() {
     },
     change,
     upload,
+    capture,
     submit,
     flush,
   };

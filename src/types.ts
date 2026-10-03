@@ -16,7 +16,28 @@ export type Screenshot = {
   file: string;
   mime: string;
   annotations: Annotation[];
+  source?: CaptureSource;
 };
+export type CaptureKind = "web" | "simulator";
+export type CaptureSource = {
+  capturedAt: string;
+} & (
+  | {
+      kind: "web";
+      url: string;
+      title: string;
+      viewport: { width: number; height: number };
+      scroll: { x: number; y: number };
+      deviceScaleFactor: number;
+    }
+  | {
+      kind: "simulator";
+      provider: "serve-sim";
+      device: { id: string; name: string };
+      orientation: string;
+      appBundleId?: string;
+    }
+);
 export type Session = {
   id: string;
   title: string;

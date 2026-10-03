@@ -15,13 +15,21 @@ import {
   AlertCircle,
   Download,
   PencilLine,
+  Camera,
 } from "lucide-react";
 import { Canvas } from "./components/Canvas";
+import { CapturePanel } from "./components/CapturePanel";
 import { Toolbar } from "./components/Toolbar";
 import { useSession } from "./useSession";
 import { feedbackUrl, imageUrl } from "./api";
 import { exampleFile } from "./example";
-import { INKS, type Annotation, type Draft, type Tool } from "./types";
+import {
+  INKS,
+  type Annotation,
+  type Draft,
+  type Tool,
+  type CaptureKind,
+} from "./types";
 export default function App() {
   const {
     session,
@@ -34,10 +42,13 @@ export default function App() {
     useSavedDraft,
     change,
     upload,
+    capture,
     submit,
     flush,
   } = useSession();
   const busy = working || !!recovery;
+  const [captureOpen, setCaptureOpen] = useState(false);
+  const [captureKind, setCaptureKind] = useState<CaptureKind>("web");
   const [activeId, setActiveId] = useState<string>();
   const [selected, setSelected] = useState<string | null>(null);
   const [tool, setTool] = useState<Tool>("pin");
@@ -56,7 +67,7 @@ export default function App() {
   const totalMarks =
     session?.images.reduce((n, i) => n + i.annotations.length, 0) || 0;
   const submitted = session?.status === "submitted";
-  const disabled = busy || !session || submitted;
+  const disabled = busy || !session || submitted || captureOpen;
   const currentDraft = useCallback(
     (): Draft => ({ message: session!.message, images: session!.images }),
     [session],
@@ -102,7 +113,11 @@ export default function App() {
   );
   useEffect(() => {
     const paste = (e: ClipboardEvent) => {
-      if ((e.target as HTMLElement).matches("textarea,input,[contenteditable]"))
+      if (
+        (e.target as HTMLElement).matches(
+          "textarea,input,select,[contenteditable]",
+        )
+      )
         return;
       const files = Array.from(e.clipboardData?.files || []);
       if (files.length) {
@@ -112,7 +127,9 @@ export default function App() {
     };
     const key = (e: KeyboardEvent) => {
       if (
-        (e.target as HTMLElement).matches("textarea,input,[contenteditable]") ||
+        (e.target as HTMLElement).matches(
+          "textarea,input,select,[contenteditable]",
+        ) ||
         disabled
       )
         return;
@@ -398,6 +415,20 @@ export default function App() {
             Another round of feedback? Call Scribble again in your agent.
           </p>
         </main>
+      ) : captureOpen ? (
+        <CapturePanel
+          kind={captureKind}
+          setKind={setCaptureKind}
+          onBack={() => setCaptureOpen(false)}
+          onCapture={async (kind) => {
+            const result = await capture(kind);
+            setPast([]);
+            setFuture([]);
+            setSelected(null);
+            setActiveId(result.images.at(-1)?.id);
+            setCaptureOpen(false);
+          }}
+        />
       ) : (
         <main className="workspace">
           <nav className="screenshot-rail" aria-label="Screenshots">
@@ -461,6 +492,18 @@ export default function App() {
                 <span>Add images</span>
               </button>
             </div>
+            <button
+              className="capture-shortcut"
+              onClick={() => setCaptureOpen(true)}
+              disabled={disabled}
+            >
+              <Camera size={19} />
+              <span>
+                {session.images.some((image) => image.source)
+                  ? "Resume live capture"
+                  : "Capture live app"}
+              </span>
+            </button>
             <div className="rail-footer">
               <ShieldCheck size={16} />
               <span>
@@ -478,6 +521,7 @@ export default function App() {
             onSelect={selectMark}
             onMark={addMark}
             onUpload={() => input.current?.click()}
+            onCapture={() => setCaptureOpen(true)}
             onExample={() => {
               void exampleFile()
                 .then((f) => addFiles([f]))
