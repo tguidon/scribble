@@ -1546,3 +1546,38 @@ kbd {
     max-width: 135px;
   }
 }
+
+.capture-apps {
+  margin-top: 18px;
+}
+.capture-app {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  color: var(--ink);
+}
+.capture-app:hover {
+  color: var(--blue);
+}
+.capture-app > span {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+.capture-app strong {
+  font-size: var(--text-body);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.capture-app span span {
+  font-size: var(--text-label);
+  color: #70685c;
+  overflow-wrap: anywhere;
+}
+.capture-app svg {
+  flex-shrink: 0;
+}

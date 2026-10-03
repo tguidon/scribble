@@ -1,5 +1,5 @@
 import { playwright } from "./runtime.mjs";
-import { localUrl, imageDimensions, captureError } from "./common.mjs";
+import { webpageUrl, imageDimensions, captureError } from "./common.mjs";
 
 export class WebCapture {
   constructor(root, options = {}) {
@@ -18,7 +18,7 @@ export class WebCapture {
           client.on("Fetch.requestPaused", (event) => {
             let allowed = false;
             try {
-              localUrl(event.request.url);
+              webpageUrl(event.request.url);
               allowed = true;
             } catch {}
             void client
@@ -53,7 +53,7 @@ export class WebCapture {
     return this.page;
   }
   async open(input) {
-    const url = localUrl(input.url).href;
+    const url = webpageUrl(input.url).href;
     const width = input.width ?? 1280,
       height = input.height ?? 900;
     if (
@@ -92,7 +92,7 @@ export class WebCapture {
         const request = route.request();
         if (request.isNavigationRequest() && !request.frame().parentFrame()) {
           try {
-            localUrl(request.url());
+            webpageUrl(request.url());
           } catch {
             await route.abort("blockedbyclient");
             return;
@@ -117,11 +117,11 @@ export class WebCapture {
       await page.goto(url, { waitUntil: "domcontentloaded", timeout: 20000 });
     } catch {
       throw captureError(
-        "The local page did not open. Check that its development server is running and the URL stays local.",
+        "The webpage did not open. Check the URL and connection. For a local app, make sure its development server is running.",
         502,
       );
     }
-    localUrl(page.url());
+    webpageUrl(page.url());
     await page.bringToFront();
     return this.state();
   }
@@ -138,7 +138,7 @@ export class WebCapture {
   async capture() {
     const page = this.currentPage();
     if (!page) throw captureError("Open a webpage before capturing it.", 409);
-    const url = localUrl(page.url()).href;
+    const url = webpageUrl(page.url()).href;
     // Metadata brackets the screenshot; discard captures changed by navigation or scroll.
     const before = await page.evaluate(() => ({
       url: location.href,

@@ -1,7 +1,7 @@
 ---
 name: scribble
 disable-model-invocation: true
-description: Collect visual feedback from the user in a local screenshot canvas. Use when the user invokes scribble or wants to annotate uploaded images, local webpages, or simulator captures for a coding task.
+description: Collect visual feedback from the user in a local screenshot canvas. Use when the user invokes scribble or wants to annotate uploaded images, webpages, or simulator captures for a coding task.
 ---
 
 # Scribble
@@ -21,7 +21,7 @@ The default storage directory is `.scribble` in the working project. Startup exc
 
 ## Live capture
 
-When the user requests a running webpage or simulator, open **Capture live app** in Scribble. If the source needs setup, run the relevant command from the project directory:
+When the user requests a running webpage or simulator, open **Capture live app** in Scribble. Selecting **Open browser** or **Connect simulator** installs missing tools automatically. To prepare tools ahead of time or recover a failed installation, run the relevant command:
 
 ```sh
 node "SKILL_DIRECTORY/scripts/scribble.mjs" setup web
@@ -30,7 +30,9 @@ node "SKILL_DIRECTORY/scripts/scribble.mjs" setup simulator
 
 Replace `SKILL_DIRECTORY` with its resolved absolute path. Pass the same `--dir` used for startup. Web setup installs Playwright and Chromium; simulator setup installs serve-sim. These downloads are only needed for the requested capture source. After setup, select **Refresh sources**.
 
-- **Webpage:** Start the project’s development server if needed. Enter its loopback URL, choose the viewport, and select **Open browser**. The user navigates in a separate visible browser, then selects **Capture & annotate** in Scribble. Capture uses the viewport of the tab opened through Scribble. Other tabs do not change the target; **Return to browser** restores the capture tab. The temporary profile has separate login state; navigation to external sites, including external sign-in pages, is blocked. A desktop session is required.
+- **Webpage:** For a local app, check the detected apps under **Running on this Mac**. Use the project’s development command if its server is not running. The user can also enter any public or local HTTP/HTTPS URL, including a bare hostname. Select **Open browser**. The user navigates in a separate visible browser, then selects **Capture & annotate** in Scribble. Capture uses the viewport of the tab opened through Scribble. Other tabs do not change the target; **Return to browser** restores the capture tab. The temporary profile has separate login state and supports external navigation. A desktop session is required.
 - **Simulator:** Requires an Apple Silicon Mac, Xcode, and a booted simulator. Build and launch the app with the project’s normal tools when requested. Select the device and **Connect simulator**, then open the live preview to navigate. Return to Scribble for **Capture & annotate**. Scribble reuses or starts serve-sim; no separate serve-sim skill is required.
 
 Each capture is a frozen image. The user can annotate it and select **Resume live capture** for another screen. Earlier images and marks remain unchanged. Closing the capture browser clears its temporary login state. Disconnecting a simulator leaves the simulator and shared preview running. A Scribble restart requires reconnecting sources; saved captures remain available.
+
+If capture reports an old or mismatched server, run the launcher again and reload the browser tab. For a pre-versioning server that fails its health check, inspect the reported PID and command before stopping it. Preserve the storage directory and restart with the recorded port and session so the user’s draft and browser backup remain available. Verify the current browser session after an upgrade, not only a separate test server.

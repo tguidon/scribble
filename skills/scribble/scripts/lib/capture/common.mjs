@@ -21,6 +21,41 @@ export function localUrl(value) {
     );
   return url;
 }
+export function webpageUrl(value) {
+  if (typeof value !== "string" || !value.trim())
+    throw captureError(
+      "Enter a webpage URL, such as example.com or localhost:3000.",
+    );
+  let text = value.trim();
+  if (!/^[a-z][a-z\d+.-]*:\/\//i.test(text)) {
+    const local = /^(localhost|127\.0\.0\.1|\[::1\])(?=[:/]|$)/i.test(text);
+    // Reject explicit non-web schemes instead of treating them as hostnames.
+    if (
+      !local &&
+      /^[a-z][a-z\d+.-]*:/i.test(text) &&
+      !/^[^/:]+:\d+(?:[/?#]|$)/.test(text)
+    )
+      throw captureError("Use an HTTP or HTTPS webpage URL.");
+    text = `${local ? "http" : "https"}://${text}`;
+  }
+  let url;
+  try {
+    url = new URL(text);
+  } catch {
+    throw captureError(
+      "Enter a valid webpage URL, such as https://example.com.",
+    );
+  }
+  if (
+    !["http:", "https:"].includes(url.protocol) ||
+    url.username ||
+    url.password
+  )
+    throw captureError(
+      "Use an HTTP or HTTPS URL without embedded credentials.",
+    );
+  return url;
+}
 export function imageDimensions(bytes) {
   let width, height;
   if (

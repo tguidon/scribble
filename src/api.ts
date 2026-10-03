@@ -1,4 +1,5 @@
 import type { Draft, Session } from "./types";
+import { version } from "../skills/scribble/version.json";
 const params = new URLSearchParams(location.hash.slice(1));
 const token = params.get("token") || "";
 export const sessionId = params.get("session") || "";
@@ -11,9 +12,15 @@ export async function request<T>(
     headers: {
       Authorization: `Bearer ${token}`,
       "X-Scribble-Session": sessionId,
+      "X-Scribble-Version": version,
       ...options.headers,
     },
   });
+  const serverVersion = response.headers.get("X-Scribble-Version");
+  if (serverVersion && serverVersion !== version)
+    throw new Error(
+      "The Scribble app and server versions differ. Run the Scribble skill again, then reload this tab. Saved feedback is preserved.",
+    );
   const data = await response.json();
   if (!response.ok)
     throw Object.assign(
@@ -52,4 +59,21 @@ export async function uploadImage(file: File): Promise<Session> {
     name: file.name,
   });
   return request<Session>(`/images?${query}`, { method: "POST", body: file });
+}
+
+export async function checkCaptureRuntime() {
+  let health: { version?: string };
+  try {
+    health = await request<{ version?: string }>("/health");
+  } catch (error) {
+    if ((error as { status?: number }).status === 404)
+      throw new Error(
+        "This Scribble server is too old for live capture. Ask your agent to restart Scribble, then reload this tab. Your saved draft is preserved.",
+      );
+    throw error;
+  }
+  if (health.version !== version)
+    throw new Error(
+      "The Scribble app and server versions differ. Run the Scribble skill again, then reload this tab. Saved feedback is preserved.",
+    );
 }

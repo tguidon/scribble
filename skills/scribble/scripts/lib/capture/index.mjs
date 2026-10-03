@@ -1,6 +1,11 @@
 import { WebCapture } from "./web.mjs";
 import { SimulatorCapture } from "./simulator.mjs";
-import { playwright, simCommand, setupCommand } from "./runtime.mjs";
+import {
+  playwright,
+  simCommand,
+  setupCommand,
+  ensureCapture,
+} from "./runtime.mjs";
 import { captureError } from "./common.mjs";
 
 export function createCaptures(root, options = {}) {
@@ -65,7 +70,11 @@ export function createCaptures(root, options = {}) {
         throw captureError("Choose a webpage or simulator.");
       return run(id, async (sources) => {
         const source = sources[input.kind];
-        if (action === "open") return source.open(input);
+        if (action === "open") {
+          if (!(input.kind === "simulator" && options.simulator?.command))
+            await ensureCapture(root, input.kind);
+          return source.open(input);
+        }
         if (action === "focus" && input.kind === "web") return source.focus();
         if (action === "disconnect") {
           await source.close();

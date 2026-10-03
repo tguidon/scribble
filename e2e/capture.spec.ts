@@ -53,6 +53,10 @@ test.beforeEach(async ({ page }) => {
     root,
     session,
     captureOptions: {
+      discovery: {
+        list: async () =>
+          `p123\ncnode\nn127.0.0.1:${new URL(sourceUrl).port}\n`,
+      },
       web: { headless: true, channel: "chrome" },
       simulator: {
         devices: async () => [device],
@@ -80,7 +84,10 @@ test("local capture opens, annotates, resumes, captures again, and submits both 
   await expect(
     page.getByRole("heading", { name: "Bring a live screen into focus." }),
   ).toBeFocused();
-  await page.getByLabel("Local page URL").fill(sourceUrl);
+  await page
+    .getByRole("button", { name: `Local workspace ${sourceUrl}` })
+    .click();
+  await expect(page.getByLabel("Webpage URL")).toHaveValue(sourceUrl);
   await page.getByRole("button", { name: "Open browser", exact: true }).click();
   await expect(
     page.getByRole("heading", { name: "Your browser is ready." }),
@@ -125,7 +132,7 @@ test("local capture opens, annotates, resumes, captures again, and submits both 
   await expect(
     page.getByRole("button", { name: "Return to browser" }),
   ).toBeVisible();
-  await page.getByLabel("Local page URL").fill(sourceUrl + "/details");
+  await page.getByLabel("Webpage URL").fill(sourceUrl + "/details");
   await page.getByRole("button", { name: "Open this URL" }).click();
   await expect(
     page.getByRole("button", { name: "Capture & annotate" }),
@@ -206,14 +213,14 @@ test("simulator selection captures into the same editor and supports disconnect"
   ).toBeVisible();
 });
 
-test("capture errors allow correction and unavailable tools show setup instructions", async ({
+test("capture errors allow correction and missing tools do not block first-use setup", async ({
   page,
 }) => {
   await page.getByRole("button", { name: "Capture live app" }).click();
-  await page.getByLabel("Local page URL").fill("https://example.com");
+  await page.getByLabel("Webpage URL").fill("file:///etc/passwd");
   await page.getByRole("button", { name: "Open browser", exact: true }).click();
-  await expect(page.getByRole("alert")).toContainText("localhost");
-  await page.getByLabel("Local page URL").fill(sourceUrl);
+  await expect(page.getByRole("alert")).toContainText("HTTP or HTTPS");
+  await page.getByLabel("Webpage URL").fill(sourceUrl);
   await page.getByRole("button", { name: "Open browser", exact: true }).click();
   await expect(
     page.getByRole("button", { name: "Capture & annotate" }),
@@ -230,9 +237,33 @@ test("capture errors allow correction and unavailable tools show setup instructi
   });
   await page.getByRole("button", { name: "Refresh sources" }).click();
   await expect(
-    page.getByRole("heading", { name: "One quick setup" }),
+    page.getByText(/First use installs the browser tools automatically/),
   ).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Open browser", exact: true }),
-  ).toBeDisabled();
+  ).toBeEnabled();
+});
+
+test("a stale backend explains recovery instead of showing Not found", async ({
+  page,
+}) => {
+  await page.route("**/api/health", (route) =>
+    route.fulfill({
+      status: 404,
+      contentType: "application/json",
+      body: JSON.stringify({ error: "Not found." }),
+    }),
+  );
+  await page
+    .getByRole("button", { name: "Capture live app", exact: true })
+    .click();
+  await expect(page.getByRole("alert")).toContainText(
+    "server is too old for live capture",
+  );
+  await expect(page.getByRole("alert")).toContainText(
+    "saved draft is preserved",
+  );
+  await page.unroute("**/api/health");
+  await page.getByRole("button", { name: "Refresh sources" }).click();
+  await expect(page.getByLabel("Webpage URL")).toBeVisible();
 });

@@ -35,7 +35,7 @@ export async function serverHealth(info) {
     (info.instanceId && health.instanceId !== info.instanceId)
   )
     throw new Error(
-      "The recorded Scribble process is still running but did not pass its health check. Retry shortly, or inspect and stop that process before restarting Scribble.",
+      `The recorded Scribble process (PID ${info.pid}) is still running but did not pass its health check. Retry shortly, or inspect and stop that process before restarting Scribble on port ${new URL(info.url).port}.`,
     );
   return health;
 }

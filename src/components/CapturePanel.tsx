@@ -8,7 +8,7 @@ import {
   RefreshCw,
   AlertCircle,
 } from "lucide-react";
-import { request } from "../api";
+import { checkCaptureRuntime, request } from "../api";
 import type { CaptureKind } from "../types";
 
 type Connection = {
@@ -38,14 +38,17 @@ export function CapturePanel({ kind, setKind, onBack, onCapture }: Props) {
   const [status, setStatus] = useState<Status>();
   const [devices, setDevices] = useState<{ id: string; name: string }[]>([]);
   const [deviceId, setDeviceId] = useState("");
-  const [url, setUrl] = useState("http://localhost:3000");
+  const [url, setUrl] = useState("");
+  const [apps, setApps] = useState<{ url: string; title: string }[]>([]);
+  const [discoveryMessage, setDiscoveryMessage] = useState("");
   const [width, setWidth] = useState(1280);
   const [height, setHeight] = useState(900);
-  const [busy, setBusy] = useState("");
+  const [busy, setBusy] = useState("Checking sources…");
   const [error, setError] = useState("");
   const heading = useRef<HTMLHeadingElement>(null);
   const connection = status?.[kind];
   const refresh = useCallback(async () => {
+    await checkCaptureRuntime();
     const next = await request<Status>("/capture/status");
     setStatus(next);
     if (next.web.connected && next.web.url) setUrl(next.web.url);
@@ -54,6 +57,19 @@ export function CapturePanel({ kind, setKind, onBack, onCapture }: Props) {
       setHeight(next.web.viewport.height);
     }
     if (next.simulator.device) setDeviceId(next.simulator.device.id);
+    if (kind === "web") {
+      const result = await request<{
+        apps: { url: string; title: string }[];
+        message?: string;
+      }>("/capture/apps");
+      setApps(result.apps);
+      setDiscoveryMessage(
+        result.message ||
+          (result.apps.length
+            ? ""
+            : "No running web apps found. Enter a URL, or start your app and refresh."),
+      );
+    }
     if (kind === "simulator" && next.simulator.supported) {
       const result = await request<{ devices: { id: string; name: string }[] }>(
         "/capture/devices",
@@ -133,27 +149,58 @@ export function CapturePanel({ kind, setKind, onBack, onCapture }: Props) {
               <form
                 onSubmit={(event) => {
                   event.preventDefault();
-                  void perform("Opening browser…", async () => {
-                    await action("open", { kind, url, width, height });
-                    await refresh();
-                  });
+                  void perform(
+                    connection?.available
+                      ? "Opening browser…"
+                      : "Installing capture tools and opening browser…",
+                    async () => {
+                      await action("open", { kind, url, width, height });
+                      await refresh();
+                    },
+                  );
                 }}
               >
                 <label className="capture-field">
-                  Local page URL
+                  Webpage URL
                   <input
-                    type="url"
+                    type="text"
+                    inputMode="url"
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
                     required
                     value={url}
                     onChange={(event) => setUrl(event.target.value)}
-                    placeholder="http://localhost:3000"
+                    placeholder="example.com or localhost:3000"
                     disabled={!!busy}
                   />
                 </label>
                 <p className="capture-hint">
-                  Open your running development server in a separate capture
-                  browser.
+                  Open any website or local app in a separate capture browser.
                 </p>
+                <div className="capture-apps" aria-label="Running web apps">
+                  {apps.length > 0 && (
+                    <p className="capture-hint">Running on this Mac</p>
+                  )}
+                  {apps.map((app) => (
+                    <button
+                      type="button"
+                      className="capture-app"
+                      key={app.url}
+                      disabled={!!busy}
+                      onClick={() => setUrl(app.url)}
+                    >
+                      <Globe size={17} />
+                      <span>
+                        <strong>{app.title}</strong>
+                        <span>{app.url}</span>
+                      </span>
+                    </button>
+                  ))}
+                  {discoveryMessage && (
+                    <p className="capture-hint">{discoveryMessage}</p>
+                  )}
+                </div>
                 <div className="capture-dimensions">
                   <label className="capture-field">
                     Width <span>px</span>
@@ -186,7 +233,7 @@ export function CapturePanel({ kind, setKind, onBack, onCapture }: Props) {
                 <button
                   className="secondary capture-open"
                   type="submit"
-                  disabled={!!busy || !connection?.available}
+                  disabled={!!busy}
                 >
                   <Globe size={17} />
                   {connection?.connected ? "Open this URL" : "Open browser"}
@@ -220,17 +267,17 @@ export function CapturePanel({ kind, setKind, onBack, onCapture }: Props) {
                 </p>
                 <button
                   className="secondary capture-open"
-                  disabled={
-                    !!busy ||
-                    !deviceId ||
-                    !connection?.available ||
-                    !connection?.supported
-                  }
+                  disabled={!!busy || !deviceId || !connection?.supported}
                   onClick={() =>
-                    void perform("Connecting simulator…", async () => {
-                      await action("open", { kind, deviceId });
-                      await refresh();
-                    })
+                    void perform(
+                      connection?.available
+                        ? "Connecting simulator…"
+                        : "Installing serve-sim and connecting…",
+                      async () => {
+                        await action("open", { kind, deviceId });
+                        await refresh();
+                      },
+                    )
                   }
                 >
                   <Smartphone size={17} />
@@ -241,16 +288,11 @@ export function CapturePanel({ kind, setKind, onBack, onCapture }: Props) {
             {connection &&
               !connection.available &&
               (kind === "web" || connection.supported) && (
-                <div className="capture-setup">
-                  <h2>One quick setup</h2>
-                  <p>
-                    Ask your agent to run this command, then refresh. It
-                    installs the tools for{" "}
-                    {kind === "web" ? "webpage" : "simulator"} capture in this
-                    project’s local storage.
-                  </p>
-                  <code>{connection.setupCommand}</code>
-                </div>
+                <p className="capture-hint">
+                  First use installs{" "}
+                  {kind === "web" ? "the browser tools" : "serve-sim"}{" "}
+                  automatically. This download can take a few minutes.
+                </p>
               )}
             {connection?.connected && (
               <section

@@ -5,6 +5,7 @@ import { execFile, spawn } from "node:child_process";
 import { promisify } from "node:util";
 import { mkdir } from "node:fs/promises";
 import { captureError } from "./common.mjs";
+import { withStartLock } from "../lock.mjs";
 const exec = promisify(execFile);
 export const CAPTURE_PACKAGES = {
   web: "playwright@1.63.0",
@@ -97,4 +98,36 @@ export async function setupCapture(root, kind) {
     );
     await run(process.execPath, [cli, "install", "chromium"]);
   }
+}
+
+// Serialize package changes across sessions and CLI setup without duplicate downloads.
+const preparations = new Map();
+export async function ensureCapture(root, kind) {
+  const available = async () => {
+    try {
+      if (kind === "web") playwright(root);
+      else await simCommand(root);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+  if (await available()) return;
+  const key = `${root}:${kind}`;
+  if (!preparations.has(key)) {
+    const task = withStartLock(root, async () => {
+      if (!(await available())) {
+        try {
+          await setupCapture(root, kind);
+        } catch {
+          throw captureError(
+            `Could not install the capture tools. Check your internet connection and retry, or run: ${setupCommand(root, kind)}`,
+            503,
+          );
+        }
+      }
+    }).finally(() => preparations.delete(key));
+    preparations.set(key, task);
+  }
+  return preparations.get(key);
 }

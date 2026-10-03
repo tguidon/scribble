@@ -11,6 +11,7 @@ import {
 } from "../skills/scribble/scripts/lib/capture/simulator.mjs";
 import {
   localUrl,
+  webpageUrl,
   imageDimensions,
 } from "../skills/scribble/scripts/lib/capture/common.mjs";
 import { createSession } from "../skills/scribble/scripts/lib/store.mjs";
@@ -53,16 +54,30 @@ test("capture URLs are local and captured dimensions come from image bytes", () 
     "not a url",
   ])
     assert.throws(() => localUrl(url));
+  assert.equal(webpageUrl("example.com/path").href, "https://example.com/path");
+  assert.equal(webpageUrl("localhost:3000").href, "http://localhost:3000/");
+  assert.equal(webpageUrl("https://example.com").hostname, "example.com");
+  for (const url of [
+    "file:///etc/passwd",
+    "javascript:alert(1)",
+    "ftp://example.com",
+    "https://user:pass@example.com",
+    " ",
+  ])
+    assert.throws(() => webpageUrl(url));
   assert.deepEqual(imageDimensions(png), { width: 1, height: 1 });
   assert.throws(() => imageDimensions(Buffer.alloc(30)));
 });
 
 test("controlled webpage captures preserve navigation, scroll, viewport, and frozen bytes", async (t) => {
   const root = await temp(t);
+  const destination = await server(t, (_req, res) =>
+    res.end("<title>Redirect destination</title><h1>Another origin</h1>"),
+  );
   const url = await server(t, (req, res) => {
     res.setHeader("Content-Type", "text/html");
     if (req.url === "/redirect") {
-      res.writeHead(302, { Location: "https://example.com" });
+      res.writeHead(302, { Location: destination });
       res.end();
       return;
     }
@@ -103,10 +118,16 @@ test("controlled webpage captures preserve navigation, scroll, viewport, and fro
   await assert.rejects(web.capture(), /Open a webpage/);
   await web.open({ url, width: 800, height: 600 });
   assert.equal((await web.capture()).source.url, url + "/");
-  await assert.rejects(
-    web.open({ url: url + "/redirect", width: 800, height: 600 }),
-    /did not open/,
+  await web.context.route("https://capture.example/**", (route) =>
+    route.fulfill({
+      contentType: "text/html",
+      body: "<title>Public capture</title><h1>Public URL</h1>",
+    }),
   );
+  await web.open({ url: "https://capture.example/", width: 800, height: 600 });
+  assert.equal((await web.capture()).source.url, "https://capture.example/");
+  await web.open({ url: url + "/redirect", width: 800, height: 600 });
+  assert.equal((await web.capture()).source.url, destination + "/");
   await web.close();
   await assert.rejects(web.capture(), /Open a webpage/);
 });
@@ -215,6 +236,13 @@ test("capture API saves immutable images, retries without duplicates, and submit
     ).status,
     200,
   );
+  const mismatch = await fetch(origin + "/api/draft", {
+    method: "PUT",
+    headers: { ...headers, "X-Scribble-Version": "0.0.0" },
+    body: JSON.stringify({}),
+  });
+  assert.equal(mismatch.status, 409);
+  assert.match((await mismatch.json()).error, /versions differ/);
   const snapshot = { kind: "web", captureId: "first-capture", revision: 0 };
   const captured = await (await call("/capture/snapshot", snapshot)).json();
   assert.equal(captured.images.length, 1);

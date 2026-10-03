@@ -15,6 +15,7 @@ import { draftBytes, MAX_DRAFT_BYTES, DRAFT_TOO_LARGE } from "./limits.mjs";
 import { acquireServerLease } from "./lock.mjs";
 import { VERSION, SERVER_PROTOCOL } from "./version.mjs";
 import { createCaptures } from "./capture/index.mjs";
+import { discoverWebApps } from "./capture/discovery.mjs";
 const appRoot = fileURLToPath(new URL("../../", import.meta.url));
 const mime = {
   ".html": "text/html",
@@ -109,6 +110,7 @@ export async function startServer({
         })
       : null;
     server = createServer(async (req, res) => {
+      res.setHeader("X-Scribble-Version", VERSION);
       res.setHeader("X-Content-Type-Options", "nosniff");
       res.setHeader("Referrer-Policy", "no-referrer");
       res.setHeader("X-Frame-Options", "DENY");
@@ -181,6 +183,14 @@ export async function startServer({
           return;
         }
         if (closing) fail(503, "Scribble is restarting. Retry shortly.");
+        if (
+          req.headers["x-scribble-version"] &&
+          req.headers["x-scribble-version"] !== VERSION
+        )
+          fail(
+            409,
+            "The Scribble app and server versions differ. Run the Scribble skill again, then reload this tab. Saved feedback is preserved.",
+          );
         // Receive slow bodies before acquiring the session's write queue.
         const upload = req.method === "POST" && url.pathname === "/api/images";
         const input = upload
@@ -195,6 +205,15 @@ export async function startServer({
         if (url.pathname.startsWith("/api/capture/")) {
           if (req.method === "GET" && url.pathname === "/api/capture/status")
             return reply(res, 200, await captures.status(id));
+          if (req.method === "GET" && url.pathname === "/api/capture/apps")
+            return reply(
+              res,
+              200,
+              await discoverWebApps({
+                excludePorts: [server.address().port],
+                ...captureOptions.discovery,
+              }),
+            );
           if (req.method === "GET" && url.pathname === "/api/capture/devices")
             return reply(res, 200, { devices: await captures.devices(id) });
           if (authenticated.status !== "draft")
@@ -404,6 +423,14 @@ export async function startServer({
           fail(404, "Not found.");
         };
         if (closing) fail(503, "Scribble is restarting. Retry shortly.");
+        if (
+          req.headers["x-scribble-version"] &&
+          req.headers["x-scribble-version"] !== VERSION
+        )
+          fail(
+            409,
+            "The Scribble app and server versions differ. Run the Scribble skill again, then reload this tab. Saved feedback is preserved.",
+          );
         if (req.method === "GET") await operate();
         else await serialize(id, operate);
       } catch (error) {
