@@ -1,6 +1,6 @@
 {
   "name": "scribble-feedback",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "private": true,
   "type": "module",
   "description": "A local sketchbook for visual feedback to coding agents.",

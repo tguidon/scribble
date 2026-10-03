@@ -2,7 +2,7 @@
 
 **Show your agent what you mean.**
 
-Scribble is a local browser canvas for visual feedback to Codex and Claude Code. Screenshots, marks, and comments show your agent what to change.
+Scribble is a local browser canvas for visual feedback to Codex and Claude Code. Screenshots, marks, and comments show your agent what to change. Upload images or capture a local webpage or simulator screen.
 
 No account, hosted backend, or model API key is required.
 
@@ -10,7 +10,7 @@ No account, hosted backend, or model API key is required.
 
 ## Install
 
-Scribble requires **Node.js 22 or newer**. The skill includes the browser app and server. No separate build or dependency installation is required.
+Scribble requires **Node.js 22 or newer**. The skill includes the browser app and server. Screenshot uploads need no separate build or dependency installation. Live capture uses optional tools, described below.
 
 From your project directory, run:
 
@@ -30,6 +30,8 @@ Add `--global` to install across projects. The [skills CLI documentation](https:
 
 ### Test a fixed release
 
+The `0.0.2` release supports screenshot uploads. Live capture is available from the default branch.
+
 To install the `0.0.2` release:
 
 ```sh
@@ -42,13 +44,63 @@ This uses the skills CLI’s [direct repository path format](https://github.com/
 
 1. Run **`$scribble` in Codex** or **`/scribble` in Claude Code**.
 2. Open the session link from your agent.
-3. Upload, paste, or drag screenshots onto the canvas.
+3. Upload, paste, or drag screenshots onto the canvas. To capture a running app, select **Capture live app**.
 4. Add pins, arrows, rectangles, or freehand marks.
 5. Add a comment to each mark that needs an explanation.
 6. To describe the overall goal, add a message for the session.
 7. Select **Send to agent**.
 
 The agent receives your screenshots, mark positions, and comments in one feedback bundle. The canvas also supports undo, redo, zoom, and pan.
+
+## Capture a running app
+
+Scribble saves each capture as a still image in the same annotation editor. Your app keeps running. Later captures do not change earlier images or marks.
+
+### Set up capture tools
+
+Run the setup command for the source you need. From this repository:
+
+```sh
+node bin/scribble.mjs setup web
+node bin/scribble.mjs setup simulator
+```
+
+For an installed skill, replace `bin/scribble.mjs` with the absolute path to its `scripts/scribble.mjs` file. The capture screen shows the complete command. If you use custom storage, pass the same `--dir PATH` to setup and startup.
+
+- **Webpage:** Setup installs Playwright and downloads Chromium. A desktop session is required to display the capture browser.
+- **Simulator:** Setup installs serve-sim. Capture requires an Apple Silicon Mac, Xcode, and a booted simulator. Scribble also accepts serve-sim on `PATH`.
+
+The optional packages live in `.scribble/capture-runtime/`. Chromium uses Playwright’s browser cache. Setup requires internet access. Scribble stores captured images and feedback locally.
+
+### Capture a local webpage
+
+1. Start your app’s development server.
+2. Select **Capture live app**, then **Webpage**.
+3. Enter its local URL and the viewport dimensions.
+4. Select **Open browser**.
+5. Navigate to the screen you want in the capture browser.
+6. Return to Scribble and select **Capture & annotate**.
+
+Scribble captures the visible viewport of the tab opened with **Open browser**. Other tabs do not change the capture target. **Return to browser** brings the capture tab to the front. Each capture records the URL, page title, viewport dimensions, scroll position, and capture time.
+
+The capture browser has a separate temporary profile. It does not share your normal browser’s logins. URLs must use HTTP or HTTPS on `localhost`, `127.0.0.1`, or `[::1]`. External page navigation is blocked, including external sign-in pages. Pages can still load external images, scripts, and API data.
+
+### Capture a simulator
+
+1. Launch your app in Simulator.
+2. Select **Capture live app**, then **Simulator**.
+3. Choose a booted device and select **Connect simulator**.
+4. Select **Open live simulator**.
+5. Navigate to the screen you want in the live preview.
+6. Return to Scribble and select **Capture & annotate**.
+
+Scribble reuses or starts serve-sim for the selected device. Each capture records the device, orientation, capture time, and app identifier when available.
+
+### Continue a review
+
+Select **Resume live capture** to return to a source and capture another screen. Add marks and comments in the editor, then select **Send to agent**. The feedback bundle and brief include each image’s capture context.
+
+**Close capture browser** closes the temporary browser and clears its login state. **Disconnect simulator** leaves the simulator and shared serve-sim preview running. Source connections end when Scribble stops; saved images and feedback remain available.
 
 ## Sessions and saved drafts
 
@@ -102,7 +154,7 @@ Open the full session URL from the terminal. Keep the token after `#` in the URL
 | `npm test` | Run server, storage, and launcher tests |
 | `npm run test:e2e` | Run browser tests with an installed Google Chrome |
 
-The complete skill is in `skills/scribble/`. The production server uses only Node built-ins. Vite writes the browser build to `skills/scribble/app/`. The skills installer copies these files without a build step.
+The complete skill is in `skills/scribble/`. The core server uses only Node built-ins. Optional capture adapters load Playwright or call serve-sim. Vite writes the browser build to `skills/scribble/app/`. The skills installer copies these files without a build step.
 
 After UI changes, run `npm run build`. Then commit the updated `skills/scribble/app/` directory with the source changes.
 
@@ -129,6 +181,8 @@ For an installed skill, use `node /absolute/path/to/skills/scribble/scripts/scri
 | `ack --session ID` | Mark submitted feedback as read after inspecting its images |
 | `status` | Show the latest session, unread feedback, and recorded server version and process |
 | `stop` | Shut down the authenticated server and preserve saved feedback |
+| `setup web` | Install Playwright and Chromium for local webpage capture |
+| `setup simulator` | Install serve-sim for simulator capture |
 | `--version` | Print the installed version |
 
 Common flags are `--dir PATH`, `--port NUMBER`, and `--title TEXT`. The default port is 0, which selects an available port. Background server logs are in `.scribble/server.log`.

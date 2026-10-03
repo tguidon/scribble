@@ -99,7 +99,10 @@ wait exits with code 2 on timeout. feedback rereads a submission without acknowl
 wait and feedback return a Markdown brief with image paths and computed geometry.
 The brief is saved as feedback.md. --full returns the original JSON, including all drawing points.
 start reuses a matching server or restarts an older version on the same port.
-stop shuts down the authenticated server. Drafts and submissions remain on disk.
+stop shuts down the authenticated server and capture browsers. Drafts and submissions remain on disk.
+setup web installs Playwright and Chromium; a desktop session is required for capture.
+setup simulator installs serve-sim; an Apple Silicon Mac with Xcode is required.
+Optional tools are installed in the storage directory. Uploading screenshots needs no setup.
 Before an upgrade or stop, wait for Draft saved in open browser tabs. Reload after upgrading.
 Update an installation with: npx skills add tguidon/scribble
 Developers changing the UI in this repository must run npm run build before committing.`);

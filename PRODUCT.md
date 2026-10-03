@@ -15,10 +15,13 @@ People working with coding agents who need to explain visual changes using scree
 Show your agent what you mean. Screenshot annotations and comments should communicate a change faster than describing its location in prose.
 
 ## Operating Context
-An agent skill starts a local browser canvas and waits for feedback. Users upload, paste, or drop screenshots, annotate them, and send a batch back to the agent. The shared app supports Codex and Claude Code. Install with npx skills; the skill is explicitly invoked. The launcher checks whether a healthy local server exists, reuses it, and starts one when needed. The installed skill carries the built web app and dependency-free Node runtime.
+An agent skill starts a local browser canvas and waits for feedback. Users upload screenshots or capture a local webpage or simulator, annotate frozen images, and send a batch back to the agent. The shared app supports Codex and Claude Code. Install with npx skills; the skill is explicitly invoked. The launcher checks whether a healthy local server exists, reuses it, and starts one when needed. The installed skill carries the built web app and Node runtime. Screenshot uploads need no extra dependencies; live capture uses optional Playwright and serve-sim packages.
 
 ## Capabilities and Constraints
 - Multiple screenshots; pins, arrows, rectangles, and freehand drawing.
+- Local webpage capture from a separate browser, with URL and viewport context.
+- Simulator capture through serve-sim, with device and orientation context.
+- Return to a live source for another capture while preserving earlier images and feedback.
 - Comments on individual annotations and one overall message.
 - Screenshot navigation, undo, zoom, pan, and automatic draft saving.
 - A structured bundle with original images, annotation coordinates, comments, and overall feedback.
