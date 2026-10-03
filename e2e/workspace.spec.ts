@@ -332,6 +332,13 @@ test("a genuine conflict preserves a downloadable backup until explicitly dismis
   await expect(message).toBeDisabled();
   await page.reload();
   await page.setViewportSize({ width: 390, height: 844 });
+  await page.getByText("View unsaved draft", { exact: true }).click();
+  const preview = page.getByRole("textbox", { name: "Unsaved draft backup" });
+  await expect(preview).toBeVisible();
+  expect(JSON.parse(await preview.inputValue()).message).toBe(
+    "My unsaved draft must survive.",
+  );
+  await expect(preview).toHaveAttribute("readonly", "");
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,

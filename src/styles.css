@@ -876,6 +876,20 @@ kbd {
 .error-banner > button:not(.icon-button) {
   text-decoration: underline;
 }
+.recovery-preview {
+  flex: 1 1 100%;
+  min-width: 0;
+}
+.recovery-preview summary {
+  cursor: pointer;
+}
+.recovery-preview p {
+  margin: 10px 0;
+}
+.recovery-preview textarea {
+  width: 100%;
+  font-size: var(--text-body);
+}
 .opening {
   flex: 1;
   display: flex;

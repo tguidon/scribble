@@ -337,6 +337,19 @@ export default function App() {
             <>
               <button onClick={downloadRecovery}>Download unsaved draft</button>
               <button onClick={useSavedDraft}>Use saved draft</button>
+              <details className="recovery-preview">
+                <summary>View unsaved draft</summary>
+                <p>
+                  If the download does not start, copy this backup before using
+                  the saved draft.
+                </p>
+                <textarea
+                  aria-label="Unsaved draft backup"
+                  readOnly
+                  value={JSON.stringify(recovery.draft, null, 2)}
+                  rows={8}
+                />
+              </details>
             </>
           )}
           {!recovery && saveState === "offline" && session && (
