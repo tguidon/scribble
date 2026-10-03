@@ -20,6 +20,7 @@ import { excludeStorage } from "./lib/git-exclude.mjs";
 import { VERSION, SERVER_PROTOCOL } from "./lib/version.mjs";
 import { serverHealth, stopServer } from "./lib/lifecycle.mjs";
 import { writeFeedbackBrief } from "./lib/brief.mjs";
+import { setupCapture } from "./lib/capture/runtime.mjs";
 const cli = fileURLToPath(import.meta.url);
 const packageRoot = resolve(dirname(cli), "..");
 const delay = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -81,6 +82,7 @@ async function main() {
   scribble stop
   scribble status
   scribble --version
+  scribble setup web|simulator
 
 Install: npx skills add tguidon/scribble
 Installed skills include the app and server. Node.js 22+ is required; no build is needed.
@@ -101,6 +103,12 @@ stop shuts down the authenticated server. Drafts and submissions remain on disk.
 Before an upgrade or stop, wait for Draft saved in open browser tabs. Reload after upgrading.
 Update an installation with: npx skills add tguidon/scribble
 Developers changing the UI in this repository must run npm run build before committing.`);
+    return;
+  }
+  if (command === "setup") {
+    await excludeStorage(root);
+    await withStartLock(root, () => setupCapture(root, positionals[1]));
+    print({ ready: true, capture: positionals[1], root });
     return;
   }
   if (command === "stop") {

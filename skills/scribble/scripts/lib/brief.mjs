@@ -209,6 +209,13 @@ export function renderFeedbackBrief(bundle) {
       `Dimensions: ${image.width} × ${image.height} px. Marks: ${marks.length}.`,
       "",
     );
+    if (image.source) {
+      lines.push(
+        "Capture context (recorded with this frozen image):",
+        literal(JSON.stringify(image.source, null, 2)),
+        "",
+      );
+    }
     for (const mark of marks) {
       lines.push(
         `### Mark ${mark.number} — ${mark.type}`,

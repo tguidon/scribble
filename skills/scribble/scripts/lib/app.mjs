@@ -14,6 +14,7 @@ import { imageKind, validateDraft } from "./validation.mjs";
 import { draftBytes, MAX_DRAFT_BYTES, DRAFT_TOO_LARGE } from "./limits.mjs";
 import { acquireServerLease } from "./lock.mjs";
 import { VERSION, SERVER_PROTOCOL } from "./version.mjs";
+import { createCaptures } from "./capture/index.mjs";
 const appRoot = fileURLToPath(new URL("../../", import.meta.url));
 const mime = {
   ".html": "text/html",
@@ -61,9 +62,11 @@ export async function startServer({
   session: initial,
   port = 0,
   dev = false,
+  captureOptions = {},
 }) {
   const initialSession = initial;
   const release = await acquireServerLease(root);
+  const captures = createCaptures(root, captureOptions);
   const queues = new Map();
   const serialize = (id, task) => {
     const operation = (queues.get(id) || Promise.resolve()).then(task);
@@ -87,6 +90,7 @@ export async function startServer({
         try {
           await new Promise((resolve) => server.close(resolve));
           await Promise.all([...queues.values()]);
+          await captures.close();
           await release();
         } finally {
           clearTimeout(timer);
@@ -157,7 +161,7 @@ export async function startServer({
             );
           return session;
         };
-        await authenticate();
+        const authenticated = await authenticate();
         if (req.method === "GET" && url.pathname === "/api/health")
           return reply(res, 200, {
             pid: process.pid,
@@ -188,6 +192,30 @@ export async function startServer({
           : ["PUT", "POST"].includes(req.method)
             ? await json(req)
             : null;
+        if (url.pathname.startsWith("/api/capture/")) {
+          if (req.method === "GET" && url.pathname === "/api/capture/status")
+            return reply(res, 200, await captures.status(id));
+          if (req.method === "GET" && url.pathname === "/api/capture/devices")
+            return reply(res, 200, { devices: await captures.devices(id) });
+          if (authenticated.status !== "draft")
+            fail(
+              409,
+              "Start a new feedback session to capture another screen.",
+            );
+          if (
+            req.method === "POST" &&
+            [
+              "/api/capture/open",
+              "/api/capture/focus",
+              "/api/capture/disconnect",
+            ].includes(url.pathname)
+          )
+            return reply(
+              res,
+              200,
+              await captures.command(id, url.pathname.split("/").pop(), input),
+            );
+        }
         const operate = async () => {
           let session = await authenticate();
           const dir = sessionDir(root, session.id);
@@ -235,11 +263,36 @@ export async function startServer({
               409,
               "This feedback has already been sent. Start a new session for more feedback.",
             );
-          if (req.method === "POST" && url.pathname === "/api/images") {
+          if (
+            req.method === "POST" &&
+            ["/api/images", "/api/capture/snapshot"].includes(url.pathname)
+          ) {
+            const capture = url.pathname === "/api/capture/snapshot";
+            if (capture) {
+              if (!safeId(input?.captureId)) fail(400, "Invalid capture ID.");
+              const previous = session.images.find(
+                (image) => image.id === input.captureId,
+              );
+              if (previous) {
+                if (previous.source?.kind !== input.kind)
+                  fail(409, "This capture ID belongs to another source.");
+                return reply(res, 200, publicSession(session));
+              }
+              if (input.revision !== session.revision)
+                fail(
+                  409,
+                  "The draft changed. Reload before capturing another screen.",
+                );
+            }
             if (session.images.length >= 30)
               fail(400, "A session can have up to 30 screenshots.");
-            const width = Number(url.searchParams.get("width"));
-            const height = Number(url.searchParams.get("height"));
+            const snapshot = capture
+              ? await captures.command(session.id, "snapshot", input)
+              : null;
+            const width =
+              snapshot?.width ?? Number(url.searchParams.get("width"));
+            const height =
+              snapshot?.height ?? Number(url.searchParams.get("height"));
             if (
               !Number.isInteger(width) ||
               !Number.isInteger(height) ||
@@ -248,20 +301,22 @@ export async function startServer({
               width * height > 40000000
             )
               fail(400, "Image dimensions exceed the 40 megapixel limit.");
-            const bytes = input;
+            const bytes = snapshot?.bytes ?? input;
             const kind = imageKind(bytes);
-            const id = randomUUID();
+            const id = capture ? input.captureId : randomUUID();
             const image = {
               id,
-              name: (url.searchParams.get("name") || "Screenshot").slice(
-                0,
-                200,
-              ),
+              name: (
+                snapshot?.name ||
+                url.searchParams.get("name") ||
+                "Screenshot"
+              ).slice(0, 200),
               width,
               height,
               file: `${id}.${kind.extension}`,
               mime: kind.mime,
               annotations: [],
+              ...(snapshot ? { source: snapshot.source } : {}),
             };
             session = {
               ...session,
@@ -389,6 +444,7 @@ export async function startServer({
       info,
     };
   } catch (error) {
+    await captures.close();
     await vite?.close();
     if (server?.listening)
       await new Promise((resolve) => server.close(resolve));
