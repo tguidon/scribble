@@ -15,6 +15,7 @@ import { draftBytes, MAX_DRAFT_BYTES, DRAFT_TOO_LARGE } from "./limits.mjs";
 import { acquireServerLease } from "./lock.mjs";
 import { VERSION, SERVER_PROTOCOL } from "./version.mjs";
 import { createCaptures } from "./capture/index.mjs";
+import { imageDimensions } from "./capture/common.mjs";
 import { discoverWebApps } from "./capture/discovery.mjs";
 const appRoot = fileURLToPath(new URL("../../", import.meta.url));
 const mime = {
@@ -124,7 +125,7 @@ export async function startServer({
         if (!dev)
           res.setHeader(
             "Content-Security-Policy",
-            "default-src 'self'; img-src 'self' blob: data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'",
+            "default-src 'self'; img-src 'self' blob: data:; media-src 'self' blob:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'",
           );
         if (!url.pathname.startsWith("/api/")) {
           if (req.method !== "GET" && req.method !== "HEAD")
@@ -194,7 +195,10 @@ export async function startServer({
             "The Scribble app and server versions differ. Run the Scribble skill again, then reload this tab. Saved feedback is preserved.",
           );
         // Receive slow bodies before acquiring the session's write queue.
-        const upload = req.method === "POST" && url.pathname === "/api/images";
+        const shared =
+          req.method === "POST" && url.pathname === "/api/capture/shared";
+        const upload =
+          req.method === "POST" && (url.pathname === "/api/images" || shared);
         const input = upload
           ? await body(
               req,
@@ -296,20 +300,32 @@ export async function startServer({
             );
           if (
             req.method === "POST" &&
-            ["/api/images", "/api/capture/snapshot"].includes(url.pathname)
+            [
+              "/api/images",
+              "/api/capture/snapshot",
+              "/api/capture/shared",
+            ].includes(url.pathname)
           ) {
-            const capture = url.pathname === "/api/capture/snapshot";
+            const capture = shared || url.pathname === "/api/capture/snapshot";
+            const operation = shared
+              ? {
+                  captureId: url.searchParams.get("captureId"),
+                  revision: Number(url.searchParams.get("revision")),
+                  kind: "shared",
+                }
+              : input;
             if (capture) {
-              if (!safeId(input?.captureId)) fail(400, "Invalid capture ID.");
+              if (!safeId(operation?.captureId))
+                fail(400, "Invalid capture ID.");
               const previous = session.images.find(
-                (image) => image.id === input.captureId,
+                (image) => image.id === operation.captureId,
               );
               if (previous) {
-                if (previous.source?.kind !== input.kind)
+                if (previous.source?.kind !== operation.kind)
                   fail(409, "This capture ID belongs to another source.");
                 return reply(res, 200, publicSession(session));
               }
-              if (input.revision !== session.revision)
+              if (operation.revision !== session.revision)
                 fail(
                   409,
                   "The draft changed. Reload before capturing another screen.",
@@ -317,9 +333,23 @@ export async function startServer({
             }
             if (session.images.length >= 30)
               fail(400, "A session can have up to 30 screenshots.");
-            const snapshot = capture
-              ? await captures.command(session.id, "snapshot", input)
-              : null;
+            const surface = url.searchParams.get("surface");
+            if (shared && !["browser", "window", "monitor"].includes(surface))
+              fail(400, "Choose a browser tab, window, or screen to share.");
+            const snapshot = shared
+              ? {
+                  bytes: input,
+                  ...imageDimensions(input),
+                  name: `${surface === "browser" ? "Shared browser tab" : surface === "window" ? "Shared window" : "Shared screen"}.png`,
+                  source: {
+                    kind: "shared",
+                    displaySurface: surface,
+                    capturedAt: new Date().toISOString(),
+                  },
+                }
+              : capture
+                ? await captures.command(session.id, "snapshot", input)
+                : null;
             const width =
               snapshot?.width ?? Number(url.searchParams.get("width"));
             const height =
@@ -334,7 +364,7 @@ export async function startServer({
               fail(400, "Image dimensions exceed the 40 megapixel limit.");
             const bytes = snapshot?.bytes ?? input;
             const kind = imageKind(bytes);
-            const id = capture ? input.captureId : randomUUID();
+            const id = capture ? operation.captureId : randomUUID();
             const image = {
               id,
               name: (

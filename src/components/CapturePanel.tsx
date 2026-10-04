@@ -5,8 +5,11 @@ import {
   Smartphone,
   RefreshCw,
   AlertCircle,
+  MonitorUp,
 } from "lucide-react";
 import { checkCaptureRuntime, request } from "../api";
+import { SharedTabView } from "./SharedTabView";
+import type { TabShare, SharedSurface } from "../useTabShare";
 import { LiveView } from "./LiveView";
 import type { CaptureKind } from "../types";
 
@@ -28,6 +31,10 @@ type Props = {
   setKind: (kind: CaptureKind) => void;
   onBack: () => void;
   onCapture: (kind: CaptureKind) => Promise<void>;
+  webMode: "direct" | "shared";
+  setWebMode: (mode: "direct" | "shared") => void;
+  share: TabShare;
+  onSharedCapture: (file: File, surface: SharedSurface) => Promise<void>;
 };
 const action = (name: string, body: object) =>
   request(`/capture/${name}`, {
@@ -35,7 +42,16 @@ const action = (name: string, body: object) =>
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-export function CapturePanel({ kind, setKind, onBack, onCapture }: Props) {
+export function CapturePanel({
+  kind,
+  setKind,
+  onBack,
+  onCapture,
+  webMode,
+  setWebMode,
+  share,
+  onSharedCapture,
+}: Props) {
   const [status, setStatus] = useState<Status>();
   const [devices, setDevices] = useState<{ id: string; name: string }[]>([]);
   const [deviceId, setDeviceId] = useState("");
@@ -47,7 +63,16 @@ export function CapturePanel({ kind, setKind, onBack, onCapture }: Props) {
   const [busy, setBusy] = useState("Checking sources…");
   const [error, setError] = useState("");
   const heading = useRef<HTMLHeadingElement>(null);
+  const workspace = useRef<HTMLElement>(null);
   const connection = status?.[kind];
+  const shared = kind === "web" && webMode === "shared";
+  const connected = shared ? !!share.stream : !!connection?.connected;
+  useEffect(() => {
+    if (connected) {
+      workspace.current?.scrollTo({ top: 0 });
+      window.scrollTo({ top: 0 });
+    }
+  }, [connected, shared, kind]);
   const refresh = useCallback(async () => {
     await checkCaptureRuntime();
     const next = await request<Status>("/capture/status");
@@ -101,11 +126,10 @@ export function CapturePanel({ kind, setKind, onBack, onCapture }: Props) {
   }, [refresh]);
   return (
     <main
-      className={`capture-workspace ${connection?.connected ? "capture-workspace-live" : ""}`}
+      ref={workspace}
+      className={`capture-workspace ${connected ? "capture-workspace-live" : ""}`}
     >
-      <div
-        className={`capture-sheet ${connection?.connected ? "capture-sheet-live" : ""}`}
-      >
+      <div className={`capture-sheet ${connected ? "capture-sheet-live" : ""}`}>
         <button
           className="text-button capture-back"
           onClick={onBack}
@@ -147,7 +171,27 @@ export function CapturePanel({ kind, setKind, onBack, onCapture }: Props) {
             <span>{error}</span>
           </div>
         )}
-        {!status ? (
+        {shared ? (
+          <div className="capture-layout">
+            <button
+              className="text-button capture-mode-back"
+              disabled={!!busy || share.pending}
+              onClick={() => setWebMode("direct")}
+            >
+              <ArrowLeft size={16} />
+              Use a webpage URL
+            </button>
+            <SharedTabView
+              share={share}
+              busy={!!busy}
+              onCapture={(file, surface) =>
+                perform("Capturing shared screen…", () =>
+                  onSharedCapture(file, surface),
+                )
+              }
+            />
+          </div>
+        ) : !status ? (
           <p role="status">{busy || "Could not check capture sources."}</p>
         ) : (
           <div className="capture-layout">
@@ -157,7 +201,12 @@ export function CapturePanel({ kind, setKind, onBack, onCapture }: Props) {
               key={`${kind}-${!!connection?.connected}`}
             >
               <summary>
-                {kind === "web" ? "Webpage settings" : "Simulator settings"}
+                <span>
+                  {kind === "web" ? "Webpage settings" : "Simulator settings"}
+                </span>
+                {connection?.connected && kind === "web" && (
+                  <span className="capture-source-label">{connection.url}</span>
+                )}
               </summary>
               {kind === "web" ? (
                 <form
@@ -174,23 +223,43 @@ export function CapturePanel({ kind, setKind, onBack, onCapture }: Props) {
                     );
                   }}
                 >
-                  <label className="capture-field">
-                    Webpage URL
-                    <input
-                      type="text"
-                      inputMode="url"
-                      autoCapitalize="none"
-                      autoCorrect="off"
-                      spellCheck={false}
-                      required
-                      value={url}
-                      onChange={(event) => setUrl(event.target.value)}
-                      placeholder="example.com or localhost:3000"
+                  <div className="capture-url-row">
+                    <label className="capture-field">
+                      Webpage URL
+                      <input
+                        type="text"
+                        inputMode="url"
+                        autoCapitalize="none"
+                        autoCorrect="off"
+                        spellCheck={false}
+                        required
+                        value={url}
+                        onChange={(event) => setUrl(event.target.value)}
+                        placeholder="localhost:3000"
+                        disabled={!!busy}
+                      />
+                    </label>
+                    <button
+                      className="secondary capture-open"
+                      type="submit"
                       disabled={!!busy}
-                    />
-                  </label>
+                    >
+                      <Globe size={17} />
+                      {connection?.connected ? "Open this URL" : "Open webpage"}
+                    </button>
+                  </div>
                   <p className="capture-hint">
-                    Open any website or local app here in Scribble.
+                    Works best with local apps. For hosted sites or existing
+                    logins,{" "}
+                    <button
+                      type="button"
+                      className="inline-action"
+                      disabled={!!busy}
+                      onClick={() => setWebMode("shared")}
+                    >
+                      share a browser tab
+                    </button>
+                    .
                   </p>
                   <div className="capture-apps" aria-label="Running web apps">
                     {apps.length > 0 && (
@@ -215,48 +284,48 @@ export function CapturePanel({ kind, setKind, onBack, onCapture }: Props) {
                       <p className="capture-hint">{discoveryMessage}</p>
                     )}
                   </div>
-                  <div className="capture-dimensions">
-                    <label className="capture-field">
-                      Width <span>px</span>
-                      <input
-                        type="number"
-                        min={320}
-                        max={2560}
-                        required
-                        value={width}
-                        onChange={(event) =>
-                          setWidth(Number(event.target.value))
-                        }
-                        disabled={!!busy}
-                      />
-                    </label>
-                    <span aria-hidden="true">×</span>
-                    <label className="capture-field">
-                      Height <span>px</span>
-                      <input
-                        type="number"
-                        min={320}
-                        max={2560}
-                        required
-                        value={height}
-                        onChange={(event) =>
-                          setHeight(Number(event.target.value))
-                        }
-                        disabled={!!busy}
-                      />
-                    </label>
-                  </div>
-                  <button
-                    className="secondary capture-open"
-                    type="submit"
-                    disabled={!!busy}
-                  >
-                    <Globe size={17} />
-                    {connection?.connected ? "Open this URL" : "Open webpage"}
-                  </button>
+                  <details className="viewport-settings">
+                    <summary>
+                      Viewport size{" "}
+                      <span>
+                        {width} × {height}
+                      </span>
+                    </summary>
+                    <div className="capture-dimensions">
+                      <label className="capture-field">
+                        Width <span>px</span>
+                        <input
+                          type="number"
+                          min={320}
+                          max={2560}
+                          required
+                          value={width}
+                          onChange={(event) =>
+                            setWidth(Number(event.target.value))
+                          }
+                          disabled={!!busy}
+                        />
+                      </label>
+                      <span aria-hidden="true">×</span>
+                      <label className="capture-field">
+                        Height <span>px</span>
+                        <input
+                          type="number"
+                          min={320}
+                          max={2560}
+                          required
+                          value={height}
+                          onChange={(event) =>
+                            setHeight(Number(event.target.value))
+                          }
+                          disabled={!!busy}
+                        />
+                      </label>
+                    </div>
+                  </details>
                 </form>
               ) : (
-                <div>
+                <div className="simulator-settings-body">
                   <label className="capture-field">
                     Booted simulator
                     <select
@@ -278,7 +347,9 @@ export function CapturePanel({ kind, setKind, onBack, onCapture }: Props) {
                   </label>
                   <p className="capture-hint">
                     {connection?.supported
-                      ? "Open Simulator and boot a device, then refresh this list. Scribble connects through serve-sim."
+                      ? devices.length
+                        ? "Choose a device to navigate and capture its screen here."
+                        : "Open Simulator and boot a device, then refresh this list."
                       : "Simulator capture requires an Apple Silicon Mac with Xcode."}
                   </p>
                   <button
@@ -310,6 +381,14 @@ export function CapturePanel({ kind, setKind, onBack, onCapture }: Props) {
                     automatically. This download can take a few minutes.
                   </p>
                 )}
+              <button
+                className="text-button capture-refresh"
+                disabled={!!busy}
+                onClick={() => void perform("Checking sources…", refresh)}
+              >
+                <RefreshCw size={16} />
+                Refresh sources
+              </button>
             </details>
             {connection?.connected && (
               <div className="capture-preview">
@@ -355,17 +434,38 @@ export function CapturePanel({ kind, setKind, onBack, onCapture }: Props) {
                 </button>
               </div>
             )}
+            {kind === "web" && (
+              <div className="sharing-entry">
+                <div>
+                  <strong>Reviewing a hosted site?</strong>
+                  <span>
+                    Use your browser’s tab, with its logins and verification
+                    already handled.
+                  </span>
+                </div>
+                <button
+                  className="text-button"
+                  disabled={!!busy}
+                  onClick={() => setWebMode("shared")}
+                >
+                  <MonitorUp size={18} />
+                  Share browser tab
+                </button>
+              </div>
+            )}
           </div>
         )}
         <div className="capture-status-row">
-          <button
-            className="text-button"
-            disabled={!!busy}
-            onClick={() => void perform("Checking sources…", refresh)}
-          >
-            <RefreshCw size={16} />
-            Refresh sources
-          </button>
+          {!status && !shared && (
+            <button
+              className="text-button"
+              disabled={!!busy}
+              onClick={() => void perform("Checking sources…", refresh)}
+            >
+              <RefreshCw size={16} />
+              Refresh sources
+            </button>
+          )}
           <span role="status">{busy}</span>
         </div>
       </div>

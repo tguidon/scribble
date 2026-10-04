@@ -262,6 +262,8 @@ export function LiveView({
           )}
           <button
             className="text-button"
+            disabled={busy || pending}
+            aria-label={onReconnect ? "Reconnect simulator" : "Reconnect view"}
             onClick={() => {
               if (onReconnect) {
                 void onReconnect();
@@ -274,7 +276,7 @@ export function LiveView({
               setAttempt((n) => n + 1);
             }}
           >
-            {onReconnect ? "Reconnect simulator" : "Reconnect view"}
+            Reconnect
           </button>
         </div>
         <button
@@ -345,9 +347,7 @@ export function LiveView({
         )}
         {failed && (
           <p className="live-placeholder" role="alert">
-            The live view disconnected. Choose{" "}
-            {onReconnect ? "Reconnect simulator" : "Reconnect view"} to try
-            again.
+            The live view disconnected. Choose Reconnect to try again.
           </p>
         )}
         <img
@@ -422,11 +422,6 @@ export function LiveView({
           </button>
         </form>
       </details>
-
-      <p className="capture-hint">
-        Saves a still image for your marks. Resume live capture whenever you
-        need another.
-      </p>
     </section>
   );
 }

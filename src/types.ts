@@ -19,6 +19,7 @@ export type Screenshot = {
   source?: CaptureSource;
 };
 export type CaptureKind = "web" | "simulator";
+export type CaptureMode = CaptureKind | "shared";
 export type CaptureSource = {
   capturedAt: string;
 } & (
@@ -30,6 +31,7 @@ export type CaptureSource = {
       scroll: { x: number; y: number };
       deviceScaleFactor: number;
     }
+  | { kind: "shared"; displaySurface: "browser" | "window" | "monitor" }
   | {
       kind: "simulator";
       provider: "serve-sim";

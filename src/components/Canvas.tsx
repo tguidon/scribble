@@ -231,7 +231,9 @@ export function Canvas({
               ·{" "}
               {image.source.kind === "web"
                 ? "Web capture"
-                : "Simulator capture"}
+                : image.source.kind === "shared"
+                  ? "Shared screen capture"
+                  : "Simulator capture"}
             </span>
           )}
         </span>

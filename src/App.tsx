@@ -20,6 +20,7 @@ import {
 import { Canvas } from "./components/Canvas";
 import { CapturePanel } from "./components/CapturePanel";
 import { Toolbar } from "./components/Toolbar";
+import { useTabShare } from "./useTabShare";
 import { useSession } from "./useSession";
 import { feedbackUrl, imageUrl } from "./api";
 import { exampleFile } from "./example";
@@ -48,6 +49,8 @@ export default function App() {
   } = useSession();
   const busy = working || !!recovery;
   const [captureOpen, setCaptureOpen] = useState(false);
+  const [webMode, setWebMode] = useState<"direct" | "shared">("direct");
+  const tabShare = useTabShare();
   const [captureKind, setCaptureKind] = useState<CaptureKind>("web");
   const [activeId, setActiveId] = useState<string>();
   const [selected, setSelected] = useState<string | null>(null);
@@ -68,6 +71,9 @@ export default function App() {
     session?.images.reduce((n, i) => n + i.annotations.length, 0) || 0;
   const submitted = session?.status === "submitted";
   const disabled = busy || !session || submitted || captureOpen;
+  useEffect(() => {
+    if (submitted) tabShare.stop();
+  }, [submitted, tabShare.stop]);
   const currentDraft = useCallback(
     (): Draft => ({ message: session!.message, images: session!.images }),
     [session],
@@ -298,6 +304,26 @@ export default function App() {
           </button>
         </div>
       </header>
+      {tabShare.stream &&
+        (!captureOpen || captureKind !== "web" || webMode !== "shared") &&
+        !submitted && (
+          <div className="sharing-banner" role="status">
+            <span>Browser sharing is on.</span>
+            <button
+              className="text-button"
+              onClick={() => {
+                setCaptureKind("web");
+                setWebMode("shared");
+                setCaptureOpen(true);
+              }}
+            >
+              Return to shared tab
+            </button>
+            <button className="text-button" onClick={tabShare.stop}>
+              Stop sharing
+            </button>
+          </div>
+        )}
       {help && (
         <section className="help-panel" aria-label="Keyboard shortcuts">
           <div>
@@ -435,6 +461,17 @@ export default function App() {
         <CapturePanel
           kind={captureKind}
           setKind={setCaptureKind}
+          webMode={webMode}
+          setWebMode={setWebMode}
+          share={tabShare}
+          onSharedCapture={async (file, surface) => {
+            const result = await capture("shared", file, surface);
+            setPast([]);
+            setFuture([]);
+            setSelected(null);
+            setActiveId(result.images.at(-1)?.id);
+            setCaptureOpen(false);
+          }}
           onBack={() => setCaptureOpen(false)}
           onCapture={async (kind) => {
             const result = await capture(kind);

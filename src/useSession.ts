@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { loadSession, request, saveDraft, sessionId, uploadImage } from "./api";
-import type { CaptureKind, Draft, Session } from "./types";
+import type { CaptureMode, Draft, Session } from "./types";
 import {
   draftBytes,
   MAX_DRAFT_BYTES,
@@ -24,7 +24,7 @@ export function useSession() {
   const [recovery, setRecovery] = useState<Backup>();
   const pending = useRef<PendingSave | undefined>(undefined);
   const pendingCapture = useRef<
-    { kind: CaptureKind; captureId: string } | undefined
+    { kind: CaptureMode; captureId: string } | undefined
   >(undefined);
   const current = useRef<Session | undefined>(undefined);
   const generation = useRef(0);
@@ -229,7 +229,7 @@ export function useSession() {
     [enqueue, flush, update],
   );
   const capture = useCallback(
-    async (kind: CaptureKind) => {
+    async (kind: CaptureMode, file?: File, surface?: string) => {
       if (recovery)
         throw new Error(
           "Resolve the saved draft conflict before capturing a screen.",
@@ -237,21 +237,38 @@ export function useSession() {
       setBusy(true);
       setError("");
       if (pendingCapture.current?.kind !== kind)
-        pendingCapture.current = { kind, captureId: crypto.randomUUID() };
+        pendingCapture.current = {
+          kind,
+          captureId: crypto.randomUUID(),
+        };
       const operation = pendingCapture.current;
       try {
         await flush();
         return await enqueue(async () => {
           let result: Session;
           try {
-            result = await request<Session>("/capture/snapshot", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                ...operation,
-                revision: revision.current,
-              }),
-            });
+            if (operation.kind === "shared") {
+              if (!file) throw new Error("Capture a shared frame first.");
+              const params = new URLSearchParams({
+                captureId: operation.captureId,
+                revision: String(revision.current),
+                surface: surface || "browser",
+              });
+              result = await request<Session>(`/capture/shared?${params}`, {
+                method: "POST",
+                // Keep the ID for lost acknowledgements, but use the current
+                // frame when the previous attempt did not save an image.
+                body: file,
+              });
+            } else
+              result = await request<Session>("/capture/snapshot", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  ...operation,
+                  revision: revision.current,
+                }),
+              });
           } catch (error) {
             const recovered = await loadSession().catch(() => undefined);
             if (

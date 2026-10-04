@@ -5,6 +5,12 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { createSession } from "../skills/scribble/scripts/lib/store.mjs";
 import { startServer } from "../skills/scribble/scripts/lib/app.mjs";
+// Test-only permission automation selects our fixture tab, never a user window.
+test.use({
+  launchOptions: {
+    args: ["--auto-select-tab-capture-source-by-title=Local workspace"],
+  },
+});
 let root: string,
   source: Server,
   sourceUrl: string,
@@ -412,4 +418,296 @@ test("leaving a live view discards queued typing and rejects delayed input for a
   await expect(
     page.getByRole("button", { name: "Open Project details.png" }),
   ).toBeVisible();
+});
+
+async function mockTabSharing(page: import("@playwright/test").Page) {
+  await page.addInitScript(() => {
+    const state = { streams: [] as MediaStream[], reject: false, requests: 0 };
+    Object.assign(window, { tabShareTest: state });
+    Object.defineProperty(navigator.mediaDevices, "getDisplayMedia", {
+      configurable: true,
+      value: async () => {
+        state.requests++;
+        if (state.reject)
+          throw new DOMException("Cancelled", "NotAllowedError");
+        const canvas = document.createElement("canvas");
+        canvas.width = 1200 + state.streams.length;
+        canvas.height = 800;
+        const ctx = canvas.getContext("2d")!;
+        const draw = () => {
+          ctx.fillStyle = "#f6f3ec";
+          ctx.fillRect(0, 0, 1200, 800);
+          ctx.fillStyle = "#34322e";
+          ctx.font = "48px system-ui";
+          ctx.fillText("Your existing browser tab", 80, 130);
+          ctx.font = "24px system-ui";
+          ctx.fillText("Signed in. Ready to review.", 80, 190);
+        };
+        draw();
+        const stream = canvas.captureStream(15);
+        const track = stream.getVideoTracks()[0];
+        const settings = track.getSettings.bind(track);
+        track.getSettings = () => ({
+          ...settings(),
+          displaySurface: "browser",
+        });
+        const interval = setInterval(draw, 100);
+        const stop = track.stop.bind(track);
+        track.stop = () => {
+          clearInterval(interval);
+          stop();
+        };
+        state.streams.push(stream);
+        return stream;
+      },
+    });
+  });
+  await page.reload();
+}
+
+test("shared tab captures survive lost responses, resume sharing, and stop on submission", async ({
+  page,
+}) => {
+  await mockTabSharing(page);
+  await page
+    .getByRole("button", { name: "Capture live app", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Share browser tab", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Share browser tab", exact: true })
+    .click();
+  await expect(
+    page.getByRole("button", { name: "Capture & annotate" }),
+  ).toBeEnabled();
+  await expect(
+    page.getByText(
+      "View only here. Click, type, and scroll in the original tab.",
+    ),
+  ).toBeVisible();
+  await page.screenshot({
+    path: ".impeccable/review/shared-tab-desktop.png",
+    fullPage: true,
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.evaluate(async () => {
+    await document.fonts.ready;
+    window.scrollTo(0, 0);
+    await new Promise((resolve) =>
+      requestAnimationFrame(() => requestAnimationFrame(resolve)),
+    );
+  });
+  await page.screenshot({
+    path: ".impeccable/review/shared-tab-mobile.png",
+    fullPage: true,
+  });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.route("**/api/capture/shared?*", async (route) => {
+    await route.fetch();
+    await route.abort();
+    await page.unroute("**/api/capture/shared?*");
+  });
+  await page.getByRole("button", { name: "Capture & annotate" }).click();
+  await expect(
+    page.getByRole("button", {
+      name: "Open Shared browser tab.png",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(page.getByText("Browser sharing is on.")).toBeVisible();
+  await page.locator(".image-stage").focus();
+  await page.keyboard.press("Enter");
+  await page
+    .getByRole("textbox", { name: "Comment for mark 1" })
+    .fill("Keep this logged-in view.");
+  await page.getByRole("button", { name: "Return to shared tab" }).click();
+  await expect(
+    page.getByRole("button", { name: "Capture & annotate" }),
+  ).toBeEnabled();
+  expect(await page.evaluate(() => (window as any).tabShareTest.requests)).toBe(
+    1,
+  );
+  await page.getByRole("button", { name: "Back to annotations" }).click();
+  await page.getByRole("button", { name: "Send to agent" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Point made." }),
+  ).toBeVisible();
+  expect(
+    await page.evaluate(
+      () =>
+        (window as any).tabShareTest.streams[0].getVideoTracks()[0].readyState,
+    ),
+  ).toBe("ended");
+  const params = new URLSearchParams(new URL(app.url).hash.slice(1));
+  const bundle = await (
+    await page.request.get(new URL(app.url).origin + "/api/feedback", {
+      headers: { Authorization: `Bearer ${params.get("token")}` },
+    })
+  ).json();
+  expect(bundle.images).toHaveLength(1);
+  expect(bundle.images[0]).toMatchObject({
+    width: 1200,
+    height: 800,
+    source: { kind: "shared", displaySurface: "browser" },
+  });
+});
+
+test("a rejected shared capture saves the new source on the next attempt", async ({
+  page,
+}) => {
+  await mockTabSharing(page);
+  await page
+    .getByRole("button", { name: "Capture live app", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Share browser tab", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Share browser tab", exact: true })
+    .click();
+  await expect(
+    page.getByRole("button", { name: "Capture & annotate" }),
+  ).toBeEnabled();
+  await page.route("**/api/capture/shared?*", (route) =>
+    route.fulfill({
+      status: 503,
+      contentType: "application/json",
+      body: JSON.stringify({ error: "Temporary save failure" }),
+    }),
+  );
+  await page.getByRole("button", { name: "Capture & annotate" }).click();
+  await expect(page.getByText("Temporary save failure")).toBeVisible();
+  await page.unroute("**/api/capture/shared?*");
+  await page.getByRole("button", { name: "Choose another tab" }).click();
+  await expect
+    .poll(() =>
+      page
+        .getByLabel("Shared tab preview")
+        .evaluate((video: HTMLVideoElement) => video.videoWidth),
+    )
+    .toBe(1201);
+  await page.getByRole("button", { name: "Capture & annotate" }).click();
+  await expect(
+    page.getByRole("button", {
+      name: "Open Shared browser tab.png",
+      exact: true,
+    }),
+  ).toBeVisible();
+  const params = new URLSearchParams(new URL(app.url).hash.slice(1));
+  const session = await (
+    await page.request.get(new URL(app.url).origin + "/api/session", {
+      headers: { Authorization: `Bearer ${params.get("token")}` },
+    })
+  ).json();
+  expect(session.images).toHaveLength(1);
+  expect(session.images[0].width).toBe(1201);
+});
+
+test("sharing handles cancelled pickers, replacement, browser stop, and unsupported browsers", async ({
+  page,
+}) => {
+  await mockTabSharing(page);
+  await page
+    .getByRole("button", { name: "Capture live app", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Share browser tab", exact: true })
+    .click();
+  await page.evaluate(() => {
+    (window as any).tabShareTest.reject = true;
+  });
+  await page
+    .getByRole("button", { name: "Share browser tab", exact: true })
+    .click();
+  await expect(page.getByText(/No new tab was shared/)).toBeVisible();
+  await page.evaluate(() => {
+    (window as any).tabShareTest.reject = false;
+  });
+  await page
+    .getByRole("button", { name: "Share browser tab", exact: true })
+    .click();
+  await expect(
+    page.getByRole("button", { name: "Capture & annotate" }),
+  ).toBeEnabled();
+  await page.getByRole("button", { name: "Choose another tab" }).click();
+  await expect
+    .poll(() =>
+      page.evaluate(() => (window as any).tabShareTest.streams.length),
+    )
+    .toBe(2);
+  expect(
+    await page.evaluate(
+      () =>
+        (window as any).tabShareTest.streams[0].getVideoTracks()[0].readyState,
+    ),
+  ).toBe("ended");
+  await page.evaluate(() => {
+    const track = (window as any).tabShareTest.streams[1].getVideoTracks()[0];
+    track.stop();
+    track.dispatchEvent(new Event("ended"));
+  });
+  await expect(page.getByText(/Sharing ended/)).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Capture & annotate" }),
+  ).toHaveCount(0);
+  await page.evaluate(() => {
+    Object.defineProperty(navigator.mediaDevices, "getDisplayMedia", {
+      value: undefined,
+    });
+  });
+  await page.getByRole("button", { name: "Use a webpage URL" }).click();
+  await page
+    .getByRole("button", { name: "Share browser tab", exact: true })
+    .click();
+  await expect(
+    page.getByRole("button", { name: "Share browser tab", exact: true }),
+  ).toBeDisabled();
+  await expect(
+    page.getByRole("button", { name: "Copy session link" }),
+  ).toBeVisible();
+});
+
+test.describe("native browser tab sharing", () => {
+  test("captures a real browser MediaStream without replacing getDisplayMedia", async ({
+    page,
+    context,
+  }) => {
+    const sourceTab = await context.newPage();
+    await sourceTab.goto(sourceUrl);
+    await page.bringToFront();
+    await page
+      .getByRole("button", { name: "Capture live app", exact: true })
+      .click();
+    await page
+      .getByRole("button", { name: "Share browser tab", exact: true })
+      .click();
+    await page
+      .getByRole("button", { name: "Share browser tab", exact: true })
+      .click();
+    await page.getByLabel("Shared tab preview").waitFor();
+    await sourceTab.getByRole("button", { name: "New project" }).click();
+    await sourceTab.screenshot();
+    await expect(
+      page.getByRole("button", { name: "Capture & annotate" }),
+    ).toBeEnabled({ timeout: 10000 });
+    await page.screenshot({
+      path: ".impeccable/review/shared-tab-native.png",
+      fullPage: true,
+    });
+    await page.getByRole("button", { name: "Capture & annotate" }).click();
+    await expect(
+      page.getByRole("button", {
+        name: "Open Shared browser tab.png",
+        exact: true,
+      }),
+    ).toBeVisible();
+    await page.getByRole("button", { name: "Stop sharing" }).click();
+    await sourceTab.close();
+  });
 });

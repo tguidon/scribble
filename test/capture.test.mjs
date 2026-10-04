@@ -439,3 +439,58 @@ test("simulator input uses one socket and releases touches and keyboard modifier
   assert.throws(() => simKey("😀"), /US keyboard/);
   sim.close();
 });
+
+test("shared frames validate actual dimensions and retain source metadata across retries", async (t) => {
+  const root = await temp(t);
+  const session = await createSession(root);
+  const app = await startServer({ root, session });
+  t.after(() => app.close());
+  const origin = new URL(app.url).origin;
+  const headers = {
+    Authorization: `Bearer ${session.token}`,
+    "Content-Type": "image/png",
+  };
+  const endpoint =
+    "/api/capture/shared?captureId=shared-frame&revision=0&surface=browser";
+  const post = (path, bytes = png, extra = {}) =>
+    fetch(origin + path, {
+      method: "POST",
+      headers: { ...headers, ...extra },
+      body: bytes,
+    });
+  assert.equal(
+    (await fetch(origin + endpoint, { method: "POST", body: png })).status,
+    401,
+  );
+  assert.equal(
+    (await post(endpoint, png, { Origin: "https://untrusted.example" })).status,
+    403,
+  );
+  assert.equal(
+    (await post(endpoint.replace("surface=browser", "surface=invalid"))).status,
+    400,
+  );
+  assert.equal((await post(endpoint, Buffer.from("not an image"))).status, 400);
+  assert.equal(
+    (await post(endpoint.replace("revision=0", "revision=99"))).status,
+    409,
+  );
+  const response = await post(endpoint + "&width=999&height=999");
+  assert.equal(response.status, 201);
+  const saved = await response.json();
+  assert.equal(saved.images.length, 1);
+  assert.equal(saved.images[0].width, 1);
+  assert.equal(saved.images[0].height, 1);
+  assert.equal(saved.images[0].source.kind, "shared");
+  assert.equal(saved.images[0].source.displaySurface, "browser");
+  const retried = await (await post(endpoint)).json();
+  assert.deepEqual(retried.images, saved.images);
+  assert.equal(retried.revision, saved.revision);
+  const submit = await fetch(origin + "/api/submit", {
+    method: "POST",
+    headers: { ...headers, "Content-Type": "application/json" },
+    body: JSON.stringify({ revision: saved.revision }),
+  });
+  assert.equal(submit.status, 200);
+  assert.equal((await post(endpoint)).status, 409);
+});
