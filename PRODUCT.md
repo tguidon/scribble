@@ -20,6 +20,7 @@ An agent skill starts a local browser canvas and waits for feedback. Users uploa
 ## Capabilities and Constraints
 - Multiple screenshots; pins, arrows, rectangles, and freehand drawing.
 - Embedded public and local webpage streams with click, scroll, keyboard input, and URL and viewport capture context.
+- Secondary browser tab sharing for hosted sites and existing logins, with a local view-only stream, still capture, and explicit stop control.
 - Suggestions from running local development servers and automatic capture-tool setup.
 - Simulator capture through serve-sim, with device and orientation context.
 - Embedded serve-sim screen streams with tap, drag, Home, and keyboard input.

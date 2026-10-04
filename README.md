@@ -54,6 +54,8 @@ The agent receives your screenshots, mark positions, and comments in one feedbac
 
 ## Capture a running app
 
+Direct webpage capture works best with local apps. For hosted sites, existing logins, or human-verification checks, use **Share browser tab**.
+
 Scribble saves each capture as a still image in the same annotation editor. Your app keeps running. Later captures do not change earlier images or marks.
 
 ### Set up capture tools
@@ -89,6 +91,21 @@ The capture browser has a separate temporary profile. It does not share your nor
 
 Scribble checks local development-server ports and lists those that return HTML. Select **Refresh sources** after starting another app. If automatic discovery is unavailable, enter the URL directly.
 
+### Share a browser tab
+
+1. Open the Scribble session link in Chrome or Edge.
+2. Open the website in another tab. Sign in or complete verification there.
+3. In Scribble, choose **Capture live app → Webpage → Share browser tab**.
+4. Select **Share browser tab**, then choose the website’s tab in the browser picker.
+5. Navigate in the original tab. Its live picture appears in Scribble.
+6. Select **Capture & annotate** to save a still image.
+
+Sharing is view-only inside Scribble. It requires no browser automation tools or extension. The live stream stays in your browser; captured frames are saved to the local Scribble server. Audio is not requested.
+
+Sharing stays active while you annotate. Use **Return to shared tab** for another capture, or **Stop sharing** to end it. Submitting feedback or closing the tab ends sharing. After a reload, choose a tab again. Browsers without screen-sharing support show **Copy session link** so you can continue in Chrome or Edge.
+
+If you select a window or screen instead of a tab, Scribble labels it accordingly. Shared captures record the surface type, dimensions, and capture time. The browser does not provide the website URL or scroll position through this flow.
+
 ### Capture a simulator
 
 1. Launch your app in Simulator.
@@ -101,11 +118,11 @@ Scribble reuses or starts serve-sim for the selected device and embeds only its 
 
 Click the embedded screen before typing, or expand **Type or paste text**. Press Escape to return keyboard control to Scribble. Simulator text input supports US keyboard characters; use the simulator’s on-screen keyboard for other text.
 
-Live views pause when the Scribble tab is hidden and stop when you return to annotations. **Reconnect view** restores a webpage stream; **Reconnect simulator** reconnects the selected device. The stream and input requests use the same session authentication as saved feedback.
+Direct webpage and simulator views pause when the Scribble tab is hidden and stop when you return to annotations. **Reconnect** restores the selected live view. The stream and input requests use the same session authentication as saved feedback.
 
 ### Simulator input with Xcode 27
 
-Device Hub can disable the legacy input path used by serve-sim. Scribble detects this state and keeps capture available while disabling touch and keyboard controls. The repair closes running simulator apps, so the agent must ask before running it. After repair and relaunching your app, select **Reconnect simulator**.
+Device Hub can disable the legacy input path used by serve-sim. Scribble detects this state and keeps capture available while disabling touch and keyboard controls. The repair closes running simulator apps, so the agent must ask before running it. After repair and relaunching your app, select **Reconnect**.
 
 ### Continue a review
 
