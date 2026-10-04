@@ -415,6 +415,13 @@ kbd {
   pointer-events: all;
   cursor: pointer;
 }
+/* Drawing tools select numbered badges without blocking unpainted shape interiors. */
+.viewport:not(.tool-select) .annotation[role="button"] {
+  pointer-events: none;
+}
+.annotation[role="button"] .mark-badge {
+  pointer-events: all;
+}
 .annotation:focus-visible {
   outline: none;
   filter: drop-shadow(0 2px 4px #242d7440);

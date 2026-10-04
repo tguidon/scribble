@@ -406,3 +406,55 @@ test("an edit beyond the shared draft budget keeps the last valid draft", async 
   await page.reload();
   await expect(message).toHaveValue("Still fits.");
 });
+
+test("existing numbered markers select and focus their feedback with drawing tools active", async ({
+  page,
+}) => {
+  await page.getByRole("button", { name: "Try an example" }).click();
+  const stage = page.locator(".image-stage");
+  const box = await stage.boundingBox();
+  if (!box) throw new Error("No canvas");
+  for (let i = 0; i < 8; i++) {
+    await page.mouse.click(
+      box.x + box.width * (0.15 + i * 0.09),
+      box.y + box.height * 0.3,
+    );
+    await page
+      .getByRole("textbox", { name: `Comment for mark ${i + 1}`, exact: true })
+      .fill(`Feedback ${i + 1}`);
+  }
+  const firstComment = page.getByRole("textbox", {
+    name: "Comment for mark 1",
+    exact: true,
+  });
+  // Mark 1 is above the scrolled feedback list after creating mark 8.
+  expect(
+    await page.locator(".comments").evaluate((el) => el.scrollTop),
+  ).toBeGreaterThan(0);
+  for (const tool of ["Pin (P)", "Arrow (A)", "Rectangle (R)", "Draw (D)"]) {
+    await page.getByRole("button", { name: tool, exact: true }).click();
+    await stage.locator(".mark-badge").first().click();
+    await expect(firstComment).toBeFocused();
+    await expect(firstComment).toBeInViewport();
+    await expect(
+      page.getByRole("button", { name: "Select mark 1", exact: true }),
+    ).toBeInViewport();
+    await expect(stage.locator(".annotation")).toHaveCount(8);
+    await expect(page.locator(".comment.active textarea")).toHaveValue(
+      "Feedback 1",
+    );
+  }
+  await page.getByRole("button", { name: "Zoom in", exact: true }).click();
+  await stage.locator(".mark-badge").first().click();
+  await expect(firstComment).toBeFocused();
+  await expect(stage.locator(".annotation")).toHaveCount(8);
+  await stage
+    .getByRole("button", { name: "Mark 1: Feedback 1", exact: true })
+    .focus();
+  await page.keyboard.press("Enter");
+  await expect(firstComment).toBeFocused();
+  await page.screenshot({
+    path: ".impeccable/review/marker-selection.png",
+    fullPage: true,
+  });
+});

@@ -173,7 +173,10 @@ export default function App() {
           `comment-${id}`,
         ) as HTMLTextAreaElement | null;
         field?.focus({ preventScroll: true });
-        field?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+        (field?.closest(".comment") || field)?.scrollIntoView({
+          block: "nearest",
+          behavior: "smooth",
+        });
       });
   }, []);
   const addMark = (mark: Annotation) => {

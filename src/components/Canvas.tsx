@@ -155,6 +155,8 @@ export function Canvas({
       return;
     }
     if (!svg.current?.contains(event.target as Node)) return;
+    // Existing markers own the click; do not start a new drawing underneath.
+    if ((event.target as Element).closest('.annotation[role="button"]')) return;
     if (tool === "select") {
       if (!(event.target as Element).closest(".annotation")) onSelect(null);
       return;
@@ -296,7 +298,9 @@ export function Canvas({
                   number={i + 1}
                   scale={scale}
                   selected={selected === mark.id}
-                  onSelect={tool === "select" ? onSelect : undefined}
+                  onSelect={
+                    !disabled && tool !== "pan" && !space ? onSelect : undefined
+                  }
                 />
               ))}
               {ghost && (
