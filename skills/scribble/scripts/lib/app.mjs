@@ -184,8 +184,10 @@ export async function startServer({
         }
         if (closing) fail(503, "Scribble is restarting. Retry shortly.");
         if (
-          req.headers["x-scribble-version"] &&
-          req.headers["x-scribble-version"] !== VERSION
+          (req.headers["x-scribble-version"] ||
+            url.searchParams.get("version")) &&
+          (req.headers["x-scribble-version"] ||
+            url.searchParams.get("version")) !== VERSION
         )
           fail(
             409,
@@ -221,9 +223,19 @@ export async function startServer({
               409,
               "Start a new feedback session to capture another screen.",
             );
+          if (req.method === "GET" && url.pathname === "/api/capture/stream") {
+            await captures.stream(
+              id,
+              url.searchParams.get("kind"),
+              res,
+              url.searchParams.get("generation"),
+            );
+            return;
+          }
           if (
             req.method === "POST" &&
             [
+              "/api/capture/input",
               "/api/capture/open",
               "/api/capture/focus",
               "/api/capture/disconnect",
@@ -424,8 +436,10 @@ export async function startServer({
         };
         if (closing) fail(503, "Scribble is restarting. Retry shortly.");
         if (
-          req.headers["x-scribble-version"] &&
-          req.headers["x-scribble-version"] !== VERSION
+          (req.headers["x-scribble-version"] ||
+            url.searchParams.get("version")) &&
+          (req.headers["x-scribble-version"] ||
+            url.searchParams.get("version")) !== VERSION
         )
           fail(
             409,

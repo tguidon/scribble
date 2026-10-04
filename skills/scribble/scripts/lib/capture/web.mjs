@@ -1,6 +1,8 @@
 import { playwright } from "./runtime.mjs";
 import { webpageUrl, imageDimensions, captureError } from "./common.mjs";
 
+import { streamHeaders, writeFrame, validateInput } from "./live.mjs";
+
 export class WebCapture {
   constructor(root, options = {}) {
     this.root = root;
@@ -45,7 +47,12 @@ export class WebCapture {
   state() {
     const page = this.currentPage();
     return page
-      ? { connected: true, url: page.url(), viewport: page.viewportSize() }
+      ? {
+          connected: true,
+          url: page.url(),
+          viewport: page.viewportSize(),
+          generation: this.generation || 0,
+        }
       : { connected: false };
   }
   currentPage() {
@@ -64,10 +71,13 @@ export class WebCapture {
       throw captureError(
         "Choose viewport dimensions between 320 and 2560 pixels.",
       );
+    await this.release();
+    await this.stopStream?.();
+    this.generation = (this.generation || 0) + 1;
     if (!this.context) {
       const { chromium } = playwright(this.root);
       const options = {
-        headless: false,
+        headless: true,
         ...this.options,
         viewport: { width, height },
         deviceScaleFactor: 1,
@@ -81,7 +91,7 @@ export class WebCapture {
           browser = await chromium.launch({ ...options, channel: "chrome" });
         } catch {
           throw captureError(
-            "The capture browser could not open. Run Scribble setup web, then retry. A desktop session is required.",
+            "The capture browser could not start. Run Scribble setup web, then retry.",
             503,
           );
         }
@@ -122,7 +132,6 @@ export class WebCapture {
       );
     }
     webpageUrl(page.url());
-    await page.bringToFront();
     return this.state();
   }
   async focus() {
@@ -177,7 +186,105 @@ export class WebCapture {
       source: { kind: "web", ...before, capturedAt: new Date().toISOString() },
     };
   }
+  async stream(res) {
+    const page = this.currentPage();
+    if (!page) throw captureError("Open a webpage before viewing it.", 409);
+    await this.stopStream?.();
+    const client = await this.context.newCDPSession(page);
+    let stopped = false,
+      latestFrame,
+      heartbeat;
+    const stop = async () => {
+      if (stopped) return;
+      stopped = true;
+      clearInterval(heartbeat);
+      page.off("close", stop);
+      res.end();
+      await client.detach().catch(() => {});
+      if (this.stopStream === stop) this.stopStream = null;
+    };
+    this.stopStream = stop;
+    res.once("close", () => void stop());
+    page.once("close", stop);
+    client.on("Page.screencastFrame", ({ data, sessionId }) => {
+      latestFrame = Buffer.from(data, "base64");
+      if (!stopped) writeFrame(res, latestFrame);
+      void client
+        .send("Page.screencastFrameAck", { sessionId })
+        .catch(() => {});
+    });
+    try {
+      streamHeaders(res);
+      await client.send("Page.startScreencast", {
+        format: "jpeg",
+        quality: 75,
+        maxWidth: 1600,
+        maxHeight: 1600,
+        everyNthFrame: 2,
+      });
+      // Static pages also need an initial frame.
+      latestFrame = await page.screenshot({
+        type: "jpeg",
+        quality: 75,
+        timeout: 10000,
+      });
+      writeFrame(res, latestFrame);
+      heartbeat = setInterval(() => {
+        if (latestFrame && !stopped) writeFrame(res, latestFrame);
+      }, 5000);
+    } catch (error) {
+      await stop();
+      throw error;
+    }
+  }
+  async input(raw) {
+    const input = validateInput(raw);
+    const page = this.currentPage();
+    if (!page)
+      throw captureError("Reconnect the webpage to interact with it.", 409);
+    if (input.type === "pointer") {
+      const { width, height } = page.viewportSize();
+      await page.mouse.move(input.x * width, input.y * height);
+      if (input.phase === "down") {
+        await page.mouse.down();
+        this.pointerDown = true;
+      }
+      if (input.phase === "up") await this.release();
+      clearTimeout(this.releaseTimer);
+      if (this.pointerDown)
+        this.releaseTimer = setTimeout(() => void this.release(), 10000);
+    } else if (input.type === "release") await this.release();
+    else if (input.type === "wheel") await page.mouse.wheel(input.dx, input.dy);
+    else if (input.type === "text") await page.keyboard.insertText(input.text);
+    else if (input.type === "key") {
+      const modifiers = ["Control", "Meta", "Alt", "Shift"].filter(
+        (key) => input[key.toLowerCase()] === true,
+      );
+      if (input.key.length === 1 && !input.control && !input.meta && !input.alt)
+        await page.keyboard.insertText(input.key);
+      else
+        await page.keyboard.press(
+          [...modifiers, input.key === " " ? "Space" : input.key].join("+"),
+        );
+    } else if (input.type === "back")
+      await page.goBack({ waitUntil: "domcontentloaded", timeout: 15000 });
+    else if (input.type === "reload")
+      await page.reload({ waitUntil: "domcontentloaded", timeout: 15000 });
+    else throw captureError("This action is only available for simulators.");
+    return this.state();
+  }
+  async release() {
+    clearTimeout(this.releaseTimer);
+    if (this.pointerDown) {
+      this.pointerDown = false;
+      await this.currentPage()
+        ?.mouse.up()
+        .catch(() => {});
+    }
+  }
   async close() {
+    await this.release();
+    await this.stopStream?.();
     await this.browser?.close();
     this.context = null;
     this.page = null;

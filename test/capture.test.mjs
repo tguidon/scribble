@@ -305,3 +305,137 @@ test("capture API saves immutable images, retries without duplicates, and submit
     409,
   );
 });
+
+test("live webpage input maps normalized coordinates and releases interrupted drags", async (t) => {
+  const root = await temp(t);
+  const url = await server(t, (_req, res) =>
+    res.end(
+      `<!doctype html><input style="position:absolute;left:0;top:0;width:250px;height:80px"><button style="position:absolute;left:0;top:120px;width:250px;height:80px" onmousedown="document.body.dataset.down='yes'" onmouseup="document.body.dataset.down='no'">Touch</button><div style="height:3000px"></div>`,
+    ),
+  );
+  const web = new WebCapture(root, { headless: true, channel: "chrome" });
+  t.after(() => web.close());
+  await web.open({ url, width: 800, height: 600 });
+  const pointer = async (phase, y) =>
+    web.input({ type: "pointer", phase, x: 0.1, y });
+  await pointer("down", 0.05);
+  await pointer("up", 0.05);
+  await web.input({ type: "text", text: "Embedded input" });
+  await web.input({ type: "key", key: "!", shift: true });
+  assert.equal(await web.page.locator("input").inputValue(), "Embedded input!");
+  await pointer("down", 0.25);
+  assert.equal(await web.page.locator("body").getAttribute("data-down"), "yes");
+  await web.input({ type: "release" });
+  assert.equal(await web.page.locator("body").getAttribute("data-down"), "no");
+  await web.input({ type: "wheel", dx: 0, dy: 400 });
+  await web.page.waitForFunction(() => scrollY > 0);
+  assert.ok((await web.capture()).source.scroll.y > 0);
+  await assert.rejects(
+    web.input({ type: "pointer", phase: "down", x: 2, y: 0 }),
+    /coordinates/,
+  );
+  await assert.rejects(
+    web.input({ type: "key", key: "Control+Delete" }),
+    /not supported/,
+  );
+});
+
+test("live streams require auth, stay isolated from saved drafts, and stop on disconnect", async (t) => {
+  const root = await temp(t);
+  const source = await server(t, (_req, res) =>
+    res.end("<title>Live stream</title><h1>Connected</h1>"),
+  );
+  const session = await createSession(root);
+  const app = await startServer({
+    root,
+    session,
+    captureOptions: { web: { headless: true, channel: "chrome" } },
+  });
+  t.after(() => app.close());
+  const origin = new URL(app.url).origin;
+  const headers = {
+    Authorization: `Bearer ${session.token}`,
+    "Content-Type": "application/json",
+  };
+  const post = (path, data) =>
+    fetch(origin + "/api/capture/" + path, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(data),
+    });
+  assert.equal(
+    (await fetch(origin + "/api/capture/stream?kind=web")).status,
+    401,
+  );
+  await post("open", { kind: "web", url: source, width: 800, height: 600 });
+  const abort = new AbortController();
+  const stream = await fetch(origin + "/api/capture/stream?kind=web", {
+    headers,
+    signal: abort.signal,
+  });
+  assert.equal(stream.headers.get("content-type"), "application/octet-stream");
+  const reader = stream.body.getReader();
+  const chunk = await reader.read();
+  assert.match(
+    Buffer.from(chunk.value).toString("ascii", 0, 100),
+    /Content-Length/,
+  );
+  const saved = await (
+    await fetch(origin + "/api/session", { headers })
+  ).json();
+  assert.equal(saved.images.length, 0);
+  assert.equal(saved.revision, 0);
+  assert.equal(
+    (
+      await post("input", {
+        kind: "web",
+        type: "pointer",
+        phase: "down",
+        x: -1,
+        y: 0,
+      })
+    ).status,
+    400,
+  );
+  await post("disconnect", { kind: "web" });
+  // A disconnect terminates the stream instead of retaining a browser or HTTP client.
+  let done = false;
+  while (!done) ({ done } = await reader.read());
+  abort.abort();
+  assert.equal(
+    (await post("input", { kind: "web", type: "text", text: "late" })).status,
+    409,
+  );
+});
+
+test("simulator input uses one socket and releases touches and keyboard modifiers", async () => {
+  const { SimulatorInput, simKey } =
+    await import("../skills/scribble/scripts/lib/capture/sim-input.mjs");
+  const sim = new SimulatorInput("ws://127.0.0.1:3100/ws");
+  const sent = [];
+  sim.socket = {
+    readyState: WebSocket.OPEN,
+    send: (bytes) =>
+      sent.push({ type: bytes[0], ...JSON.parse(bytes.subarray(1)) }),
+    close() {},
+  };
+  await sim.input({ type: "pointer", phase: "down", x: 0.3, y: 0.5 });
+  await sim.input({ type: "pointer", phase: "move", x: 0.3, y: 0.7 });
+  sim.release();
+  assert.deepEqual(
+    sent.map((x) => x.type),
+    ["begin", "move", "end"],
+  );
+  sent.length = 0;
+  await sim.input({ type: "text", text: "A!" });
+  assert.equal(
+    sent.filter((x) => x.type === "down" && x.usage === 225).length,
+    2,
+  );
+  assert.equal(
+    sent.filter((x) => x.type === "up" && x.usage === 225).length,
+    2,
+  );
+  assert.throws(() => simKey("😀"), /US keyboard/);
+  sim.close();
+});

@@ -65,6 +65,21 @@ export function createCaptures(root, options = {}) {
       };
     },
     devices: (id) => run(id, (s) => s.simulator.devices()),
+    stream(id, kind, res, generation) {
+      if (!["web", "simulator"].includes(kind))
+        throw captureError("Choose a webpage or simulator.");
+      return run(id, (s) => {
+        if (
+          generation !== null &&
+          Number(generation) !== s[kind].state().generation
+        )
+          throw captureError(
+            "The source changed. Reconnect the live view.",
+            409,
+          );
+        return s[kind].stream(res);
+      });
+    },
     command(id, action, input) {
       if (!["web", "simulator"].includes(input?.kind))
         throw captureError("Choose a webpage or simulator.");
@@ -74,6 +89,17 @@ export function createCaptures(root, options = {}) {
           if (!(input.kind === "simulator" && options.simulator?.command))
             await ensureCapture(root, input.kind);
           return source.open(input);
+        }
+        if (action === "input") {
+          if (
+            input.generation !== undefined &&
+            input.generation !== source.state().generation
+          )
+            throw captureError(
+              "The source changed. Reconnect the live view.",
+              409,
+            );
+          return source.input(input);
         }
         if (action === "focus" && input.kind === "web") return source.focus();
         if (action === "disconnect") {

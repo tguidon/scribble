@@ -3,11 +3,8 @@ import { version } from "../skills/scribble/version.json";
 const params = new URLSearchParams(location.hash.slice(1));
 const token = params.get("token") || "";
 export const sessionId = params.get("session") || "";
-export async function request<T>(
-  path: string,
-  options: RequestInit = {},
-): Promise<T> {
-  const response = await fetch(`/api${path}`, {
+export async function apiResponse(path: string, options: RequestInit = {}) {
+  return fetch(`/api${path}`, {
     ...options,
     headers: {
       Authorization: `Bearer ${token}`,
@@ -16,6 +13,12 @@ export async function request<T>(
       ...options.headers,
     },
   });
+}
+export async function request<T>(
+  path: string,
+  options: RequestInit = {},
+): Promise<T> {
+  const response = await apiResponse(path, options);
   const serverVersion = response.headers.get("X-Scribble-Version");
   if (serverVersion && serverVersion !== version)
     throw new Error(

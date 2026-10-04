@@ -1,19 +1,20 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ArrowLeft,
-  ArrowUpRight,
-  Camera,
   Globe,
   Smartphone,
   RefreshCw,
   AlertCircle,
 } from "lucide-react";
 import { checkCaptureRuntime, request } from "../api";
+import { LiveView } from "./LiveView";
 import type { CaptureKind } from "../types";
 
 type Connection = {
   available: boolean;
   connected: boolean;
+  generation?: number;
+  inputWarning?: string;
   setupCommand: string;
   supported?: boolean;
   url?: string;
@@ -87,6 +88,7 @@ export function CapturePanel({ kind, setKind, onBack, onCapture }: Props) {
     setError("");
     try {
       await task();
+      setError("");
     } catch (error) {
       setError((error as Error).message);
     } finally {
@@ -98,8 +100,12 @@ export function CapturePanel({ kind, setKind, onBack, onCapture }: Props) {
     void perform("Checking sources…", refresh);
   }, [refresh]);
   return (
-    <main className="capture-workspace">
-      <div className="capture-sheet">
+    <main
+      className={`capture-workspace ${connection?.connected ? "capture-workspace-live" : ""}`}
+    >
+      <div
+        className={`capture-sheet ${connection?.connected ? "capture-sheet-live" : ""}`}
+      >
         <button
           className="text-button capture-back"
           onClick={onBack}
@@ -144,212 +150,199 @@ export function CapturePanel({ kind, setKind, onBack, onCapture }: Props) {
         {!status ? (
           <p role="status">{busy || "Could not check capture sources."}</p>
         ) : (
-          <>
-            {kind === "web" ? (
-              <form
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  void perform(
-                    connection?.available
-                      ? "Opening browser…"
-                      : "Installing capture tools and opening browser…",
-                    async () => {
-                      await action("open", { kind, url, width, height });
-                      await refresh();
-                    },
-                  );
-                }}
-              >
-                <label className="capture-field">
-                  Webpage URL
-                  <input
-                    type="text"
-                    inputMode="url"
-                    autoCapitalize="none"
-                    autoCorrect="off"
-                    spellCheck={false}
-                    required
-                    value={url}
-                    onChange={(event) => setUrl(event.target.value)}
-                    placeholder="example.com or localhost:3000"
-                    disabled={!!busy}
-                  />
-                </label>
-                <p className="capture-hint">
-                  Open any website or local app in a separate capture browser.
-                </p>
-                <div className="capture-apps" aria-label="Running web apps">
-                  {apps.length > 0 && (
-                    <p className="capture-hint">Running on this Mac</p>
-                  )}
-                  {apps.map((app) => (
-                    <button
-                      type="button"
-                      className="capture-app"
-                      key={app.url}
-                      disabled={!!busy}
-                      onClick={() => setUrl(app.url)}
-                    >
-                      <Globe size={17} />
-                      <span>
-                        <strong>{app.title}</strong>
-                        <span>{app.url}</span>
-                      </span>
-                    </button>
-                  ))}
-                  {discoveryMessage && (
-                    <p className="capture-hint">{discoveryMessage}</p>
-                  )}
-                </div>
-                <div className="capture-dimensions">
-                  <label className="capture-field">
-                    Width <span>px</span>
-                    <input
-                      type="number"
-                      min={320}
-                      max={2560}
-                      required
-                      value={width}
-                      onChange={(event) => setWidth(Number(event.target.value))}
-                      disabled={!!busy}
-                    />
-                  </label>
-                  <span aria-hidden="true">×</span>
-                  <label className="capture-field">
-                    Height <span>px</span>
-                    <input
-                      type="number"
-                      min={320}
-                      max={2560}
-                      required
-                      value={height}
-                      onChange={(event) =>
-                        setHeight(Number(event.target.value))
-                      }
-                      disabled={!!busy}
-                    />
-                  </label>
-                </div>
-                <button
-                  className="secondary capture-open"
-                  type="submit"
-                  disabled={!!busy}
-                >
-                  <Globe size={17} />
-                  {connection?.connected ? "Open this URL" : "Open browser"}
-                </button>
-              </form>
-            ) : (
-              <div>
-                <label className="capture-field">
-                  Booted simulator
-                  <select
-                    value={deviceId}
-                    onChange={(event) => setDeviceId(event.target.value)}
-                    disabled={!!busy || !devices.length}
-                  >
-                    <option value="">
-                      {devices.length
-                        ? "Choose a device"
-                        : "No booted simulators"}
-                    </option>
-                    {devices.map((device) => (
-                      <option key={device.id} value={device.id}>
-                        {device.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <p className="capture-hint">
-                  {connection?.supported
-                    ? "Open Simulator and boot a device, then refresh this list. Scribble connects through serve-sim."
-                    : "Simulator capture requires an Apple Silicon Mac with Xcode."}
-                </p>
-                <button
-                  className="secondary capture-open"
-                  disabled={!!busy || !deviceId || !connection?.supported}
-                  onClick={() =>
+          <div className="capture-layout">
+            <details
+              className="capture-settings"
+              open={!connection?.connected}
+              key={`${kind}-${!!connection?.connected}`}
+            >
+              <summary>
+                {kind === "web" ? "Webpage settings" : "Simulator settings"}
+              </summary>
+              {kind === "web" ? (
+                <form
+                  onSubmit={(event) => {
+                    event.preventDefault();
                     void perform(
                       connection?.available
-                        ? "Connecting simulator…"
-                        : "Installing serve-sim and connecting…",
+                        ? "Opening webpage…"
+                        : "Installing capture tools and opening webpage…",
                       async () => {
-                        await action("open", { kind, deviceId });
+                        await action("open", { kind, url, width, height });
                         await refresh();
                       },
-                    )
-                  }
+                    );
+                  }}
                 >
-                  <Smartphone size={17} />
-                  Connect simulator
-                </button>
-              </div>
-            )}
-            {connection &&
-              !connection.available &&
-              (kind === "web" || connection.supported) && (
-                <p className="capture-hint">
-                  First use installs{" "}
-                  {kind === "web" ? "the browser tools" : "serve-sim"}{" "}
-                  automatically. This download can take a few minutes.
-                </p>
-              )}
-            {connection?.connected && (
-              <section
-                className="capture-connected"
-                aria-label="Connected source"
-              >
-                <div>
-                  <span className="connected-dot" />
-                  <h2>
-                    {kind === "web"
-                      ? "Your browser is ready."
-                      : `${connection.device?.name} is connected.`}
-                  </h2>
-                </div>
-                <p>
-                  {kind === "web"
-                    ? "Navigate or sign in in the capture browser. Return here when the screen is ready."
-                    : "Open the live preview to tap, scroll, and navigate. Return here when the screen is ready."}
-                </p>
-                {kind === "web" ? (
+                  <label className="capture-field">
+                    Webpage URL
+                    <input
+                      type="text"
+                      inputMode="url"
+                      autoCapitalize="none"
+                      autoCorrect="off"
+                      spellCheck={false}
+                      required
+                      value={url}
+                      onChange={(event) => setUrl(event.target.value)}
+                      placeholder="example.com or localhost:3000"
+                      disabled={!!busy}
+                    />
+                  </label>
+                  <p className="capture-hint">
+                    Open any website or local app here in Scribble.
+                  </p>
+                  <div className="capture-apps" aria-label="Running web apps">
+                    {apps.length > 0 && (
+                      <p className="capture-hint">Running on this Mac</p>
+                    )}
+                    {apps.map((app) => (
+                      <button
+                        type="button"
+                        className="capture-app"
+                        key={app.url}
+                        disabled={!!busy}
+                        onClick={() => setUrl(app.url)}
+                      >
+                        <Globe size={17} />
+                        <span>
+                          <strong>{app.title}</strong>
+                          <span>{app.url}</span>
+                        </span>
+                      </button>
+                    ))}
+                    {discoveryMessage && (
+                      <p className="capture-hint">{discoveryMessage}</p>
+                    )}
+                  </div>
+                  <div className="capture-dimensions">
+                    <label className="capture-field">
+                      Width <span>px</span>
+                      <input
+                        type="number"
+                        min={320}
+                        max={2560}
+                        required
+                        value={width}
+                        onChange={(event) =>
+                          setWidth(Number(event.target.value))
+                        }
+                        disabled={!!busy}
+                      />
+                    </label>
+                    <span aria-hidden="true">×</span>
+                    <label className="capture-field">
+                      Height <span>px</span>
+                      <input
+                        type="number"
+                        min={320}
+                        max={2560}
+                        required
+                        value={height}
+                        onChange={(event) =>
+                          setHeight(Number(event.target.value))
+                        }
+                        disabled={!!busy}
+                      />
+                    </label>
+                  </div>
                   <button
-                    className="text-button"
+                    className="secondary capture-open"
+                    type="submit"
                     disabled={!!busy}
+                  >
+                    <Globe size={17} />
+                    {connection?.connected ? "Open this URL" : "Open webpage"}
+                  </button>
+                </form>
+              ) : (
+                <div>
+                  <label className="capture-field">
+                    Booted simulator
+                    <select
+                      value={deviceId}
+                      onChange={(event) => setDeviceId(event.target.value)}
+                      disabled={!!busy || !devices.length}
+                    >
+                      <option value="">
+                        {devices.length
+                          ? "Choose a device"
+                          : "No booted simulators"}
+                      </option>
+                      {devices.map((device) => (
+                        <option key={device.id} value={device.id}>
+                          {device.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <p className="capture-hint">
+                    {connection?.supported
+                      ? "Open Simulator and boot a device, then refresh this list. Scribble connects through serve-sim."
+                      : "Simulator capture requires an Apple Silicon Mac with Xcode."}
+                  </p>
+                  <button
+                    className="secondary capture-open"
+                    disabled={!!busy || !deviceId || !connection?.supported}
                     onClick={() =>
-                      void perform("Opening browser…", () =>
-                        action("focus", { kind }),
+                      void perform(
+                        connection?.available
+                          ? "Connecting simulator…"
+                          : "Installing serve-sim and connecting…",
+                        async () => {
+                          await action("open", { kind, deviceId });
+                          await refresh();
+                        },
                       )
                     }
                   >
-                    Return to browser <ArrowUpRight size={16} />
+                    <Smartphone size={17} />
+                    Connect simulator
                   </button>
-                ) : (
-                  <a
-                    className="text-button"
-                    href={connection.previewUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    Open live simulator <ArrowUpRight size={16} />
-                  </a>
+                </div>
+              )}
+              {connection &&
+                !connection.available &&
+                (kind === "web" || connection.supported) && (
+                  <p className="capture-hint">
+                    First use installs{" "}
+                    {kind === "web" ? "the browser tools" : "serve-sim"}{" "}
+                    automatically. This download can take a few minutes.
+                  </p>
                 )}
-                <button
-                  className="primary capture-submit"
-                  disabled={!!busy}
-                  onClick={() =>
-                    void perform("Capturing screen…", () => onCapture(kind))
+            </details>
+            {connection?.connected && (
+              <div className="capture-preview">
+                <LiveView
+                  key={`${kind}-${connection.generation}-${connection.device?.id || connection.url}-${connection.viewport?.width}-${connection.viewport?.height}`}
+                  kind={kind}
+                  generation={connection.generation || 0}
+                  inputWarning={connection.inputWarning}
+                  onReconnect={
+                    kind === "simulator"
+                      ? () =>
+                          perform("Reconnecting simulator…", async () => {
+                            await action("open", {
+                              kind,
+                              deviceId: connection.device?.id,
+                            });
+                            await refresh();
+                          })
+                      : undefined
                   }
-                >
-                  <Camera size={18} />
-                  Capture & annotate
-                </button>
-                <p className="capture-hint">
-                  Saves a still image. Your app keeps running, and earlier
-                  captures stay as they were.
-                </p>
+                  title={
+                    kind === "web"
+                      ? "Live webpage"
+                      : connection.device?.name || "Live simulator"
+                  }
+                  busy={!!busy}
+                  onError={setError}
+                  onCapture={() =>
+                    perform("Capturing screen…", () => onCapture(kind))
+                  }
+                />
                 <button
-                  className="text-button"
+                  className="text-button capture-disconnect"
                   disabled={!!busy}
                   onClick={() =>
                     void perform("Disconnecting…", async () => {
@@ -358,13 +351,11 @@ export function CapturePanel({ kind, setKind, onBack, onCapture }: Props) {
                     })
                   }
                 >
-                  {kind === "web"
-                    ? "Close capture browser"
-                    : "Disconnect simulator"}
+                  {kind === "web" ? "Close webpage" : "Disconnect simulator"}
                 </button>
-              </section>
+              </div>
             )}
-          </>
+          </div>
         )}
         <div className="capture-status-row">
           <button

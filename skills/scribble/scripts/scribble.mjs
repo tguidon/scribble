@@ -100,7 +100,7 @@ wait and feedback return a Markdown brief with image paths and computed geometry
 The brief is saved as feedback.md. --full returns the original JSON, including all drawing points.
 start reuses a matching server or restarts an older version on the same port.
 stop shuts down the authenticated server and capture browsers. Drafts and submissions remain on disk.
-setup web installs Playwright and Chromium; a desktop session is required for capture.
+setup web installs Playwright and Chromium for the embedded browser view.
 setup simulator installs serve-sim; an Apple Silicon Mac with Xcode is required.
 Opening a capture source installs missing tools automatically in the storage directory.
 The setup commands also support advance installation. Uploading screenshots needs no setup.
