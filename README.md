@@ -58,7 +58,7 @@ Scribble saves each capture as a still image in the same annotation editor. Your
 
 ### Set up capture tools
 
-Selecting **Open browser** or **Connect simulator** installs missing tools automatically. The first download can take a few minutes.
+Selecting **Open webpage** or **Connect simulator** installs missing tools automatically. The first download can take a few minutes.
 
 To install the tools ahead of time, run the relevant command from this repository:
 
@@ -69,7 +69,7 @@ node bin/scribble.mjs setup simulator
 
 For an installed skill, replace `bin/scribble.mjs` with the absolute path to its `scripts/scribble.mjs` file. If you use custom storage, pass the same `--dir PATH` to setup and startup.
 
-- **Webpage:** Setup installs Playwright and downloads Chromium. A desktop session is required to display the capture browser.
+- **Webpage:** Setup installs Playwright and downloads Chromium. The browser runs in the background and streams its viewport into Scribble.
 - **Simulator:** Setup installs serve-sim. Capture requires an Apple Silicon Mac, Xcode, and a booted simulator. Scribble also accepts serve-sim on `PATH`.
 
 The optional packages live in `.scribble/capture-runtime/`. Chromium uses Playwright’s browser cache. Setup requires internet access. Scribble stores captured images and feedback locally.
@@ -79,11 +79,11 @@ The optional packages live in `.scribble/capture-runtime/`. Chromium uses Playwr
 1. For a local app, start its development server.
 2. Select **Capture live app**, then **Webpage**.
 3. Enter a URL, or select an app under **Running on this Mac**.
-4. Select **Open browser**.
-5. Navigate to the screen you want in the capture browser.
-6. Return to Scribble and select **Capture & annotate**.
+4. Select **Open webpage**.
+5. Click, scroll, or type in the embedded live screen.
+6. Select **Capture & annotate**.
 
-Scribble captures the visible viewport of the tab opened with **Open browser**. Other tabs do not change the capture target. **Return to browser** brings the capture tab to the front. Each capture records the URL, page title, viewport dimensions, scroll position, and capture time.
+Scribble streams a browser viewport directly into its canvas. This also works with pages that block iframe embedding. Use the back and reload controls above the screen to navigate. Each capture records the URL, page title, viewport dimensions, scroll position, and capture time.
 
 The capture browser has a separate temporary profile. It does not share your normal browser’s logins. Public and local HTTP or HTTPS URLs are supported. You can enter `example.com` or `localhost:3000` without a scheme. File URLs and URLs with embedded credentials are rejected.
 
@@ -94,17 +94,24 @@ Scribble checks local development-server ports and lists those that return HTML.
 1. Launch your app in Simulator.
 2. Select **Capture live app**, then **Simulator**.
 3. Choose a booted device and select **Connect simulator**.
-4. Select **Open live simulator**.
-5. Navigate to the screen you want in the live preview.
-6. Return to Scribble and select **Capture & annotate**.
+4. Tap or drag directly on the simulator screen inside Scribble.
+5. Select **Capture & annotate**.
 
-Scribble reuses or starts serve-sim for the selected device. Each capture records the device, orientation, capture time, and app identifier when available.
+Scribble reuses or starts serve-sim for the selected device and embeds only its screen. The Home control returns to the simulator home screen. Each capture records the device, orientation, capture time, and app identifier when available.
+
+Click the embedded screen before typing, or expand **Type or paste text**. Press Escape to return keyboard control to Scribble. Simulator text input supports US keyboard characters; use the simulator’s on-screen keyboard for other text.
+
+Live views pause when the Scribble tab is hidden and stop when you return to annotations. **Reconnect view** restores a webpage stream; **Reconnect simulator** reconnects the selected device. The stream and input requests use the same session authentication as saved feedback.
+
+### Simulator input with Xcode 27
+
+Device Hub can disable the legacy input path used by serve-sim. Scribble detects this state and keeps capture available while disabling touch and keyboard controls. The repair closes running simulator apps, so the agent must ask before running it. After repair and relaunching your app, select **Reconnect simulator**.
 
 ### Continue a review
 
 Select **Resume live capture** to return to a source and capture another screen. Add marks and comments in the editor, then select **Send to agent**. The feedback bundle and brief include each image’s capture context.
 
-**Close capture browser** closes the temporary browser and clears its login state. **Disconnect simulator** leaves the simulator and shared serve-sim preview running. Source connections end when Scribble stops; saved images and feedback remain available.
+**Close webpage** closes the temporary browser and clears its login state. **Disconnect simulator** leaves the simulator and shared serve-sim preview running. Source connections end when Scribble stops; saved images and feedback remain available.
 
 ## Sessions and saved drafts
 

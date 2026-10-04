@@ -19,9 +19,10 @@ An agent skill starts a local browser canvas and waits for feedback. Users uploa
 
 ## Capabilities and Constraints
 - Multiple screenshots; pins, arrows, rectangles, and freehand drawing.
-- Public and local webpage capture from a separate browser, with URL and viewport context.
+- Embedded public and local webpage streams with click, scroll, keyboard input, and URL and viewport capture context.
 - Suggestions from running local development servers and automatic capture-tool setup.
 - Simulator capture through serve-sim, with device and orientation context.
+- Embedded serve-sim screen streams with tap, drag, Home, and keyboard input.
 - Return to a live source for another capture while preserving earlier images and feedback.
 - Comments on individual annotations and one overall message.
 - Screenshot navigation, undo, zoom, pan, and automatic draft saving.

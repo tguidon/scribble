@@ -20,3 +20,5 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
 Signature interaction: a new pin pops into place, its matching comment receives focus, and selecting either connects both. Reduced-motion preference removes the pop. Submission replaces editing with a durable receipt.
 
 Readability refinement: preserve the native system sans and existing copy. Use 14px labels and hints, 16px reading and form text, and 20px section headings at the default browser font setting. Preserve these roles on mobile; resize or wrap containers instead of shrinking text.
+
+Live capture is a companion Operate surface within this workspace. Its source settings, embedded interaction, and responsive layout are recorded in [Embedded live capture](src-components-capturepanel-tsx.md). Capturing a still returns to the existing annotation editor; the live source remains available for another capture.
