@@ -30,12 +30,12 @@ Add `--global` to install across projects. The [skills CLI documentation](https:
 
 ### Test a fixed release
 
-The `0.0.2` release supports screenshot uploads. Live capture is available from the default branch.
+The `0.0.3` release includes screenshot uploads, embedded webpage and simulator capture, and browser tab sharing.
 
-To install the `0.0.2` release:
+To install the `0.0.3` release:
 
 ```sh
-npx skills add https://github.com/tguidon/scribble/tree/v0.0.2/skills/scribble
+npx skills add https://github.com/tguidon/scribble/tree/v0.0.3/skills/scribble
 ```
 
 This uses the skills CLI’s [direct repository path format](https://github.com/vercel-labs/skills#source-formats). Use a release tag to keep tests on a fixed version; the shorter install command follows the repository’s default branch.
