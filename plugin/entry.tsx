@@ -4,12 +4,19 @@ import App from "../src/App";
 import { setEditorHost } from "../src/editorHost";
 import { app, createEditorHost, type Connection } from "./bridge";
 import "../src/styles.css";
+import "./editor.css";
 
 function PluginEditor() {
   const [connection, setConnection] = useState<Connection>();
   const [error, setError] = useState("");
   const [ready, setReady] = useState("");
   useEffect(() => {
+    const setDisplayMode = (mode?: string) => {
+      document.documentElement.dataset.displayMode = mode || "inline";
+    };
+    app.onhostcontextchanged = (context) => {
+      if (context.displayMode) setDisplayMode(context.displayMode);
+    };
     app.ontoolresult = (result) => {
       const value = result._meta?.scribble as Connection | undefined;
       if (value?.sessionId && value.token && value.url) setConnection(value);
@@ -17,6 +24,7 @@ function PluginEditor() {
     void app
       .connect()
       .then(() => {
+        setDisplayMode(app.getHostContext()?.displayMode);
         if (!app.getHostCapabilities()?.serverTools)
           setError(
             "This host cannot connect the Scribble editor to its tools. Use the browser link in the tool result.",

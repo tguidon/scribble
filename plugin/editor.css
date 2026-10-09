@@ -1,0 +1,20 @@
+/* Inline hosts fit their frame to our document. Its outer height must not
+   depend on that frame, or the responsive canvas creates a resize loop. */
+html {
+  overflow: hidden;
+}
+
+body {
+  margin: 0;
+}
+
+#root {
+  height: 760px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  contain: layout size;
+}
+
+html[data-display-mode="fullscreen"] #root {
+  height: 100dvh;
+}

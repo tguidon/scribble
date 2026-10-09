@@ -22,6 +22,8 @@ Agent → read_feedback / read_image → saved feedback and originals
 
 The plugin bundles its MCP SDK and UI in `plugin/dist/`. Node.js 22+ is the only required runtime. Build dependencies stay in the development checkout. Optional Playwright and serve-sim capture setup still follows the existing skill workflow.
 
+Inline editors have a fixed outer height and scroll internally. A host can resize an inline frame from its content, so the document's height must not grow with the iframe viewport. Fullscreen mode follows the host's viewport. The plugin tests include restoring a saved canvas inside a host that sizes frames from their content.
+
 ## Data and delivery
 
 - Feedback stays in the selected project's `.scribble` directory.

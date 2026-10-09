@@ -99,7 +99,7 @@ test.beforeEach(async () => {
         const params = new URL(req.url, "http://fixture").searchParams;
         res.setHeader("Content-Type", "text/html");
         res.end(
-          `<html><body style="margin:0"><iframe title="Scribble plugin" sandbox="allow-scripts allow-downloads" style="border:0;width:100%;height:100vh"></iframe><script>window.fixture=${JSON.stringify({ result, canSend: !params.has("no-send"), reject: params.has("reject") }).replaceAll("<", "\\u003c")}</script><script type="module" src="/host.js"></script></body></html>`,
+          `<html><body style="margin:0"><iframe title="Scribble plugin" sandbox="allow-scripts allow-downloads" style="border:0;width:100%;height:100vh"></iframe><script>window.fixture=${JSON.stringify({ result, canSend: !params.has("no-send"), reject: params.has("reject"), fitContent: params.has("fit-content") }).replaceAll("<", "\\u003c")}</script><script type="module" src="/host.js"></script></body></html>`,
         );
       } else if (req.url === "/host.js") {
         res.setHeader("Content-Type", "text/javascript");
@@ -110,7 +110,21 @@ test.beforeEach(async () => {
           "Content-Security-Policy",
           "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; media-src data:",
         );
-        res.end(editor);
+        res.end(
+          editor.replace(
+            "</body>",
+            `<script>
+          let previous = 0;
+          new ResizeObserver(() => {
+            const height = Math.ceil(Math.max(document.body.scrollHeight, document.body.getBoundingClientRect().height));
+            if (height !== previous) {
+              previous = height;
+              parent.postMessage({ type: "fixture-size", height }, "*");
+            }
+          }).observe(document.body);
+        </script></body>`,
+          ),
+        );
       } else {
         const chunks = [];
         for await (const chunk of req) chunks.push(chunk);
@@ -257,6 +271,50 @@ test("uploaded screenshot decodes with desktop CSP and survives reopening the pl
     await readFile("docs/images/scribble.png"),
   );
   expect(violations).toEqual([]);
+});
+
+test("restoring an inline canvas cannot grow the chat's frame indefinitely", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 720, height: 1000 });
+  await page.goto(`${origin}/host?fit-content`);
+  const ui = page.frameLocator("iframe");
+  await ui.getByRole("button", { name: "Try an example" }).click();
+  await expectDecodedScreenshot(ui.locator(".image-stage image"));
+  await expect(ui.getByText("Draft saved", { exact: true })).toBeVisible();
+  await page.reload();
+  await expectDecodedScreenshot(ui.locator(".image-stage image"));
+  // Allow several animation frames so a resize feedback loop can surface.
+  await page.waitForTimeout(600);
+  const heights = await page.evaluate(
+    () => (window as any).fixtureHeights as number[],
+  );
+  expect(heights.length).toBeGreaterThan(0);
+  expect(heights.length).toBeLessThan(10);
+  expect(Math.max(...heights)).toBeLessThanOrEqual(760);
+  await ui
+    .getByRole("textbox", { name: "The bigger picture" })
+    .fill("Still usable after reopening.");
+  await ui.getByRole("button", { name: "Finish feedback" }).click();
+  await expect(
+    ui.getByRole("heading", { name: "Ready for your agent." }),
+  ).toBeVisible();
+});
+
+test("expanded canvases use the host's full height while inline canvases stay bounded", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 720, height: 1000 });
+  await page.goto(`${origin}/host`);
+  const ui = page.frameLocator("iframe");
+  await expect(
+    ui.getByRole("button", { name: "Add screenshots", exact: true }),
+  ).toBeEnabled();
+  await expect(ui.locator("#root")).toHaveCSS("height", "760px");
+  await ui.getByRole("button", { name: "Expand canvas" }).click();
+  await expect(ui.locator("#root")).toHaveCSS("height", "1000px");
+  await page.setViewportSize({ width: 720, height: 800 });
+  await expect(ui.locator("#root")).toHaveCSS("height", "800px");
 });
 
 test("hosts that cannot send messages keep a copy fallback and never claim delivery", async ({
