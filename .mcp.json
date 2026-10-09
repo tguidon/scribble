@@ -5,7 +5,7 @@
       "args": [
         "./plugin/mcp.mjs"
       ],
-      "cwd": "."
+      "cwd": "./"
     }
   }
 }
