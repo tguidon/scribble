@@ -2,27 +2,25 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ArrowUpRight,
   Check,
-  CheckCheck,
   ChevronDown,
   CircleHelp,
   ImagePlus,
   MessageCircle,
   Plus,
-  Send,
   ShieldCheck,
   Trash2,
   X,
   AlertCircle,
-  Download,
   PencilLine,
   Camera,
 } from "lucide-react";
+import { FeedbackReceipt } from "./components/FeedbackReceipt";
 import { Canvas } from "./components/Canvas";
 import { CapturePanel } from "./components/CapturePanel";
 import { Toolbar } from "./components/Toolbar";
 import { useTabShare } from "./useTabShare";
 import { useSession } from "./useSession";
-import { feedbackUrl, imageUrl } from "./api";
+import { imageUrl } from "./api";
 import { exampleFile } from "./example";
 import {
   INKS,
@@ -286,7 +284,7 @@ export default function App() {
               <span className="status-dot" />
             )}
             {submitted
-              ? "Feedback sent"
+              ? "Feedback saved"
               : saveState === "loading"
                 ? "Opening your canvas…"
                 : saveState === "saving"
@@ -424,40 +422,7 @@ export default function App() {
           )}
         </main>
       ) : submitted ? (
-        <main className="receipt">
-          <div className="receipt-check">
-            <CheckCheck size={36} />
-          </div>
-          <h1>Point made.</h1>
-          <p>
-            Your screenshots and feedback are ready for your agent.
-            <br />
-            You can return to your conversation.
-          </p>
-          <div className="receipt-images">
-            {session.images.map((i) => (
-              <img key={i.id} src={imageUrl(i.id)} alt={i.name} />
-            ))}
-          </div>
-          <div className="receipt-details">
-            <span>
-              {session.images.length} screenshot
-              {session.images.length !== 1 ? "s" : ""}
-            </span>
-            <span>
-              {totalMarks} mark{totalMarks !== 1 ? "s" : ""}
-            </span>
-            <span>Saved on this device</span>
-          </div>
-          {session.message && <blockquote>{session.message}</blockquote>}
-          <a className="primary" href={feedbackUrl} download>
-            <Download size={16} />
-            Download feedback
-          </a>
-          <p className="receipt-note">
-            Another round of feedback? Call Scribble again in your agent.
-          </p>
-        </main>
+        <FeedbackReceipt session={session} />
       ) : captureOpen ? (
         <CapturePanel
           kind={captureKind}
@@ -719,12 +684,12 @@ export default function App() {
                 disabled={!session.images.length || busy}
                 onClick={() => void submit()}
               >
-                {working ? "Saving your feedback…" : "Send to agent"}
-                <Send size={16} />
+                {working ? "Saving your feedback…" : "Finish feedback"}
+                <Check size={16} />
               </button>
               <span className="send-hint">
                 {session.images.length
-                  ? "Everything goes together in one batch."
+                  ? "Next, copy the handoff into your agent."
                   : "Add a screenshot to get started."}
               </span>
             </div>

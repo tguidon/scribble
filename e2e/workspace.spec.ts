@@ -121,14 +121,14 @@ test("complete visual feedback flow, recovery, and responsive layout", async ({
     page.getByRole("textbox", { name: "Comment for mark 4" }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Delete mark 4" }).click();
-  await page.getByRole("button", { name: "Send to agent" }).focus();
+  await page.getByRole("button", { name: "Finish feedback" }).focus();
   await page.keyboard.press("Space");
   await expect(
-    page.getByRole("heading", { name: "Point made." }),
+    page.getByRole("heading", { name: "Ready for your agent." }),
   ).toBeVisible();
-  const download = page.waitForEvent("download");
-  await page.getByRole("link", { name: "Download feedback" }).click();
-  expect((await download).suggestedFilename()).toBe("scribble-feedback.json");
+  await expect(
+    page.getByRole("button", { name: "Copy for agent" }),
+  ).toBeEnabled();
   const params = new URLSearchParams(new URL(app.url).hash.slice(1));
   const result = await page.request.get(
     `${new URL(app.url).origin}/api/feedback`,
@@ -143,7 +143,7 @@ test("complete visual feedback flow, recovery, and responsive layout", async ({
   );
   await page.reload();
   await expect(
-    page.getByRole("heading", { name: "Point made." }),
+    page.getByRole("heading", { name: "Ready for your agent." }),
   ).toBeVisible();
   expect(errors).toEqual([]);
 });
@@ -235,9 +235,9 @@ test("a lost submission response still recovers the saved receipt", async ({
     await route.fetch();
     await route.abort();
   });
-  await page.getByRole("button", { name: "Send to agent" }).click();
+  await page.getByRole("button", { name: "Finish feedback" }).click();
   await expect(
-    page.getByRole("heading", { name: "Point made." }),
+    page.getByRole("heading", { name: "Ready for your agent." }),
   ).toBeVisible();
 });
 
@@ -586,12 +586,12 @@ test("split-view controls stay usable through upload, annotation, help, and rece
     });
   }
   await page.setViewportSize({ width: 390, height: 900 });
-  await page.getByRole("button", { name: "Send to agent" }).click();
+  await page.getByRole("button", { name: "Finish feedback" }).click();
   await expect(
-    page.getByRole("heading", { name: "Point made." }),
+    page.getByRole("heading", { name: "Ready for your agent." }),
   ).toBeVisible();
   await expect(
-    page.getByRole("link", { name: "Download feedback" }),
+    page.getByRole("button", { name: "Copy for agent" }),
   ).toBeInViewport();
   expect(
     await page.evaluate(
@@ -608,4 +608,111 @@ test("split-view controls stay usable through upload, annotation, help, and rece
     path: ".impeccable/review/narrow-390-receipt.png",
     fullPage: true,
   });
+});
+
+test("clipboard handoff can be pasted into an agent and survives a new canvas", async ({
+  page,
+  context,
+}) => {
+  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+  await page.getByRole("button", { name: "Try an example" }).click();
+  await page
+    .getByRole("textbox", { name: "The bigger picture" })
+    .fill("Make the main action clearer.");
+  await page.getByRole("button", { name: "Finish feedback" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Ready for your agent." }),
+  ).toBeFocused();
+  await page.getByRole("button", { name: "Copy for agent" }).click();
+  await expect(
+    page.getByRole("status").filter({ hasText: "Copied." }),
+  ).toBeVisible();
+  const copied = await page.evaluate(() => navigator.clipboard.readText());
+  const params = new URLSearchParams(new URL(app.url).hash.slice(1));
+  const handoff = await (
+    await page.request.get(`${new URL(app.url).origin}/api/handoff`, {
+      headers: { Authorization: `Bearer ${params.get("token")}` },
+    })
+  ).json();
+  expect(copied).toBe(handoff.text);
+  const { readFile } = await import("node:fs/promises");
+  expect(await readFile(handoff.briefPath, "utf8")).toContain(
+    "Make the main action clearer.",
+  );
+  const bundle = JSON.parse(await readFile(handoff.bundlePath, "utf8"));
+  expect((await readFile(bundle.images[0].path)).length).toBeGreaterThan(0);
+  for (const width of [390, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.screenshot({
+      path: `.impeccable/review/clipboard-${width}.png`,
+      fullPage: true,
+    });
+  }
+  await page.getByRole("button", { name: "New canvas" }).click();
+  await expect(page.getByRole("heading", { name: /A picture/ })).toBeVisible();
+  expect(new URL(page.url()).hash).not.toBe(new URL(app.url).hash);
+  expect(await readFile(handoff.bundlePath, "utf8")).toContain(
+    "Make the main action clearer.",
+  );
+  await page.goto(app.url);
+  await page.getByRole("button", { name: "Copy for agent" }).click();
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(
+    copied,
+  );
+});
+
+test("blocked clipboard and a failed handoff load have explicit recovery", async ({
+  page,
+}) => {
+  await page.getByRole("button", { name: "Try an example" }).click();
+  await page.route("**/api/handoff", (route) => route.abort());
+  await page.getByRole("button", { name: "Finish feedback" }).click();
+  await expect(page.getByRole("alert")).toContainText("Your feedback is saved");
+  await expect(
+    page.getByRole("button", { name: "Copy for agent" }),
+  ).toBeDisabled();
+  await page.unroute("**/api/handoff");
+  await page.getByRole("button", { name: "Retry handoff" }).click();
+  await page.evaluate(() => {
+    Object.defineProperty(navigator.clipboard, "writeText", {
+      value: () =>
+        Promise.reject(new DOMException("Denied", "NotAllowedError")),
+    });
+  });
+  await page.getByRole("button", { name: "Copy for agent" }).click();
+  await expect(page.getByRole("alert")).toContainText(
+    "Clipboard access was blocked",
+  );
+  const message = page.getByRole("textbox", { name: "Handoff message" });
+  await expect(message).toBeVisible();
+  await expect(message).toBeFocused();
+  await expect(message).toHaveAttribute("readonly", "");
+  expect(
+    await message.evaluate(
+      (el: HTMLTextAreaElement) => el.selectionEnd - el.selectionStart,
+    ),
+  ).toBe((await message.inputValue()).length);
+  await page.setViewportSize({ width: 390, height: 900 });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  await page.screenshot({
+    path: ".impeccable/review/clipboard-blocked.png",
+    fullPage: true,
+  });
+  await page.route("**/api/sessions", async (route) => {
+    await route.fetch();
+    await route.abort();
+  });
+  await page.getByRole("button", { name: "New canvas" }).click();
+  await expect(
+    page.getByText(
+      "Could not open a new canvas. Your feedback is saved. Try again.",
+    ),
+  ).toBeVisible();
+  await page.unroute("**/api/sessions");
+  await page.getByRole("button", { name: "New canvas" }).click();
+  await expect(page.getByRole("heading", { name: /A picture/ })).toBeVisible();
 });

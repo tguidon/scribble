@@ -36,7 +36,6 @@ export async function request<T>(
 }
 export const imageUrl = (id: string) =>
   `/api/images/${id}?token=${encodeURIComponent(token)}&session=${encodeURIComponent(sessionId)}`;
-export const feedbackUrl = `/api/feedback?token=${encodeURIComponent(token)}&session=${encodeURIComponent(sessionId)}`;
 export const loadSession = () => request<Session>("/session");
 export const saveDraft = (draft: Draft, revision: number, saveId: string) =>
   request<Session>("/draft", {

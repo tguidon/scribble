@@ -1,47 +1,23 @@
-import { readdir } from "node:fs/promises";
 import { join } from "node:path";
-import { atomicJson, readJson, safeId, sessionDir } from "./store.mjs";
+import { writeFeedbackBrief } from "./brief.mjs";
 
-// The immutable bundle is the submission marker, even after an interrupted save.
-export async function pendingFeedback(root) {
-  const ids = await readdir(join(root, "sessions")).catch((error) => {
-    if (error.code === "ENOENT") return [];
-    throw error;
-  });
-  const pending = [];
-  for (const id of ids.filter(safeId)) {
-    const dir = sessionDir(root, id);
-    const bundlePath = join(dir, "feedback.json");
-    const feedback = await readJson(bundlePath).catch((error) => {
-      if (error.code === "ENOENT") return null;
-      throw error;
-    });
-    if (!feedback) continue;
-    const receipt = await readJson(join(dir, "read.json")).catch((error) => {
-      if (error.code === "ENOENT") return null;
-      throw error;
-    });
-    if (!receipt)
-      pending.push({
-        sessionId: id,
-        title: feedback.title,
-        submittedAt: feedback.submittedAt,
-        bundlePath,
-      });
-  }
-  return pending.sort((a, b) => a.submittedAt.localeCompare(b.submittedAt));
-}
-
-export async function acknowledgeFeedback(root, id) {
-  const dir = sessionDir(root, id);
-  await readJson(join(dir, "feedback.json")).catch((error) => {
-    if (error.code === "ENOENT")
-      throw new Error("Feedback has not been sent yet.");
-    throw error;
-  });
-  await atomicJson(join(dir, "read.json"), {
-    sessionId: id,
-    readAt: new Date().toISOString(),
-  });
-  return { sessionId: id, acknowledged: true };
+// Keep clipboard content small. The immutable bundle and original images stay on disk.
+export async function prepareHandoff(bundle, directory) {
+  const { briefPath } = await writeFeedbackBrief(bundle, directory);
+  const bundlePath = join(directory, "feedback.json");
+  return {
+    sessionId: bundle.sessionId,
+    briefPath,
+    bundlePath,
+    text: [
+      "Apply my Scribble feedback to this project.",
+      "",
+      `Session: ${bundle.sessionId}`,
+      `Read the feedback brief: ${JSON.stringify(briefPath)}`,
+      `Full annotation data: ${JSON.stringify(bundlePath)}`,
+      "",
+      "Read the brief and inspect every original image at the paths it lists before making changes. The brief contains my comments, mark positions, and capture context. Use the JSON if you need the full drawing data.",
+      "Follow my feedback within the scope of this task and verify the changes. If these local files are unavailable, ask me to provide them.",
+    ].join("\n"),
+  };
 }

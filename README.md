@@ -6,7 +6,7 @@ Scribble is a local browser canvas for visual feedback to Codex and Claude Code.
 
 No account, hosted backend, or model API key is required.
 
-![Scribble showing a screenshot marked with a pin, an arrow, and a rectangle, with comments and the Send to agent button alongside it.](docs/images/scribble.png)
+![Scribble showing a screenshot marked with a pin, an arrow, and a rectangle, with comments alongside it.](docs/images/scribble.png)
 
 ## Install
 
@@ -30,12 +30,12 @@ Add `--global` to install across projects. The [skills CLI documentation](https:
 
 ### Test a fixed release
 
-The `0.0.3` release includes screenshot uploads, embedded webpage and simulator capture, and browser tab sharing.
+The `0.0.4` release uses clipboard handoff: finish feedback, copy its file references into your agent, and start another canvas without relaunching the skill. It also includes the split-view layout improvements.
 
-To install the `0.0.3` release:
+To install the `0.0.4` release:
 
 ```sh
-npx skills add https://github.com/tguidon/scribble/tree/v0.0.3/skills/scribble
+npx skills add https://github.com/tguidon/scribble/tree/v0.0.4/skills/scribble
 ```
 
 This uses the skills CLI’s [direct repository path format](https://github.com/vercel-labs/skills#source-formats). Use a release tag to keep tests on a fixed version; the shorter install command follows the repository’s default branch.
@@ -48,11 +48,12 @@ This uses the skills CLI’s [direct repository path format](https://github.com/
 4. Add pins, arrows, rectangles, or freehand marks.
 5. Add a comment to each mark that needs an explanation.
 6. To describe the overall goal, add a message for the session.
-7. Select **Send to agent**.
+7. Select **Finish feedback**, then **Copy for agent**.
+8. Paste the copied message into the agent chat where you want the changes made.
 
-The agent receives your screenshots, mark positions, and comments in one feedback bundle. The canvas also supports undo, redo, zoom, and pan.
+The copied message points to a saved brief and the full annotation data. The brief includes your comments, mark positions, capture context, and original image paths. The agent reads those files after you paste the message; Scribble does not send messages automatically. The canvas also supports undo, redo, zoom, and pan.
 
-The bare `$scribble` or `/scribble` command does the same thing. The agent runs the bundled launcher, opens the editor, and waits for your feedback. No project build or capture-tool installation is needed to open it.
+The bare `$scribble` or `/scribble` command does the same thing. The agent runs the bundled launcher, opens the editor, and ends its turn. No project build or capture-tool installation is needed to open it.
 
 You can also add:
 
@@ -60,7 +61,11 @@ You can also add:
 - `status` to check the current session and server.
 - `stop` to shut down Scribble without deleting saved feedback.
 
-For example, use `$scribble stop` in Codex or `/scribble stop` in Claude Code. A normal start resumes a draft or recovers unread feedback before opening another session.
+For example, use `$scribble stop` in Codex or `/scribble stop` in Claude Code. A normal start resumes a draft or opens a new session after the previous one was finished.
+
+After copying, select **New canvas** to collect another round without calling the skill again. Earlier feedback and image paths remain available. If clipboard access is blocked, expand **View handoff message** and copy the text manually.
+
+The receiving agent needs access to the saved files on this device. Pasting local paths into a cloud-only chat does not upload the files.
 
 ## Capture a running app
 
@@ -136,15 +141,15 @@ Device Hub can disable the legacy input path used by serve-sim. Scribble detects
 
 ### Continue a review
 
-Select **Resume live capture** to return to a source and capture another screen. Add marks and comments in the editor, then select **Send to agent**. The feedback bundle and brief include each image’s capture context.
+Select **Resume live capture** to return to a source and capture another screen. Add marks and comments in the editor, then select **Finish feedback** and **Copy for agent**. Paste the handoff into your agent chat. The feedback bundle and brief include each image’s capture context.
 
 **Close webpage** closes the temporary browser and clears its login state. **Disconnect simulator** leaves the simulator and shared serve-sim preview running. Source connections end when Scribble stops; saved images and feedback remain available.
 
 ## Sessions and saved drafts
 
-The agent runs the skill only after an explicit request. The launcher sends an authenticated request to the local server. If the server responds and runs the installed version, the launcher reuses it. If its version differs, the launcher requests an authenticated shutdown and starts the installed version on the same port. If no server process is running, it starts one in the background. If a recorded process is still alive but does not respond, the launcher asks you to retry or stop that process before restarting.
+The agent runs the skill only after an explicit request. The launcher sends an authenticated request to the local server. If the server responds and matches the installed version and server protocol, the launcher reuses it. If either differs, the launcher requests an authenticated shutdown and starts the installed version on the same port. If no server process is running, it starts one in the background. If a recorded process is still alive but does not respond, the launcher asks you to retry or stop that process before restarting.
 
-The latest unfinished draft resumes automatically. After submission, the next skill request recovers any feedback the agent has not acknowledged. The agent reads the bundle and images, then marks it as read with `ack --session ID`. Reading with `wait` or `feedback` alone does not clear it. Once all submissions are acknowledged, the next request opens a new session on the same server. The server remains available for later sessions.
+The latest unfinished draft resumes automatically. Finished feedback stays on disk. Use **Copy for agent** on its receipt to copy the exact session paths, then paste into your chosen chat. **New canvas** starts another round on the same server. You can return to an older receipt with its original URL or `start --session ID`.
 
 Scribble saves drafts and screenshots in `.scribble/` in your project. On startup, it adds the storage directory to Git’s local `info/exclude` file. This keeps screenshots, feedback, and session tokens out of new commits without changing your shared `.gitignore`. Custom storage directories inside a Git repository receive the same protection. If storage files are already tracked, startup stops and asks you to remove them from Git’s index. A browser backup stores unsaved edits to marks and messages. Saved work remains available after the agent or server stops.
 
@@ -215,13 +220,11 @@ For an installed skill, use `node /absolute/path/to/skills/scribble/scripts/scri
 | Command | Behavior |
 | --- | --- |
 | `start --detach --no-open` | Start or reuse the server and return the session URL as JSON |
-| `start --new` | Create a separate draft without clearing unread feedback |
+| `start --new` | Create a separate draft while preserving earlier feedback |
 | `start --session ID` | Open a saved draft or submission |
-| `wait --session ID --timeout 60` | Wait for submission and return a feedback brief, with exit code 2 on timeout |
 | `feedback --session ID` | Read a saved submission as a feedback brief |
-| `feedback --session ID --full` | Read the full JSON, including every drawing point; also supported by `wait` |
-| `ack --session ID` | Mark submitted feedback as read after inspecting its images |
-| `status` | Show the latest session, unread feedback, and recorded server version and process |
+| `feedback --session ID --full` | Read the full JSON, including every drawing point |
+| `status` | Show the latest session and recorded server version and process |
 | `stop` | Shut down the authenticated server and preserve saved feedback |
 | `setup web` | Install Playwright and Chromium for webpage capture |
 | `setup simulator` | Install serve-sim for simulator capture |
@@ -249,9 +252,9 @@ Agent sandboxes can require permission to open a local port or start a backgroun
 
 ## Feedback format
 
-Each session contains `session.json` and original screenshots in `images/`. Submission creates a `feedback.json` file that remains unchanged.
+Each session contains `session.json` and original screenshots in `images/`. Finishing feedback creates an immutable `feedback.json` bundle and a readable `feedback.md` brief before the copy button becomes available.
 
-By default, `wait` and `feedback` generate a Markdown brief in `feedback.md` and return its text, its path, and the full JSON path. This also works for older submissions. The brief puts the overall request first, followed by each screenshot and its numbered marks. It includes:
+The `feedback` command can also read a saved submission and regenerate its brief, including for older sessions. It returns the brief text, its path, and the full JSON path. The brief puts the overall request first, followed by each screenshot and its numbered marks. It includes:
 
 - Original image paths, dimensions, and exact comments.
 - Mark locations and bounds in pixels and percentages of the image size.
@@ -261,7 +264,7 @@ By default, `wait` and `feedback` generate a Markdown brief in `feedback.md` and
 
 Region labels describe the mark's bounds center within a 3 × 3 image grid. Spatial relationships describe geometry; they do not infer a requested change. The agent still inspects the original images. No images are rendered or sent to an external service to create the brief.
 
-Use `--full` with `wait` or `feedback` to return the original JSON instead of the brief.
+Use `--full` with `feedback` to return the original JSON instead of the brief.
 
 The feedback bundle contains:
 
@@ -271,6 +274,6 @@ The feedback bundle contains:
 
 Coordinates use **original image pixels from the top-left corner**. Zoom and pan do not change these coordinates. Pins have one point. Arrows and rectangles have endpoints. Freehand marks have ordered points.
 
-The browser download contains JSON. Its image paths refer to files on the same computer.
+The handoff copies a short message with absolute file paths. It contains no image bytes or browser access token.
 
 The example screenshot shows a fictional workspace. Scribble creates it locally without external images or customer data.

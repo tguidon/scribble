@@ -51,7 +51,7 @@ test("copied skill starts without dependencies; concurrent launchers reuse and r
   assert.equal(status.session.id, resumed.sessionId);
 });
 
-test("unread feedback survives reads and restarts until explicitly acknowledged", async (t) => {
+test("finished feedback remains available while new launches open a fresh canvas", async (t) => {
   const root = await mkdtemp(join(tmpdir(), "scribble-handoff-"));
   const cli = resolve("bin/scribble.mjs");
   let pid;
@@ -87,51 +87,41 @@ test("unread feedback survives reads and restarts until explicitly acknowledged"
       body: png,
     })
   ).json();
-  const waiting = run("wait", "--session", first.sessionId, "--timeout", "5");
   await fetch(`${url.origin}/api/submit`, {
     method: "POST",
     headers,
     body: JSON.stringify({ revision: draft.revision }),
   });
-  const bundle = await waiting;
+  const bundle = await run("feedback", "--session", first.sessionId);
   assert.equal(bundle.sessionId, first.sessionId);
   assert.match(bundle.brief, /Screenshot 1/);
   assert.equal(await readFile(bundle.briefPath, "utf8"), bundle.brief);
-  const unread = await run("start", "--detach", "--no-open");
-  assert.equal(unread.action, "read-feedback");
-  assert.equal(unread.pendingFeedback[0].sessionId, first.sessionId);
-  assert.equal((await run("status")).pendingFeedback.length, 1);
-  await run("feedback", "--session", first.sessionId);
-  assert.equal(
-    (await run("start", "--detach", "--no-open")).action,
-    "read-feedback",
-  );
-  const separate = await run("start", "--detach", "--no-open", "--new");
-  assert.notEqual(separate.sessionId, first.sessionId);
-  assert.equal(
-    (await run("start", "--detach", "--no-open")).pendingFeedback.length,
-    1,
+  const next = await run("start", "--detach", "--no-open");
+  assert.notEqual(next.sessionId, first.sessionId);
+  assert.equal(next.pid, pid);
+  await assert.rejects(
+    run("wait", "--session", first.sessionId),
+    /Automatic feedback delivery was removed/,
   );
   await assert.rejects(
-    run("ack", "--session", separate.sessionId),
-    /not been sent/,
+    run("ack", "--session", first.sessionId),
+    /Automatic feedback delivery was removed/,
   );
-  await assert.rejects(run("ack"), /Use ack --session/);
+  const oldReceipt = await run(
+    "start",
+    "--detach",
+    "--no-open",
+    "--session",
+    first.sessionId,
+  );
+  assert.equal(oldReceipt.sessionId, first.sessionId);
+  const original = await readFile(bundle.bundlePath, "utf8");
   process.kill(pid, "SIGTERM");
   await new Promise((r) => setTimeout(r, 400));
-  assert.equal(
-    (await run("start", "--detach", "--no-open")).action,
-    "read-feedback",
-  );
-  const original = await readFile(bundle.bundlePath, "utf8");
-  await run("ack", "--session", first.sessionId);
-  await run("ack", "--session", first.sessionId);
+  const resumed = await run("start", "--detach", "--no-open");
+  pid = resumed.pid;
+  assert.equal(resumed.sessionId, next.sessionId);
   assert.equal(await readFile(bundle.bundlePath, "utf8"), original);
-  assert.deepEqual((await run("status")).pendingFeedback, []);
-  const next = await run("start", "--detach", "--no-open");
-  pid = next.pid;
-  assert.equal(next.sessionId, separate.sessionId);
-  assert.notEqual(next.sessionId, first.sessionId);
   assert.equal(
     (await run("feedback", "--session", first.sessionId, "--full")).feedback
       .images.length,

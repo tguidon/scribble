@@ -159,7 +159,7 @@ Warm neutrals carry the workspace; saturated ink makes actions and marks easy to
 
 ### Primary
 
-- **Cobalt (`blue`)** identifies upload and send actions, selection, caret, and focus. Its hover and active siblings darken the same interaction.
+- **Cobalt (`blue`)** identifies upload and finish actions, selection, caret, and focus. Its hover and active siblings darken the same interaction.
 - **Pale cobalt (`blue-light`)** sits behind selected drawing tools. **Comment selection (`comment-active`)** lightly connects the active feedback row to its mark.
 
 ### Secondary
@@ -230,7 +230,7 @@ Lucide icons render as SVG strokes. The logo's pencil is tilted by nine degrees 
 
 Primary actions are compact cobalt rectangles with white text, a 46px minimum height, and a nine-pixel radius. Hover and pressed states darken the fill. Secondary controls use cream, a thin line border, and an eight-pixel radius. Text buttons remain light and gain cobalt text on hover.
 
-Buttons, links, and textareas use a three-pixel cobalt focus outline offset by three pixels. Most disabled buttons use 0.4 opacity; disabled Send uses an opaque warm gray treatment. Never infer a saved or sent state from a decorative color alone.
+Buttons, links, and textareas use a three-pixel cobalt focus outline offset by three pixels. Most disabled buttons use 0.4 opacity; disabled Finish feedback uses an opaque warm gray treatment. Never infer a saved or sent state from a decorative color alone.
 
 ### Drawing Dock and Ink Choices
 
@@ -275,3 +275,7 @@ No external raster artwork ships as part of this visual system. The example scre
 
 
 Not canonized: the directional handwritten wordmark did not ship; the implemented logo uses system sans with a rotated pencil icon. The large system-font receipt heading is recorded only as an existing one-off, not a display-family rule. These observations do not change the finish review's resolved-fix ship verdict.
+
+## Feedback receipt
+
+Finish feedback saves the brief, full annotation data, and original image references. The receipt offers Copy for agent and New canvas. Copy status reports clipboard success only; the user pastes into their chosen agent chat. A collapsed handoff preview opens and selects its text when clipboard access is blocked. New canvas preserves the earlier feedback and closes its capture connections. At 440px and below, the two actions stack at full width.

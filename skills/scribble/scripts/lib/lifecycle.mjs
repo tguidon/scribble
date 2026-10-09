@@ -44,7 +44,7 @@ export async function stopServer(root, info) {
   if (!info || !alive(info.pid))
     return { stopped: false, alreadyStopped: true };
   const health = await serverHealth(info);
-  if (!health.instanceId || health.protocol !== SERVER_PROTOCOL)
+  if (!health.instanceId || ![1, SERVER_PROTOCOL].includes(health.protocol))
     throw new Error(
       `This older server does not support safe shutdown. Save your browser draft, inspect PID ${info.pid}, and stop it with your process manager. Then run Scribble again.`,
     );

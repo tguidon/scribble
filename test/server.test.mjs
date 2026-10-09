@@ -133,3 +133,76 @@ test("one server handles isolated sessions and recovers a committed receipt", as
   );
   assert.equal((await call("/api/session")).status, 200);
 });
+
+test("clipboard handoffs survive new canvases, reloads, and legacy receipts", async (t) => {
+  const { call, base, root, session } = await setup(t);
+  assert.equal((await fetch(base + "/api/handoff")).status, 401);
+  assert.equal((await call("/api/handoff")).status, 404);
+  assert.equal(
+    (await call("/api/sessions", { method: "POST", body: "{}" })).status,
+    409,
+  );
+  const draft = await (
+    await call("/api/images?width=1&height=1&name=test.png", {
+      method: "POST",
+      body: png,
+    })
+  ).json();
+  assert.equal(
+    (
+      await call("/api/submit", {
+        method: "POST",
+        body: JSON.stringify({ revision: draft.revision }),
+      })
+    ).status,
+    200,
+  );
+  // The brief exists even if no agent is listening and no handoff GET has run.
+  const directory = join(root, "sessions", session.id);
+  const brief = await readFile(join(directory, "feedback.md"), "utf8");
+  const bundle = await readFile(join(directory, "feedback.json"), "utf8");
+  const handoff = await (await call("/api/handoff")).json();
+  assert.equal(handoff.sessionId, session.id);
+  assert.ok(handoff.text.includes(JSON.stringify(handoff.briefPath)));
+  assert.ok(handoff.text.includes(JSON.stringify(handoff.bundlePath)));
+  assert.ok(handoff.text.length < 1500);
+  assert.ok(!handoff.text.includes(session.token));
+  const image = JSON.parse(bundle).images[0];
+  assert.ok(brief.includes(image.path));
+  assert.deepEqual(await readFile(image.path), png);
+  const create = () =>
+    call("/api/sessions", { method: "POST", body: "{}" }).then((r) => r.json());
+  const [next, retry] = await Promise.all([create(), create()]);
+  assert.deepEqual(next, retry);
+  const params = new URLSearchParams(new URL(next.url, base).hash.slice(1));
+  const nextId = params.get("session");
+  assert.notEqual(nextId, session.id);
+  assert.equal((await loadSession(root, nextId)).images.length, 0);
+  assert.equal((await loadSession(root, session.id)).status, "submitted");
+  assert.equal(await readFile(handoff.bundlePath, "utf8"), bundle);
+  // An old receipt missing its generated brief can still be copied.
+  await rm(handoff.briefPath);
+  assert.deepEqual(await (await call("/api/handoff")).json(), handoff);
+  assert.equal(await readFile(handoff.briefPath, "utf8"), brief);
+  assert.equal(
+    (
+      await fetch(base + "/api/handoff", {
+        headers: {
+          Authorization: `Bearer ${params.get("token")}`,
+          "X-Scribble-Session": session.id,
+        },
+      })
+    ).status,
+    401,
+  );
+  assert.equal(
+    (
+      await call("/api/sessions", {
+        method: "POST",
+        headers: { Origin: "https://untrusted.example" },
+        body: "{}",
+      })
+    ).status,
+    403,
+  );
+});

@@ -15,7 +15,6 @@ import {
   atomicJson,
 } from "./lib/store.mjs";
 import { startServer } from "./lib/app.mjs";
-import { pendingFeedback, acknowledgeFeedback } from "./lib/handoff.mjs";
 import { excludeStorage } from "./lib/git-exclude.mjs";
 import { VERSION, SERVER_PROTOCOL } from "./lib/version.mjs";
 import { serverHealth, stopServer } from "./lib/lifecycle.mjs";
@@ -40,7 +39,6 @@ const { values, positionals } = parseArgs({
     help: { type: "boolean" },
     version: { type: "boolean" },
     full: { type: "boolean" },
-    timeout: { type: "string" },
   },
 });
 const command = positionals[0] || "start";
@@ -76,9 +74,7 @@ async function main() {
     console.log(`Scribble ${VERSION} — show your agent what you mean.
 
   scribble start [--detach] [--no-open] [--new] [--session ID]
-  scribble wait --session ID [--timeout SECONDS] [--full]
   scribble feedback --session ID [--full]
-  scribble ack --session ID
   scribble stop
   scribble status
   scribble --version
@@ -90,13 +86,13 @@ Run with: node /absolute/path/to/skills/scribble/scripts/scribble.mjs COMMAND
 In this repository: node bin/scribble.mjs COMMAND
 
 Options: --dir PATH (default .scribble in this project), --port NUMBER,
-         --title TEXT, --timeout SECONDS (wait only; default 3600).
+         --title TEXT.
 Use the same --dir for every command when choosing custom storage.
 
-start recovers unread feedback before opening a draft. Read each bundle and its
-images, then use ack to mark it as read. --new bypasses recovery without clearing it.
-wait exits with code 2 on timeout. feedback rereads a submission without acknowledging it.
-wait and feedback return a Markdown brief with image paths and computed geometry.
+start resumes a draft or opens a fresh session, preserving earlier feedback.
+Finish feedback in the editor, choose Copy for agent, then paste into your agent chat.
+No automatic delivery or background waiting is used.
+feedback reads a saved submission and returns its Markdown brief and file paths.
 The brief is saved as feedback.md. --full returns the original JSON, including all drawing points.
 start reuses a matching server or restarts an older version on the same port.
 stop shuts down the authenticated server and capture browsers. Drafts and submissions remain on disk.
@@ -142,51 +138,29 @@ Developers changing the UI in this repository must run npm run build before comm
           }
         : null,
       server: server && alive(server.pid) ? server : null,
-      pendingFeedback: await pendingFeedback(root),
     });
     return;
   }
-  if (command === "ack") {
-    if (!values.session)
-      throw new Error(
-        "Use ack --session ID after reading the feedback and images.",
-      );
-    print(await acknowledgeFeedback(root, values.session));
-    return;
+  if (command === "wait" || command === "ack") {
+    throw new Error(
+      "Automatic feedback delivery was removed. Finish feedback in Scribble, choose Copy for agent, then paste into your agent chat.",
+    );
   }
-  if (command === "wait" || command === "feedback") {
+  if (command === "feedback") {
     const session = await selected();
     const path = join(sessionDir(root, session.id), "feedback.json");
-    const timeout =
-      values.timeout === undefined ? 3600 : Number(values.timeout);
-    if (!Number.isFinite(timeout) || timeout < 0)
-      throw new Error("Timeout must be a nonnegative number of seconds.");
-    const start = Date.now();
-    while (true) {
-      const feedback = await readJson(path).catch((error) => {
-        if (error.code === "ENOENT") return null;
-        throw error;
-      });
-      if (feedback) {
-        const summary = await writeFeedbackBrief(feedback, dirname(path));
-        print(
-          values.full
-            ? { bundlePath: path, feedback }
-            : { sessionId: feedback.sessionId, bundlePath: path, ...summary },
-        );
-        return;
-      }
-      if (command === "feedback")
-        throw new Error("Feedback has not been sent yet. Use scribble wait.");
-      if (Date.now() - start >= timeout * 1000) {
-        console.error(
-          `Still waiting. Draft preserved. Resume with: node "${cli}" wait --dir "${root}" --session ${session.id}`,
-        );
-        process.exitCode = 2;
-        return;
-      }
-      await delay(500);
-    }
+    const feedback = await readJson(path).catch((error) => {
+      if (error.code === "ENOENT")
+        throw new Error("Finish your feedback in Scribble first.");
+      throw error;
+    });
+    const summary = await writeFeedbackBrief(feedback, dirname(path));
+    print(
+      values.full
+        ? { bundlePath: path, feedback }
+        : { sessionId: feedback.sessionId, bundlePath: path, ...summary },
+    );
+    return;
   }
   if (command !== "start") throw new Error(`Unknown command: ${command}`);
   const port = Number(values.port || 0);
@@ -196,13 +170,6 @@ Developers changing the UI in this repository must run npm run build before comm
 }
 async function start() {
   if (!values.child) await excludeStorage(root);
-  if (!values.child && !values.new && !values.session) {
-    const pending = await pendingFeedback(root);
-    if (pending.length) {
-      print({ action: "read-feedback", pendingFeedback: pending });
-      return;
-    }
-  }
   const existing = await readJson(join(root, "server.json")).catch(() => null);
   if (existing && alive(existing.pid)) {
     const health = await serverHealth(existing);

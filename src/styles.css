@@ -2084,3 +2084,54 @@ kbd {
     display: flex;
   }
 }
+
+/* The saved receipt hands off through the clipboard; it never implies delivery. */
+.handoff-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+}
+.handoff-actions .secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.receipt .handoff-status {
+  margin-top: 16px;
+  max-width: 55ch;
+}
+.handoff-preview {
+  width: min(100%, 640px);
+  margin-top: 20px;
+  text-align: left;
+}
+.handoff-preview summary {
+  cursor: pointer;
+  color: var(--blue);
+}
+.handoff-preview textarea {
+  width: 100%;
+  min-height: 220px;
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--ink);
+  font: inherit;
+  line-height: 1.6;
+  resize: vertical;
+}
+.receipt .handoff-error {
+  color: #923922;
+  max-width: 55ch;
+  margin-top: 16px;
+}
+@media (max-width: 440px) {
+  .handoff-actions {
+    width: 100%;
+    flex-direction: column;
+  }
+}

@@ -25,16 +25,16 @@ Use the word after the skill name to select the action. In Claude Code it arrive
 
 | Invocation suffix | Action |
 | --- | --- |
-| No suffix, or `start` | Run the launch command above. Resume a draft or recover unread feedback. |
+| No suffix, or `start` | Run the launch command above. Resume a draft or open a new canvas. |
 | `start --new` | Add `--new` to the launch command. Open a fresh draft and preserve prior feedback. |
 | `status` | Run `node "SKILL_DIRECTORY/scripts/scribble.mjs" status`, summarize the result, and stop. |
 | `stop` | Wait for **Draft saved** if the user is editing, then run `node "SKILL_DIRECTORY/scripts/scribble.mjs" stop`. Report the result and stop. |
 
 Keep the working directory fixed. Use the same `--dir PATH` on every command if custom storage was requested; concurrent agents need separate storage directories. Leave the server running after feedback unless asked to stop it. Before a known version upgrade, wait for **Draft saved** in active tabs and reload them afterward.
 
-## Open and collect
+## Open and hand back to the user
 
-1. If startup returns `action: "read-feedback"`, read [the feedback workflow](references/feedback.md) and recover each `pendingFeedback` entry with `feedback --session ID`. Do not silently discard unread feedback or force a new draft.
-2. Otherwise, open the exact returned `url` in the available browser and share the link immediately. Preserve its token fragment. Tell the user: **Paste or drop screenshots, add marks and comments, then choose Send to agent.** They can also choose **Capture live app**; read [live capture](references/live-capture.md) only when helping with webpage, shared-tab, or simulator capture.
-3. Run `node "SKILL_DIRECTORY/scripts/scribble.mjs" wait --session SESSION_ID --timeout 60` using the returned session ID. Keep a yielded process alive until it returns. Exit code 2 means no submission yet; repeat while the user is giving feedback. Honor cancellation or a new user instruction.
-4. Once feedback arrives, read [the feedback workflow](references/feedback.md). Inspect the brief and every original image before acknowledging receipt with `ack --session SESSION_ID`, then apply the requested changes. Saved drafts and submissions survive interruptions.
+1. Open the exact returned `url` in the available browser and share the link immediately. Preserve its token fragment.
+2. Tell the user: **Add screenshots, marks, and comments. Choose Finish feedback, then Copy for agent, and paste the handoff into this chat.** They can also choose **Capture live app**; read [live capture](references/live-capture.md) only when helping with webpage, shared-tab, or simulator capture.
+3. End your turn after sharing the URL and instructions. The user controls delivery by pasting the handoff. Do not poll, wait for a submission, or automatically read saved feedback. The editor's **New canvas** button starts another round without invoking the skill again.
+4. When the user pastes a handoff, read [the feedback workflow](references/feedback.md) and use the exact files it names. A new launch only opens the editor; it does not authorize applying earlier feedback.

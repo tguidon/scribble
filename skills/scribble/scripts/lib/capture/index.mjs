@@ -110,6 +110,13 @@ export function createCaptures(root, options = {}) {
         throw captureError("Unknown capture action.");
       });
     },
+    async release(id) {
+      if (!sessions.has(id)) return;
+      await run(id, async (sources) => {
+        await Promise.all([sources.web.close(), sources.simulator.close()]);
+        sessions.delete(id);
+      });
+    },
     async close() {
       closed = true;
       await Promise.all([...queues.values()]);

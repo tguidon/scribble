@@ -33,6 +33,13 @@ test("installed versions restart on the same origin, preserve drafts, and stop s
     await new Promise((r) => setTimeout(r, 200));
     await rm(temp, { recursive: true, force: true });
   });
+  // Simulate an installed server from before clipboard handoff (protocol 1).
+  const protocolFile = join(skill, "scripts/lib/version.mjs");
+  const currentProtocol = await readFile(protocolFile, "utf8");
+  await writeFile(
+    protocolFile,
+    currentProtocol.replace("SERVER_PROTOCOL = 2", "SERVER_PROTOCOL = 1"),
+  );
   const first = await run("start", "--detach", "--no-open");
   pids.add(first.pid);
   const url = new URL(first.url);
@@ -73,6 +80,7 @@ test("installed versions restart on the same origin, preserve drafts, and stop s
     join(skill, "version.json"),
     JSON.stringify({ version: "9.0.0-test" }),
   );
+  await writeFile(protocolFile, currentProtocol);
   const upgraded = await run("start", "--detach", "--no-open");
   pids.add(upgraded.pid);
   assert.notEqual(upgraded.pid, first.pid);

@@ -304,6 +304,10 @@ test("capture API saves immutable images, retries without duplicates, and submit
     ).status,
     409,
   );
+  assert.equal((await call("/sessions", {})).status, 200);
+  const captureState = await (await call("/capture/status")).json();
+  assert.equal(captureState.web.connected, false);
+  assert.deepEqual(await readFile(bundle.images[0].path), original);
 });
 
 test("live webpage input maps normalized coordinates and releases interrupted drags", async (t) => {

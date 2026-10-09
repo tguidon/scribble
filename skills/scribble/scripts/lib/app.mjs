@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { randomUUID, createHash } from "node:crypto";
 import {
   atomicJson,
+  createSession,
   publicSession,
   sessionDir,
   loadSession,
@@ -17,6 +18,7 @@ import { VERSION, SERVER_PROTOCOL } from "./version.mjs";
 import { createCaptures } from "./capture/index.mjs";
 import { imageDimensions } from "./capture/common.mjs";
 import { discoverWebApps } from "./capture/discovery.mjs";
+import { prepareHandoff } from "./handoff.mjs";
 const appRoot = fileURLToPath(new URL("../../", import.meta.url));
 const mime = {
   ".html": "text/html",
@@ -280,9 +282,30 @@ export async function startServer({
             });
             return res.end(await readFile(join(dir, "images", image.file)));
           }
+          if (req.method === "POST" && url.pathname === "/api/sessions") {
+            if (!receipt)
+              fail(409, "Finish this feedback before opening a new canvas.");
+            await captures.release(id);
+            // Reuse the next draft after a lost response or repeated click.
+            let next = session.nextSessionId
+              ? await loadSession(root, session.nextSessionId)
+              : null;
+            if (!next || next.status !== "draft") {
+              next = await createSession(root);
+              session.nextSessionId = next.id;
+              await persist();
+            }
+            return reply(res, 200, {
+              url: `/?session=${next.id}#token=${next.token}&session=${next.id}`,
+            });
+          }
+          if (req.method === "GET" && url.pathname === "/api/handoff") {
+            if (!receipt) fail(404, "Finish your feedback before copying it.");
+            return reply(res, 200, await prepareHandoff(receipt, dir));
+          }
           if (req.method === "GET" && url.pathname === "/api/feedback") {
             if (session.status !== "submitted")
-              fail(404, "Feedback has not been sent yet.");
+              fail(404, "Feedback has not been finished yet.");
             res.setHeader(
               "Content-Disposition",
               'attachment; filename="scribble-feedback.json"',
@@ -296,7 +319,7 @@ export async function startServer({
           if (session.status !== "draft")
             fail(
               409,
-              "This feedback has already been sent. Start a new session for more feedback.",
+              "This feedback has already been finished. Start a new session for more feedback.",
             );
           if (
             req.method === "POST" &&
@@ -427,9 +450,9 @@ export async function startServer({
           }
           if (req.method === "POST" && url.pathname === "/api/submit") {
             if (input.revision !== session.revision)
-              fail(409, "The draft changed. Save it again before sending.");
+              fail(409, "The draft changed. Save it again before finishing.");
             if (!session.images.length)
-              fail(400, "Add at least one screenshot before sending.");
+              fail(400, "Add at least one screenshot before finishing.");
             const submittedAt = new Date().toISOString();
             const bundle = {
               version: 1,
@@ -448,7 +471,8 @@ export async function startServer({
                 })),
               })),
             };
-            // feedback.json is the commit marker read by waiting agents.
+            // Prepare supporting files before committing the immutable submission.
+            await prepareHandoff(bundle, dir);
             await atomicJson(join(dir, "feedback.json"), bundle);
             session = {
               ...session,

@@ -161,9 +161,9 @@ test("local capture opens, annotates, resumes, captures again, and submits both 
   await expect(
     page.getByRole("button", { name: "Open Project details.png" }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "Send to agent" }).click();
+  await page.getByRole("button", { name: "Finish feedback" }).click();
   await expect(
-    page.getByRole("heading", { name: "Point made." }),
+    page.getByRole("heading", { name: "Ready for your agent." }),
   ).toBeVisible();
   const url = new URL(app.url),
     params = new URLSearchParams(url.hash.slice(1));
@@ -534,9 +534,9 @@ test("shared tab captures survive lost responses, resume sharing, and stop on su
     1,
   );
   await page.getByRole("button", { name: "Back to annotations" }).click();
-  await page.getByRole("button", { name: "Send to agent" }).click();
+  await page.getByRole("button", { name: "Finish feedback" }).click();
   await expect(
-    page.getByRole("heading", { name: "Point made." }),
+    page.getByRole("heading", { name: "Ready for your agent." }),
   ).toBeVisible();
   expect(
     await page.evaluate(

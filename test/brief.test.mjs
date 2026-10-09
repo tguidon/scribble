@@ -159,7 +159,7 @@ test("the brief preserves multiline user text and keeps generated structure outs
   assert.match(text, /Screenshot 2[\s\S]*Marks: 0/);
 });
 
-test("CLI reads old submissions as briefs, preserves full JSON, and does not acknowledge them", async (t) => {
+test("CLI reads old submissions as briefs, preserves full JSON, without modifying their bundle", async (t) => {
   const root = await mkdtemp(join(tmpdir(), "scribble-brief-"));
   t.after(() => rm(root, { recursive: true, force: true }));
   const session = await createSession(root);
@@ -193,11 +193,6 @@ test("CLI reads old submissions as briefs, preserves full JSON, and does not ack
   if (process.platform !== "win32")
     assert.equal((await stat(result.briefPath)).mode & 0o777, 0o600);
   assert.deepEqual((await run("feedback", "--full")).feedback, feedback);
-  assert.deepEqual(await run("wait", "--timeout", "0"), result);
-  assert.deepEqual(
-    (await run("wait", "--timeout", "0", "--full")).feedback,
-    feedback,
-  );
   assert.equal(await readFile(bundlePath, "utf8"), original);
   await assert.rejects(readFile(join(dir, "read.json")), { code: "ENOENT" });
 });
