@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Locator } from "@playwright/test";
 import { createServer } from "node:http";
 import { mkdtemp, rm, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -12,6 +12,19 @@ import { startServer } from "../skills/scribble/scripts/lib/app.mjs";
 
 let project: string, origin: string, result: any, messages: any[];
 let calls: string[];
+// Visibility alone does not prove that an SVG image decoded; broken images
+// still occupy their full canvas rectangle.
+async function expectDecodedScreenshot(image: Locator) {
+  await expect(image).toBeVisible();
+  const size = await image.evaluate(async (element) => {
+    const bitmap = new Image();
+    bitmap.src = element.getAttribute("href")!;
+    await bitmap.decode();
+    return { width: bitmap.naturalWidth, height: bitmap.naturalHeight };
+  });
+  expect(size.width).toBeGreaterThan(0);
+  expect(size.height).toBeGreaterThan(0);
+}
 let http: Awaited<ReturnType<typeof startServer>>,
   plugin: ReturnType<typeof createPlugin>,
   host: ReturnType<typeof createServer>,
@@ -95,7 +108,7 @@ test.beforeEach(async () => {
         res.setHeader("Content-Type", "text/html");
         res.setHeader(
           "Content-Security-Policy",
-          "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src blob: data:; media-src blob:",
+          "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; media-src data:",
         );
         res.end(editor);
       } else {
@@ -162,6 +175,7 @@ for (const width of [1440, 390])
     const ui = page.frameLocator("iframe");
     await expect(ui.getByRole("heading", { name: /A picture/ })).toBeVisible();
     await ui.getByRole("button", { name: "Try an example" }).click();
+    await expectDecodedScreenshot(ui.locator(".image-stage image"));
     await ui
       .getByRole("textbox", { name: "The bigger picture" })
       .fill("Improve this example's spacing.");
@@ -202,6 +216,48 @@ for (const width of [1440, 390])
       });
     expect(errors).toEqual([]);
   });
+
+test("uploaded screenshot decodes with desktop CSP and survives reopening the plugin", async ({
+  page,
+}) => {
+  const violations: string[] = [];
+  page.on("console", (message) => {
+    if (message.text().includes("Content Security Policy"))
+      violations.push(message.text());
+  });
+  await page.goto(`${origin}/host`);
+  const ui = page.frameLocator("iframe");
+  await expect(
+    ui.getByRole("button", { name: "Add screenshots", exact: true }),
+  ).toBeEnabled();
+  await ui
+    .locator('input[type="file"]')
+    .setInputFiles("docs/images/scribble.png");
+  await expectDecodedScreenshot(ui.locator(".image-stage image"));
+  await expect(ui.getByText("Draft saved", { exact: true })).toBeVisible();
+  await page.reload();
+  await expectDecodedScreenshot(ui.locator(".image-stage image"));
+  await ui.getByRole("button", { name: "Finish feedback" }).click();
+  await ui.getByRole("button", { name: "Send to this chat" }).click();
+  await expect(
+    ui.getByRole("button", { name: "Message accepted" }),
+  ).toBeVisible();
+  const feedback: any = await client.callTool({
+    name: "read_feedback",
+    arguments: { sessionId: result.structuredContent.sessionId },
+  });
+  const original: any = await client.callTool({
+    name: "read_image",
+    arguments: {
+      sessionId: result.structuredContent.sessionId,
+      imageId: feedback.structuredContent.images[0].id,
+    },
+  });
+  expect(Buffer.from(original.content[0].data, "base64")).toEqual(
+    await readFile("docs/images/scribble.png"),
+  );
+  expect(violations).toEqual([]);
+});
 
 test("hosts that cannot send messages keep a copy fallback and never claim delivery", async ({
   page,
@@ -266,7 +322,7 @@ for (const kind of ["web", "simulator"])
       await image.evaluate((element: HTMLImageElement) => element.naturalWidth),
     ).toBeGreaterThan(0);
     await ui.getByRole("button", { name: "Capture & annotate" }).click();
-    await expect(ui.locator(".image-stage image")).toBeVisible();
+    await expectDecodedScreenshot(ui.locator(".image-stage image"));
     await ui.getByRole("button", { name: "Finish feedback" }).click();
     await expect(
       ui.getByRole("heading", { name: "Ready for your agent." }),

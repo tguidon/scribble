@@ -29,6 +29,7 @@ The plugin bundles its MCP SDK and UI in `plugin/dist/`. Node.js 22+ is the only
 - A registry maps IDs created by this plugin to their storage directories. It uses `SCRIBBLE_PLUGIN_DATA`, then `PLUGIN_DATA`, or `~/.local/share/scribble-plugin` by default. It holds paths, not screenshots.
 - UI requests need the canvas ID and its random session token. The adapter permits only supported editor routes and supplies authentication itself. It cannot proxy arbitrary URLs or shut down the server.
 - Image bytes and live frames travel through UI-only tool metadata. They are not added to model context by those tools. The agent reads chosen original screenshots with `read_image`.
+- Embedded images use data URLs because Codex's content security policy blocks blob image URLs. The standalone editor keeps object URLs to avoid the extra base64 copies.
 - Live preview keeps one source connection and only the newest frame. UI calls are limited to roughly six per second; hidden or abandoned views release their stream after inactivity. This limits backlog, but the host's MCP transport can make embedded previews slower than the standalone browser.
 - Sending is an explicit user action. `ui/message` acceptance and `read_feedback` retrieval are distinct states. The agent's retrieval writes a small `plugin-read.json` receipt.
 - On hosts that forbid browser storage, temporary unsaved recovery stays in memory. Autosave continues writing to local disk; wait for Draft saved before closing the editor.
@@ -56,7 +57,7 @@ npm test
 npm run test:e2e
 ```
 
-The plugin tests exercise real MCP requests, isolated canvases, preserved images, a copied runtime without dependencies, and an opaque browser iframe using the official MCP Apps host bridge. Browser tests cover sending, read receipts, new canvases, rejected messages, and unsupported-host fallback. These tests do not prove a specific desktop build supports embedded UI or starts an idle chat.
+The plugin tests exercise real MCP requests, isolated canvases, preserved images, a copied runtime without dependencies, and an opaque browser iframe using the official MCP Apps host bridge. The iframe blocks blob image URLs, matching Codex, and tests confirm that uploaded screenshots and live frames decode. Browser tests cover sending, read receipts, new canvases, rejected messages, and unsupported-host fallback. These tests do not prove a specific desktop build supports embedded UI or starts an idle chat.
 
 Before declaring a desktop build supported, verify it directly:
 

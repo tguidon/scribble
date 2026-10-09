@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowLeft, Camera, Home, RefreshCw } from "lucide-react";
 import { request, apiResponse } from "../api";
 import { readLiveFrames } from "../liveStream";
+import { createImageSource, releaseImageSource } from "../imageSource";
 import type { CaptureKind } from "../types";
 
 type Input = {
@@ -78,11 +79,9 @@ export function LiveView({
           );
           if (performance.now() - lastFrame < 65) return;
           lastFrame = performance.now();
-          URL.revokeObjectURL(previousUrl);
+          releaseImageSource(previousUrl);
           previousUrl = currentUrl;
-          currentUrl = URL.createObjectURL(
-            new Blob([bytes as BlobPart], { type: "image/jpeg" }),
-          );
+          currentUrl = createImageSource(bytes, "image/jpeg");
           setFrameUrl(currentUrl);
         }),
       )
@@ -98,8 +97,8 @@ export function LiveView({
       active = false;
       abort.abort();
       clearTimeout(watchdog);
-      URL.revokeObjectURL(currentUrl);
-      URL.revokeObjectURL(previousUrl);
+      releaseImageSource(currentUrl);
+      releaseImageSource(previousUrl);
     };
   }, [kind, generation, attempt, visible]);
   const [ready, setReady] = useState(false);
