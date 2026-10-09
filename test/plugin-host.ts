@@ -11,11 +11,17 @@ declare global {
       canSend: boolean;
       reject: boolean;
       fitContent?: boolean;
+      inline?: boolean;
+      rejectExpand?: boolean;
     };
     fixtureHeights: number[];
+    fixtureDisplayMode: (mode: "inline" | "fullscreen") => void;
   }
 }
 const frame = document.querySelector("iframe")!;
+let displayMode: "inline" | "fullscreen" = window.fixture.inline
+  ? "inline"
+  : "fullscreen";
 window.fixtureHeights = [];
 // Model an inline chat host which fits its frame to the widget document.
 // Unlike the fixed-size panel fixture, this exposes viewport/content cycles.
@@ -24,6 +30,7 @@ if (window.fixture.fitContent) {
   window.addEventListener("message", (event) => {
     if (
       event.source !== frame.contentWindow ||
+      displayMode !== "inline" ||
       event.data?.type !== "fixture-size"
     )
       return;
@@ -42,7 +49,7 @@ const bridge = new AppBridge(
   },
   {
     hostContext: {
-      displayMode: "inline",
+      displayMode,
       availableDisplayModes: ["inline", "fullscreen"],
     },
   },
@@ -56,8 +63,14 @@ bridge.onmessage = async (params) => {
   await fetch("/message", { method: "POST", body: JSON.stringify(params) });
   return {};
 };
-bridge.onrequestdisplaymode = async ({ mode }) => {
+window.fixtureDisplayMode = (mode) => {
+  displayMode = mode;
+  frame.style.height = mode === "fullscreen" ? "100vh" : "200px";
   bridge.setHostContext({ displayMode: mode });
+};
+bridge.onrequestdisplaymode = async ({ mode }) => {
+  if (window.fixture.rejectExpand) return { mode: "inline" };
+  window.fixtureDisplayMode(mode as "inline" | "fullscreen");
   return { mode };
 };
 bridge.oninitialized = async () => {

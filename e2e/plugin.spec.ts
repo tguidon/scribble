@@ -99,7 +99,7 @@ test.beforeEach(async () => {
         const params = new URL(req.url, "http://fixture").searchParams;
         res.setHeader("Content-Type", "text/html");
         res.end(
-          `<html><body style="margin:0"><iframe title="Scribble plugin" sandbox="allow-scripts allow-downloads" style="border:0;width:100%;height:100vh"></iframe><script>window.fixture=${JSON.stringify({ result, canSend: !params.has("no-send"), reject: params.has("reject"), fitContent: params.has("fit-content") }).replaceAll("<", "\\u003c")}</script><script type="module" src="/host.js"></script></body></html>`,
+          `<html><body style="margin:0"><iframe title="Scribble plugin" sandbox="allow-scripts allow-downloads" style="border:0;width:100%;height:100vh"></iframe><script>window.fixture=${JSON.stringify({ result, canSend: !params.has("no-send"), reject: params.has("reject"), fitContent: params.has("fit-content"), inline: params.has("inline"), rejectExpand: params.has("reject-expand") }).replaceAll("<", "\\u003c")}</script><script type="module" src="/host.js"></script></body></html>`,
         );
       } else if (req.url === "/host.js") {
         res.setHeader("Content-Type", "text/javascript");
@@ -273,48 +273,83 @@ test("uploaded screenshot decodes with desktop CSP and survives reopening the pl
   expect(violations).toEqual([]);
 });
 
-test("restoring an inline canvas cannot grow the chat's frame indefinitely", async ({
+test("restored chat cards stay compact, allow chat scrolling, and reopen the saved canvas", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 720, height: 1000 });
-  await page.goto(`${origin}/host?fit-content`);
+  await page.goto(`${origin}/host?inline&fit-content`);
   const ui = page.frameLocator("iframe");
+  await ui.getByRole("button", { name: "Open canvas", exact: true }).click();
   await ui.getByRole("button", { name: "Try an example" }).click();
   await expectDecodedScreenshot(ui.locator(".image-stage image"));
   await expect(ui.getByText("Draft saved", { exact: true })).toBeVisible();
   await page.reload();
-  await expectDecodedScreenshot(ui.locator(".image-stage image"));
-  // Allow several animation frames so a resize feedback loop can surface.
+  await expect(
+    ui.getByRole("button", { name: "Open canvas", exact: true }),
+  ).toBeEnabled();
+  await expect(ui.locator(".app")).toHaveCount(0);
   await page.waitForTimeout(600);
   const heights = await page.evaluate(
     () => (window as any).fixtureHeights as number[],
   );
   expect(heights.length).toBeGreaterThan(0);
   expect(heights.length).toBeLessThan(10);
-  expect(Math.max(...heights)).toBeLessThanOrEqual(760);
+  expect(Math.max(...heights)).toBeLessThan(320);
+  // Wheel over the card must reach the conversation, not a hidden canvas.
+  await page.evaluate(() => {
+    document.body.style.paddingBottom = "2000px";
+  });
+  await ui.getByRole("heading", { name: "Scribble", exact: true }).hover();
+  await page.mouse.wheel(0, 400);
+  await expect
+    .poll(() => page.evaluate(() => window.scrollY))
+    .toBeGreaterThan(100);
+  await ui.getByRole("button", { name: "Open canvas", exact: true }).click();
+  await expectDecodedScreenshot(ui.locator(".image-stage image"));
   await ui
     .getByRole("textbox", { name: "The bigger picture" })
     .fill("Still usable after reopening.");
+  await expect(ui.getByText("Draft saved", { exact: true })).toBeVisible();
+  await page.evaluate(() => (window as any).fixtureDisplayMode("inline"));
+  await expect(ui.locator(".app")).toHaveCount(0);
+  await ui.getByRole("button", { name: "Open canvas", exact: true }).click();
+  await expect(
+    ui.getByRole("textbox", { name: "The bigger picture" }),
+  ).toHaveValue("Still usable after reopening.");
   await ui.getByRole("button", { name: "Finish feedback" }).click();
   await expect(
     ui.getByRole("heading", { name: "Ready for your agent." }),
   ).toBeVisible();
 });
 
-test("expanded canvases use the host's full height while inline canvases stay bounded", async ({
+test("expanded canvases follow the host height and collapse back to a card", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 720, height: 1000 });
-  await page.goto(`${origin}/host`);
+  await page.goto(`${origin}/host?inline`);
   const ui = page.frameLocator("iframe");
-  await expect(
-    ui.getByRole("button", { name: "Add screenshots", exact: true }),
-  ).toBeEnabled();
-  await expect(ui.locator("#root")).toHaveCSS("height", "760px");
-  await ui.getByRole("button", { name: "Expand canvas" }).click();
+  await ui.getByRole("button", { name: "Open canvas", exact: true }).click();
   await expect(ui.locator("#root")).toHaveCSS("height", "1000px");
   await page.setViewportSize({ width: 720, height: 800 });
   await expect(ui.locator("#root")).toHaveCSS("height", "800px");
+  await page.evaluate(() => (window as any).fixtureDisplayMode("inline"));
+  await expect(
+    ui.getByRole("button", { name: "Open canvas", exact: true }),
+  ).toBeEnabled();
+  await expect(ui.locator(".app")).toHaveCount(0);
+});
+
+test("a declined expansion keeps the chat card usable and offers the browser editor", async ({
+  page,
+}) => {
+  await page.goto(`${origin}/host?inline&reject-expand`);
+  const ui = page.frameLocator("iframe");
+  await ui.getByRole("button", { name: "Open canvas", exact: true }).click();
+  await expect(ui.getByRole("alert")).toContainText("Could not open");
+  await expect(
+    ui.getByRole("button", { name: "Open browser editor" }),
+  ).toBeEnabled();
+  await expect(ui.locator(".app")).toHaveCount(0);
 });
 
 test("hosts that cannot send messages keep a copy fallback and never claim delivery", async ({

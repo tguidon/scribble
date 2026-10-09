@@ -1,5 +1,5 @@
-/* Inline hosts fit their frame to our document. Its outer height must not
-   depend on that frame, or the responsive canvas creates a resize loop. */
+/* Chat history contains only a content-sized launch card. The editor and its
+   scroll/input handlers mount only in the host's expanded panel. */
 html {
   overflow: hidden;
 }
@@ -9,12 +9,30 @@ body {
 }
 
 #root {
-  height: 760px;
-  overflow: auto;
-  overscroll-behavior: contain;
-  contain: layout size;
+  display: flow-root;
 }
 
 html[data-display-mode="fullscreen"] #root {
   height: 100dvh;
+  overflow: auto;
+  contain: layout size;
+}
+
+.plugin-launcher {
+  padding: 20px 24px;
+}
+
+.plugin-launcher h1 {
+  margin: 0;
+  font-size: 24px;
+  letter-spacing: -0.04em;
+}
+
+.plugin-launcher p {
+  margin: 8px 0 16px;
+  color: var(--muted);
+}
+
+.plugin-launcher button {
+  min-height: 44px;
 }

@@ -41,7 +41,7 @@ codex plugin add scribble@scribble
 
 You can also install Scribble from its marketplace in the desktop app's Plugins Directory. Restart the app if its new tools do not appear, then invoke `$scribble start` in your project chat. No npm install or build is required for the installed package.
 
-On hosts that support MCP Apps, Scribble opens an embedded editor. Choose **Finish feedback**, then **Send to this chat**. The host routes the message to the conversation that opened the canvas. **Message accepted** confirms host acceptance; **Feedback read** confirms that the agent retrieved the saved feedback. Neither means the requested changes are complete.
+On hosts that support MCP Apps, choose **Open canvas** in the Scribble card to open the embedded editor. The card stays compact in your chat history. Choose **Finish feedback**, then **Send to this chat**. The host routes the message to the conversation that opened the canvas. **Message accepted** confirms host acceptance; **Feedback read** confirms that the agent retrieved the saved feedback. Neither means the requested changes are complete.
 
 The plugin checks host capabilities. If direct messages are unavailable or rejected, use **Copy for agent**. If the host does not render the editor, use the browser link returned by its tool; the standalone browser keeps its clipboard workflow. Desktop UI and messaging support can vary by host build. The plugin is a preview until the installed desktop workflow is verified.
 

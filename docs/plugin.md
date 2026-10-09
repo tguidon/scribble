@@ -22,7 +22,7 @@ Agent → read_feedback / read_image → saved feedback and originals
 
 The plugin bundles its MCP SDK and UI in `plugin/dist/`. Node.js 22+ is the only required runtime. Build dependencies stay in the development checkout. Optional Playwright and serve-sim capture setup still follows the existing skill workflow.
 
-Inline editors have a fixed outer height and scroll internally. A host can resize an inline frame from its content, so the document's height must not grow with the iframe viewport. Fullscreen mode follows the host's viewport. The plugin tests include restoring a saved canvas inside a host that sizes frames from their content.
+Chat history shows a compact **Open canvas** card. The editor mounts only in the host's expanded panel, which uses the MCP Apps `fullscreen` display mode. Returning to inline mode removes the editor and its input handlers. The card has no viewport-based height or nested scroll area. Tests cover restoring the card, scrolling the conversation over it, and reopening saved feedback. Hosts without expanded panels offer the browser editor.
 
 ## Data and delivery
 
