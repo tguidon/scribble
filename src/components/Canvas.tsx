@@ -40,7 +40,12 @@ export function Canvas({
 }: Props) {
   const viewport = useRef<HTMLDivElement>(null);
   const svg = useRef<SVGSVGElement>(null);
-  const [size, setSize] = useState({ width: 800, height: 600 });
+  const [size, setSize] = useState({
+    width: 800,
+    height: 600,
+    inlinePadding: 80,
+    blockPadding: 155,
+  });
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [ghost, setGhost] = useState<Annotation>();
@@ -56,20 +61,23 @@ export function Canvas({
   >(undefined);
   const fit = image
     ? Math.min(
-        (size.width - 80) / image.width,
-        (size.height - 155) / image.height,
+        (size.width - size.inlinePadding) / image.width,
+        (size.height - size.blockPadding) / image.height,
         1,
       )
     : 1;
   const scale = Math.max(0.02, fit) * zoom;
   useEffect(() => {
     if (!viewport.current) return;
-    const observer = new ResizeObserver(([entry]) =>
+    const observer = new ResizeObserver(([entry]) => {
+      const style = getComputedStyle(entry.target);
       setSize({
         width: entry.contentRect.width,
         height: entry.contentRect.height,
-      }),
-    );
+        inlinePadding: parseFloat(style.getPropertyValue("--fit-inline")) || 80,
+        blockPadding: parseFloat(style.getPropertyValue("--fit-block")) || 155,
+      });
+    });
     observer.observe(viewport.current);
     return () => observer.disconnect();
   }, []);

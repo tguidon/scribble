@@ -59,6 +59,7 @@ export default function App() {
   const [past, setPast] = useState<Draft[]>([]);
   const [future, setFuture] = useState<Draft[]>([]);
   const [help, setHelp] = useState(false);
+  const [screenshotsExpanded, setScreenshotsExpanded] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [removeId, setRemoveId] = useState<string>();
   const input = useRef<HTMLInputElement>(null);
@@ -489,7 +490,21 @@ export default function App() {
               <span>Screenshots</span>
               <span className="count">{session.images.length}</span>
             </div>
-            <div className="screenshot-list">
+            <button
+              className="screenshot-toggle"
+              aria-label="Screenshots"
+              aria-expanded={screenshotsExpanded}
+              aria-controls="screenshot-list"
+              disabled={!session.images.length}
+              onClick={() => setScreenshotsExpanded((open) => !open)}
+            >
+              Screenshots <span className="count">{session.images.length}</span>
+              <ChevronDown size={16} />
+            </button>
+            <div
+              id="screenshot-list"
+              className={`screenshot-list ${screenshotsExpanded ? "expanded" : ""}`}
+            >
               {session.images.map((item, index) => (
                 <div
                   className={`screenshot-item ${image?.id === item.id ? "current" : ""}`}
@@ -502,6 +517,7 @@ export default function App() {
                     onClick={() => {
                       setActiveId(item.id);
                       setSelected(null);
+                      setScreenshotsExpanded(false);
                     }}
                   >
                     <div className="thumbnail">
@@ -536,6 +552,8 @@ export default function App() {
                   )}
                 </div>
               ))}
+            </div>
+            <div className="screenshot-actions">
               <button
                 className="add-screenshot"
                 onClick={() => input.current?.click()}
@@ -544,19 +562,19 @@ export default function App() {
                 <Plus size={21} />
                 <span>Add images</span>
               </button>
+              <button
+                className="capture-shortcut"
+                onClick={() => setCaptureOpen(true)}
+                disabled={disabled}
+              >
+                <Camera size={19} />
+                <span>
+                  {session.images.some((image) => image.source)
+                    ? "Resume live capture"
+                    : "Capture live app"}
+                </span>
+              </button>
             </div>
-            <button
-              className="capture-shortcut"
-              onClick={() => setCaptureOpen(true)}
-              disabled={disabled}
-            >
-              <Camera size={19} />
-              <span>
-                {session.images.some((image) => image.source)
-                  ? "Resume live capture"
-                  : "Capture live app"}
-              </span>
-            </button>
             <div className="rail-footer">
               <ShieldCheck size={16} />
               <span>

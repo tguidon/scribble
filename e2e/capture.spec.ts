@@ -711,3 +711,111 @@ test.describe("native browser tab sharing", () => {
     await sourceTab.close();
   });
 });
+
+test("capture setup and live controls fit split-view widths", async ({
+  page,
+}) => {
+  await page
+    .getByRole("button", { name: "Capture live app", exact: true })
+    .click();
+  for (const width of [320, 390, 570, 768, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.getByLabel("Webpage URL").fill(sourceUrl);
+    await expect(
+      page.getByRole("button", { name: "Open webpage", exact: true }),
+    ).toBeVisible();
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBe(true);
+    if (width === 570) {
+      await page.evaluate(async () => {
+        window.scrollTo(0, 0);
+        await document.fonts.ready;
+        await new Promise(requestAnimationFrame);
+        await new Promise(requestAnimationFrame);
+      });
+      await page.screenshot({
+        path: ".impeccable/review/narrow-570-web-setup.png",
+        fullPage: true,
+      });
+    }
+    await page
+      .getByRole("button", { name: "Share browser tab", exact: true })
+      .click();
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBe(true);
+    if (width === 570) {
+      await page.evaluate(async () => {
+        window.scrollTo(0, 0);
+        await document.fonts.ready;
+        await new Promise(requestAnimationFrame);
+        await new Promise(requestAnimationFrame);
+      });
+      await page.screenshot({
+        path: ".impeccable/review/narrow-570-share-setup.png",
+        fullPage: true,
+      });
+    }
+    await page.getByRole("button", { name: /Use a webpage URL/ }).click();
+    await page.getByRole("button", { name: "Simulator", exact: true }).click();
+    await expect(
+      page.getByRole("button", { name: "Connect simulator", exact: true }),
+    ).toBeVisible();
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBe(true);
+    if (width === 570) {
+      await page.evaluate(async () => {
+        window.scrollTo(0, 0);
+        await document.fonts.ready;
+        await new Promise(requestAnimationFrame);
+        await new Promise(requestAnimationFrame);
+      });
+      await page.screenshot({
+        path: ".impeccable/review/narrow-570-simulator-setup.png",
+        fullPage: true,
+      });
+    }
+    await page.getByRole("button", { name: "Webpage", exact: true }).click();
+  }
+  await page.getByLabel("Webpage URL").fill(sourceUrl);
+  await page.getByRole("button", { name: "Open webpage", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "Live webpage", exact: true }),
+  ).toBeVisible();
+  for (const width of [320, 390, 570, 768, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    const capture = page.getByRole("button", {
+      name: "Capture & annotate",
+      exact: true,
+    });
+    await expect(capture).toBeVisible();
+    const box = (await capture.boundingBox())!;
+    expect(box.x).toBeGreaterThanOrEqual(0);
+    expect(box.x + box.width).toBeLessThanOrEqual(width);
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBe(true);
+    if ([390, 570, 1440].includes(width)) {
+      await page.evaluate(async () => {
+        window.scrollTo(0, 0);
+        await document.fonts.ready;
+        await new Promise(requestAnimationFrame);
+        await new Promise(requestAnimationFrame);
+      });
+      await page.screenshot({
+        path: `.impeccable/review/narrow-${width}-web-live.png`,
+        fullPage: true,
+      });
+    }
+  }
+});

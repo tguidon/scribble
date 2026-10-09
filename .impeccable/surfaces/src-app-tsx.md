@@ -7,7 +7,7 @@ related_targets: ["src/styles.css"]
 
 # Feedback workspace
 
-Mode: Operate. Desktop-first; responsive mobile layout preserves all controls. Scope: the local screenshot annotation and handoff workspace.
+Mode: Operate. Desktop-first; responsive layouts preserve all controls in narrow Codex split views and on mobile. Scope: the local screenshot annotation and handoff workspace.
 
 ## Direction contract
 THESIS: A working sketchbook where screenshots occupy the page and marks become precise feedback. The application opens into the task.
@@ -22,3 +22,11 @@ Signature interaction: a new pin pops into place, its matching comment receives 
 Readability refinement: preserve the native system sans and existing copy. Use 14px labels and hints, 16px reading and form text, and 20px section headings at the default browser font setting. Preserve these roles on mobile; resize or wrap containers instead of shrinking text.
 
 Live capture is a companion Operate surface within this workspace. Its source settings, embedded interaction, and responsive layout are recorded in [Embedded live capture](src-components-capturepanel-tsx.md). Capturing a still returns to the existing annotation editor; the live source remains available for another capture.
+
+## Narrow-window layout
+
+At 980px and below, the screenshot rail becomes a compact selector above the canvas. The selector starts collapsed, expands a horizontal thumbnail strip, and closes after choosing an image. Add images and live capture stay visible outside that strip. At 520px and below, these actions move below the selector; expanded thumbnails follow them.
+
+A populated canvas uses the greater of 480px and the viewport height minus 140px. The image centers within its viewport with 32px of fitting allowance per dimension. Drawing tools sit below the image viewport, leaving more room for portrait previews. At 600px and below the dock has two rows: drawing tools first, then inks and history controls. Feedback and submission follow the canvas. Empty entry uses content height and hides disabled drawing and zoom controls.
+
+Keep the established readable text roles. Narrow layouts wrap the header and footer, reduce feedback insets, and keep help scrollable within the window. Receipt spacing compacts below 600px. Coarse-pointer drawing, ink, zoom, and help targets remain at least 44px in each dimension.

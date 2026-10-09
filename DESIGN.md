@@ -197,9 +197,13 @@ Prose outside the rails is limited to 50–60ch where space permits. The narrow 
 
 The desktop application fills the viewport height with a minimum height of 700px. A 77px header and a footer at least 40px tall bound three working columns: 176px screenshot rail, flexible canvas, and 360px feedback rail. Comments scroll independently; the overall-message form stays at the bottom of its rail. The workspace has a 36.5rem minimum height so error and recovery controls can extend the page without covering the form or footer. Error text and actions wrap on narrow screens.
 
-At widths up to 1150px the rail widths become 160px and 340px and the dock compacts. At 1600px and above they become 192px and 380px. At 980px and below the layout becomes a vertical stack: horizontal screenshot strip, 570px canvas, feedback, and submission. The header has a 65px minimum height; header and footer content can wrap. At 440px and below the canvas row is 505px and the dock can wrap. Empty canvases use a 650px row on mobile so the full instructions remain readable.
+At widths up to 1150px the rail widths become 160px and 340px and the dock compacts. At 1600px and above they become 192px and 380px. At 980px and below, including narrow desktop split views, the layout stacks screenshot controls, canvas, feedback, and submission. Screenshot navigation becomes a disclosure, collapsed initially and after choosing an image. Add images and live capture remain outside the scrolling thumbnail strip, beside the selector. At 520px and below, these actions occupy a second row and expanded thumbnails occupy a third row.
 
-The canvas dot grid repeats every 18px. A centered floating dock sits 65px above the canvas bottom on desktop, 53px on mobile, and 48px at the smallest breakpoint. The image transform is centered horizontally and anchored at 43% of the available viewport height. Screenshot and comment spacing is compact, with larger clear space around the image.
+The populated canvas row uses `max(480px, calc(100dvh - 140px))` at 980px and below, allowing portrait images to use the available window height. Its image viewport reserves 32px in each dimension for fitting and centers the image vertically. The dock follows the viewport in normal flow, keeping controls clear of the image. At 600px and below, the six drawing tools occupy the first dock row; ink choices and undo/redo occupy the second. Empty canvases instead use content height and hide the inactive dock and zoom area.
+
+The canvas dot grid repeats every 18px. On desktop above 980px, the dock floats 65px above the canvas bottom and the image is anchored at 43% of the viewport height. Screenshot and comment spacing stays compact, with larger clear space around the image. The narrow layout preserves the established text roles and uses wrapping and scrolling to fit controls.
+
+At 980px and below the header has a 65px minimum height and can wrap. The help panel scrolls within a viewport-relative height limit. At 600px and below the header uses two columns, the footer wraps, feedback insets reduce to 16px, and receipt spacing compacts. Coarse-pointer layouts up to 980px give drawing, ink, zoom, and help controls a minimum 44px target in each dimension. Capture-specific wrapping and preview limits are recorded in the embedded live capture surface brief.
 
 ## Elevation & Depth
 
@@ -230,11 +234,11 @@ Buttons, links, and textareas use a three-pixel cobalt focus outline offset by t
 
 ### Drawing Dock and Ink Choices
 
-The cream floating dock groups six drawing tools, four ink choices, and undo/redo with thin vertical separators. Default tool targets are 36px by 37px; the compact breakpoints use smaller targets. Selected tools have pale cobalt fill and cobalt SVG strokes. Ink choices use filled circles and an outer ring for selection. Every icon button carries an accessible name; toggle buttons expose pressed state.
+The cream dock groups six drawing tools, four ink choices, and undo/redo with thin vertical separators. It floats over the desktop canvas and follows the image viewport in the narrow layout. Default tool targets are 36px by 37px and compact desktop targets are 29px wide. At 600px and below, tools and ink choices use 36px by 40px targets in two organized rows; the coarse-pointer rule raises minimum targets to 44px. Selected tools have pale cobalt fill and cobalt SVG strokes. Ink choices use filled circles and an outer ring for selection. Every icon button carries an accessible name; toggle buttons expose pressed state.
 
 ### Counts and Screenshot Navigation
 
-Small rounded quantity badges summarize screenshots and marks. Screenshot thumbnails preserve image aspect ratio with `object-fit: contain`; the selected thumbnail gains a cobalt border, number tile, and filename. The remove button appears on hover or focus on desktop and is always visible on mobile. The add-image target is dashed, with an icon and label.
+Small rounded quantity badges summarize screenshots and marks. Screenshot thumbnails preserve image aspect ratio with `object-fit: contain`; the selected thumbnail gains a cobalt border, number tile, and filename. The remove button appears on hover or focus above 980px and is always visible in the narrow layout. Expanded narrow-layout thumbnails are 112px wide with 68px-high previews. The screenshot disclosure exposes its expanded state and is disabled when there are no images. The add-image target is dashed, with an icon and label; add and live-capture actions stay outside the thumbnail scroller.
 
 ### Cards / Containers
 

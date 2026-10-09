@@ -458,3 +458,154 @@ test("existing numbered markers select and focus their feedback with drawing too
     fullPage: true,
   });
 });
+
+test("split-view controls stay usable through upload, annotation, help, and receipt", async ({
+  page,
+}) => {
+  for (const width of [320, 390, 570, 768, 980, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    const add = page.getByRole("button", { name: "Add images", exact: true });
+    const capture = page.getByRole("button", {
+      name: "Capture live app",
+      exact: true,
+    });
+    await expect(add).toBeInViewport();
+    await expect(capture).toBeInViewport();
+    const a = (await add.boundingBox())!;
+    const c = (await capture.boundingBox())!;
+    expect(a.width).toBeGreaterThan(90);
+    expect(c.width).toBeGreaterThan(120);
+    expect(a.x + a.width <= c.x || a.y + a.height <= c.y).toBe(true);
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBe(true);
+    if ([390, 570, 1440].includes(width)) {
+      await page.evaluate(async () => {
+        window.scrollTo(0, 0);
+        await document.fonts.ready;
+        await new Promise(requestAnimationFrame);
+        await new Promise(requestAnimationFrame);
+      });
+      await page.screenshot({
+        path: `.impeccable/review/narrow-${width}-empty.png`,
+        fullPage: true,
+      });
+    }
+  }
+  await page.setViewportSize({ width: 570, height: 900 });
+  await page.getByRole("button", { name: "Try an example" }).click();
+  await page.getByRole("button", { name: "Screenshots", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Open Example — Fieldnotes.png" }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Open Example — Fieldnotes.png" })
+    .click();
+  await expect(
+    page.getByRole("button", { name: "Screenshots", exact: true }),
+  ).toHaveAttribute("aria-expanded", "false");
+  const stage = page.locator(".image-stage");
+  await stage.focus();
+  await page.keyboard.press("Enter");
+  const comment = page.getByRole("textbox", { name: "Comment for mark 1" });
+  await expect(comment).toBeFocused();
+  await comment.fill(
+    "Keep the screenshot controls easy to reach in split view.",
+  );
+  for (const width of [320, 390, 570, 768, 980, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.evaluate(() => window.scrollTo(0, 0));
+    const toolbar = page.getByRole("toolbar", { name: "Drawing tools" });
+    await toolbar.scrollIntoViewIfNeeded();
+    for (const button of await toolbar.getByRole("button").all()) {
+      const box = (await button.boundingBox())!;
+      expect(box.x).toBeGreaterThanOrEqual(0);
+      expect(box.x + box.width).toBeLessThanOrEqual(width);
+    }
+    await page.getByRole("button", { name: "Blue ink" }).click();
+    await expect(
+      page.getByRole("button", { name: "Blue ink" }),
+    ).toHaveAttribute("aria-pressed", "true");
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBe(true);
+    await page.evaluate(() => window.scrollTo(0, 0));
+    if ([390, 570, 1440].includes(width)) {
+      await page.evaluate(async () => {
+        window.scrollTo(0, 0);
+        await document.fonts.ready;
+        await new Promise(requestAnimationFrame);
+        await new Promise(requestAnimationFrame);
+      });
+      await page.screenshot({
+        path: `.impeccable/review/narrow-${width}-editor.png`,
+        fullPage: true,
+      });
+    }
+    await page.getByRole("button", { name: "Keyboard shortcuts" }).click();
+    const help = page.locator(".help-panel");
+    await expect(help).toBeInViewport();
+    const box = (await help.boundingBox())!;
+    expect(box.x).toBeGreaterThanOrEqual(0);
+    expect(box.x + box.width).toBeLessThanOrEqual(width);
+    await page.getByRole("button", { name: "Keyboard shortcuts" }).click();
+  }
+  const fixture = await page.context().newPage();
+  await fixture.setViewportSize({ width: 393, height: 852 });
+  await fixture.setContent(
+    `<body style="margin:0;padding:28px;font:16px system-ui;background:#f5f4f9;color:#34322e"><p>Layout test fixture</p><h1>Portrait preview</h1><p>A tall screenshot should fill the available canvas height.</p>${Array.from({ length: 8 }, (_, i) => `<p style="padding:20px 0;border-bottom:1px solid #d9d5cf">Example row ${i + 1}</p>`).join("")}</body>`,
+  );
+  const portrait = await fixture.screenshot();
+  await fixture.close();
+  await page.getByLabel("Upload screenshots").setInputFiles({
+    name: "Portrait preview.png",
+    mimeType: "image/png",
+    buffer: portrait,
+  });
+  await expect(page.locator(".canvas-heading")).toContainText(
+    "Portrait preview.png",
+  );
+  for (const width of [390, 570]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.evaluate(async () => {
+      window.scrollTo(0, 0);
+      await new Promise(requestAnimationFrame);
+      await new Promise(requestAnimationFrame);
+    });
+    const image = (await page.locator(".image-stage").boundingBox())!;
+    const tools = (await page.getByRole("toolbar").boundingBox())!;
+    expect(image.height).toBeGreaterThan(500);
+    expect(image.y + image.height).toBeLessThan(tools.y);
+    await page.screenshot({
+      path: `.impeccable/review/narrow-${width}-portrait.png`,
+      fullPage: true,
+    });
+  }
+  await page.setViewportSize({ width: 390, height: 900 });
+  await page.getByRole("button", { name: "Send to agent" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Point made." }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "Download feedback" }),
+  ).toBeInViewport();
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  await page.evaluate(async () => {
+    window.scrollTo(0, 0);
+    await document.fonts.ready;
+    await new Promise(requestAnimationFrame);
+    await new Promise(requestAnimationFrame);
+  });
+  await page.screenshot({
+    path: ".impeccable/review/narrow-390-receipt.png",
+    fullPage: true,
+  });
+});

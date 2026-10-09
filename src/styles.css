@@ -214,6 +214,18 @@ kbd {
   padding: 3px;
   flex: 1;
 }
+.screenshot-toggle {
+  display: none;
+}
+.screenshot-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-top: 12px;
+}
+.screenshot-list:empty {
+  display: none;
+}
 .screenshot-item {
   position: relative;
 }
@@ -382,6 +394,8 @@ kbd {
   min-height: 0;
   touch-action: none;
   overflow: hidden;
+  --fit-inline: 80;
+  --fit-block: 155;
 }
 .image-transform {
   position: absolute;
@@ -1137,31 +1151,60 @@ kbd {
   .workspace {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto 570px auto;
+    grid-template-rows: auto max(480px, calc(100dvh - 140px)) auto;
     flex: none;
   }
   .screenshot-rail {
-    padding: 13px 16px;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    padding: 8px 16px;
     border-right: 0;
     border-bottom: 1px solid var(--line);
-    flex-direction: row;
-    gap: 14px;
+    gap: 8px 16px;
     align-items: center;
-    min-height: 100px;
   }
   .rail-heading {
-    flex-direction: column;
-    justify-content: center;
+    display: none;
+  }
+  .screenshot-toggle {
+    display: inline-flex;
+    justify-content: flex-start;
+    min-height: 44px;
     padding: 0;
-    gap: 6px;
+    font-size: var(--text-label);
+    font-weight: 600;
+  }
+  .screenshot-toggle:disabled {
+    opacity: 1;
+    cursor: default;
+  }
+  .screenshot-toggle:disabled > svg {
+    visibility: hidden;
+  }
+  .screenshot-toggle[aria-expanded="true"] > svg {
+    transform: rotate(180deg);
+  }
+  .screenshot-list:not(.expanded) {
+    display: none;
+  }
+  .screenshot-actions {
+    grid-column: 2;
+    grid-row: 1;
+    flex-direction: row;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 0;
+    min-width: 0;
   }
   .screenshot-list {
+    grid-column: 1 / -1;
+    grid-row: 2;
     flex-direction: row;
-    gap: 14px;
+    gap: 12px;
     overflow: auto;
-    padding: 3px;
+    padding: 4px;
     min-width: 0;
-    align-items: center;
+    align-items: flex-start;
   }
   .screenshot-item {
     width: 112px;
@@ -1180,15 +1223,20 @@ kbd {
   .remove-screenshot {
     opacity: 1;
   }
-  .add-screenshot {
-    width: 110px;
-    min-height: 68px;
-    height: 68px;
-    align-self: flex-start;
-    gap: 1px;
+  .screenshot-actions .add-screenshot,
+  .screenshot-actions .capture-shortcut {
+    width: auto;
+    min-height: 44px;
+    flex-direction: row;
+    padding: 8px 12px;
+    gap: 8px;
+    white-space: nowrap;
+    margin: 0;
+    max-width: none;
   }
-  .add-screenshot svg {
-    width: 17px;
+  .screenshot-actions svg {
+    width: 18px;
+    flex-shrink: 0;
   }
   .rail-footer {
     display: none;
@@ -1208,8 +1256,19 @@ kbd {
     width: 63px;
     height: 58px;
   }
+  .viewport {
+    --fit-inline: 32;
+    --fit-block: 32;
+  }
+  .image-transform {
+    top: 50%;
+  }
   .toolbar {
-    bottom: 53px;
+    position: static;
+    transform: none;
+    align-self: center;
+    flex-shrink: 0;
+    margin: 8px auto;
   }
   .canvas-bottom {
     height: 38px;
@@ -1262,69 +1321,167 @@ kbd {
 }
 @media (max-width: 980px) {
   .workspace:has(.empty-canvas) {
-    grid-template-rows: auto 650px auto;
+    grid-template-rows: auto auto auto;
+    min-height: 0;
   }
-}
-@media (max-width: 440px) {
-  .workspace {
-    grid-template-rows: auto 505px auto;
-  }
-  .toolbar {
-    width: calc(100% - 24px);
-    gap: 5px;
-    justify-content: center;
-    flex-wrap: wrap;
-    padding: 5px 7px;
-    bottom: 48px;
-  }
-  .tool-button {
-    width: 30px;
-    height: 33px;
-  }
-  .ink {
-    width: 22px;
-  }
-  .tool-group + .tool-group {
-    padding-left: 6px;
-  }
-  .toolbar .tool-group:first-child {
-    gap: 0;
-  }
-  .toolbar .tool-group:last-child {
-    gap: 0;
-  }
-  .toolbar .tool-group:last-child .tool-button {
-    width: 27px;
+  .canvas-area:has(.empty-canvas) .viewport {
+    flex: none;
+    overflow: visible;
+    touch-action: auto;
   }
   .empty-canvas {
-    bottom: 65px;
-  }
-  .empty-symbol {
-    margin-bottom: 22px;
+    position: static;
+    padding: 24px 20px 32px;
   }
   .empty-canvas p {
-    margin: 14px 0 20px;
+    max-width: 42ch;
+  }
+  .empty-canvas .desktop-break {
+    display: none;
+  }
+  .canvas-area:has(.empty-canvas) .toolbar,
+  .canvas-area:has(.empty-canvas) .canvas-bottom {
+    display: none;
   }
   .example-button {
-    margin-top: 18px;
+    margin-top: 16px;
+    min-height: 40px;
   }
-  .brand > svg {
-    width: 21px;
+  .live-capture-empty {
+    min-height: 40px;
+  }
+  .help-panel {
+    max-height: calc(100dvh - 90px);
+    overflow-y: auto;
+  }
+}
+@media (max-width: 600px) {
+  .canvas-heading {
+    padding: 12px 16px;
+    min-height: 44px;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .canvas-heading > span:first-child {
+    min-width: 0;
+    flex: 1 1 150px;
+  }
+  .toolbar {
+    display: grid;
+    grid-template-columns: auto auto;
+    justify-content: center;
+    gap: 6px 12px;
+    padding: 8px;
+    bottom: 54px;
+    width: max-content;
+  }
+  .toolbar .tool-group:first-child {
+    grid-column: 1 / -1;
+    justify-content: center;
+  }
+  .tool-button {
+    width: 36px;
+    height: 40px;
+  }
+  .ink {
+    width: 36px;
+    height: 40px;
+  }
+  .ink > span {
+    width: 14px;
+    height: 14px;
+  }
+  .toolbar .ink-group {
+    border-left: 0;
+    padding-left: 0;
+  }
+  .toolbar .tool-group:last-child {
+    padding-left: 12px;
+  }
+  .canvas-bottom {
+    height: 44px;
+    padding-inline: 16px;
+  }
+  .zoom-controls button {
+    width: 32px;
+    height: 32px;
+  }
+  .feedback-heading,
+  .overall,
+  .comment,
+  .comments-empty {
+    padding-inline: 16px;
+  }
+  .panel-intro {
+    margin-inline: 16px;
+  }
+  .app-header {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
   }
   .header-actions {
-    gap: 7px;
+    gap: 8px;
+    min-width: 0;
   }
   .save-status {
-    gap: 4px;
+    justify-content: flex-end;
+    text-align: right;
+    line-height: 1.4;
+  }
+  .save-status > svg,
+  .status-dot {
+    flex-shrink: 0;
+  }
+  .help-button {
+    min-width: 36px;
+    min-height: 40px;
+  }
+  .receipt {
+    padding: 32px 16px;
   }
   .receipt-details {
-    gap: 12px;
+    gap: 8px 16px;
+  }
+  .receipt-images {
+    gap: 10px;
+  }
+  .receipt-images img {
+    width: 120px;
   }
   .remove-confirm {
     position: relative;
   }
-  .tool-button > svg {
-    width: 17px;
+  .app-footer {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+}
+@media (max-width: 520px) {
+  .screenshot-rail {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+  }
+  .screenshot-actions {
+    grid-column: 1;
+    grid-row: 2;
+    justify-content: flex-start;
+  }
+  .screenshot-list {
+    grid-row: 3;
+  }
+  .screenshot-actions .capture-shortcut {
+    white-space: normal;
+    line-height: 1.35;
+    flex-shrink: 1;
+  }
+}
+@media (pointer: coarse) and (max-width: 980px) {
+  .tool-button,
+  .ink,
+  .zoom-controls button,
+  .help-button {
+    min-width: 44px;
+    min-height: 44px;
   }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -1339,7 +1496,7 @@ kbd {
 
 /* Capture sources extend the sketchbook; captured images use the same editor. */
 .capture-shortcut {
-  margin: 14px 0 0;
+  margin: 0;
   padding: 12px 8px;
   color: var(--blue);
   border: 1px solid var(--line);
@@ -1847,11 +2004,6 @@ kbd {
   border: 0;
 }
 @media (max-width: 980px) {
-  .capture-shortcut {
-    margin: 0 0 0 12px;
-    flex-shrink: 0;
-    max-width: 160px;
-  }
   .live-capture-empty {
     max-width: 90%;
   }
@@ -1863,13 +2015,6 @@ kbd {
 @media (max-width: 600px) {
   .capture-workspace {
     padding: 16px;
-  }
-  .capture-sheet-live .capture-back {
-    margin: 0 0 8px;
-    display: flex;
-  }
-  .capture-sheet-live .capture-tabs {
-    display: flex;
   }
   .capture-tabs button {
     flex: 1;
@@ -1899,6 +2044,20 @@ kbd {
   .live-toolbar .capture-submit {
     width: 100%;
   }
+  .capture-url-row .capture-open,
+  .sharing-actions .primary,
+  .sharing-entry button {
+    width: 100%;
+  }
+  .capture-back {
+    margin-bottom: 16px;
+  }
+  .capture-tabs {
+    margin-block: 20px;
+  }
+  .capture-sheet-live .capture-tabs {
+    margin-block: 0 12px;
+  }
   .live-screen img,
   .live-screen video {
     max-height: 58dvh;
@@ -1914,7 +2073,14 @@ kbd {
     flex-direction: column;
     gap: 8px;
   }
-  .capture-shortcut {
-    max-width: 135px;
+}
+
+@media (max-width: 440px) {
+  .capture-sheet-live .capture-back {
+    margin: 0 0 8px;
+    display: flex;
+  }
+  .capture-sheet-live .capture-tabs {
+    display: flex;
   }
 }
