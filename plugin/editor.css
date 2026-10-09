@@ -15,7 +15,8 @@ body {
 html[data-display-mode="fullscreen"] #root {
   height: 100dvh;
   overflow: auto;
-  contain: layout size;
+  /* Keep fixed overlays relative to the viewport, not this scrolling root. */
+  contain: size;
 }
 
 .plugin-launcher {

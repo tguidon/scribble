@@ -121,8 +121,28 @@ export function Canvas({
     const element = viewport.current;
     const wheel = (event: WheelEvent) => {
       if (!image) return;
+      const zooming = event.ctrlKey || event.metaKey;
+      // In stacked layouts, a normal wheel gesture must reach the feedback
+      // below the canvas. Panning remains available with the hand tool/Space.
+      if (!zooming && tool !== "pan" && !space) {
+        for (
+          let parent = element?.parentElement;
+          parent;
+          parent = parent.parentElement
+        ) {
+          const overflow = getComputedStyle(parent).overflowY;
+          if (
+            parent.scrollHeight > parent.clientHeight + 1 &&
+            (/auto|scroll/.test(overflow) ||
+              (parent === document.scrollingElement &&
+                overflow !== "hidden" &&
+                overflow !== "clip"))
+          )
+            return;
+        }
+      }
       event.preventDefault();
-      if (event.ctrlKey || event.metaKey)
+      if (zooming)
         setZoom((z) =>
           Math.max(0.25, Math.min(5, z * (event.deltaY > 0 ? 0.92 : 1.08))),
         );
@@ -130,7 +150,7 @@ export function Canvas({
     };
     element?.addEventListener("wheel", wheel, { passive: false });
     return () => element?.removeEventListener("wheel", wheel);
-  }, [image]);
+  }, [image, tool, space]);
   const point = (event: React.PointerEvent): Point => {
     const bounds = svg.current!.getBoundingClientRect();
     return {

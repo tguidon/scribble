@@ -352,6 +352,56 @@ test("a declined expansion keeps the chat card usable and offers the browser edi
   await expect(ui.locator(".app")).toHaveCount(0);
 });
 
+test("narrow expanded editors scroll over an image and keep controls within the panel", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 800 });
+  await page.goto(`${origin}/host`);
+  const ui = page.frameLocator("iframe");
+  await ui.getByRole("button", { name: "Try an example" }).click();
+  await expectDecodedScreenshot(ui.locator(".image-stage image"));
+  await ui.locator(".viewport").hover();
+  await page.mouse.wheel(0, 500);
+  await expect
+    .poll(() => ui.locator("#root").evaluate((root) => root.scrollTop))
+    .toBeGreaterThan(100);
+  await expect(
+    ui.getByRole("textbox", { name: "The bigger picture" }),
+  ).toBeInViewport();
+  await ui.getByRole("button", { name: "Pan (H)" }).click();
+  await ui.locator("#root").evaluate((root) => {
+    root.scrollTop = 0;
+  });
+  const transform = ui.locator(".image-transform");
+  const originalTransform = await transform.getAttribute("style");
+  await ui.locator(".viewport").hover();
+  await page.mouse.wheel(0, 80);
+  await expect
+    .poll(() => transform.getAttribute("style"))
+    .not.toBe(originalTransform);
+  expect(await ui.locator("#root").evaluate((root) => root.scrollTop)).toBe(0);
+  for (const width of [320, 390, 570, 980, 1440]) {
+    await page.setViewportSize({ width, height: 800 });
+    await ui.locator("#root").evaluate((root) => {
+      root.scrollTop = 0;
+    });
+    await expect(
+      ui.getByRole("button", { name: "Add images", exact: true }),
+    ).toBeInViewport();
+    await expect(
+      ui.getByRole("button", { name: "Capture live app", exact: true }),
+    ).toBeInViewport();
+    expect(
+      await ui
+        .locator("#root")
+        .evaluate((root) => root.scrollWidth <= root.clientWidth),
+    ).toBe(true);
+    await ui.getByRole("button", { name: "Keyboard shortcuts" }).click();
+    await expect(ui.locator(".help-panel")).toBeInViewport();
+    await ui.getByRole("button", { name: "Keyboard shortcuts" }).click();
+  }
+});
+
 test("hosts that cannot send messages keep a copy fallback and never claim delivery", async ({
   page,
 }) => {
@@ -426,3 +476,30 @@ for (const kind of ["web", "simulator"])
     });
     expect(feedback.structuredContent.images[0].source.kind).toBe(kind);
   });
+
+test("upload drop overlay stays inside the viewport after scrolling the expanded editor", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 800 });
+  await page.goto(`${origin}/host`);
+  const ui = page.frameLocator("iframe");
+  await ui.getByRole("button", { name: "Try an example" }).click();
+  await expectDecodedScreenshot(ui.locator(".image-stage image"));
+  await ui.locator("#root").evaluate((root) => {
+    root.scrollTop = 500;
+  });
+  await ui.locator(".app").evaluate((element) => {
+    const dataTransfer = new DataTransfer();
+    dataTransfer.items.add(
+      new File(["fixture"], "fixture.png", { type: "image/png" }),
+    );
+    element.dispatchEvent(
+      new DragEvent("dragenter", { bubbles: true, dataTransfer }),
+    );
+  });
+  const overlay = ui.locator(".drop-overlay");
+  await expect(overlay).toBeVisible();
+  const box = await overlay.boundingBox();
+  expect(box!.y).toBeGreaterThanOrEqual(0);
+  expect(box!.y + box!.height).toBeLessThanOrEqual(800);
+});
