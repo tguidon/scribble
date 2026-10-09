@@ -66,7 +66,7 @@ export function createPlugin(options = {}) {
   server.registerTool(
     "open_canvas",
     {
-      title: "Open Scribble",
+      title: "Scribble",
       description:
         "Create a fresh visual feedback canvas in the user's local project. Open the editor and wait for the user to send feedback; do not poll. Requires local desktop access.",
       inputSchema: {
