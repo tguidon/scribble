@@ -10,6 +10,7 @@ import { createPlugin } from "../plugin/mcp.mjs";
 import { PluginBackend } from "../plugin/backend.mjs";
 import { createSession } from "../skills/scribble/scripts/lib/store.mjs";
 import { startServer } from "../skills/scribble/scripts/lib/app.mjs";
+import { VERSION } from "../skills/scribble/scripts/lib/version.mjs";
 
 const png =
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=";
@@ -93,6 +94,11 @@ test("MCP canvas isolation, feedback delivery, original images, and new rounds",
     true,
   );
   assert.equal(upload.status, 201);
+  const unfinished = await client.callTool({
+    name: "read_image",
+    arguments: { sessionId: one.sessionId, imageId: upload.data.images[0].id },
+  });
+  assert.equal(unfinished.isError, true);
   const saved = await api(
     one,
     "/draft",
@@ -187,9 +193,15 @@ test("bundled plugin starts over stdio without node_modules or source checkout",
   const html = await client.readResource({ uri: "ui://scribble/editor.html" });
   assert.ok(html.contents[0].text.length > 10000);
   assert.equal(
-    (
-      await readFile(join(destination, "skills/scribble/version.json"), "utf8")
-    ).includes("0.0.4"),
-    true,
+    JSON.parse(
+      await readFile(join(destination, "skills/scribble/version.json"), "utf8"),
+    ).version,
+    VERSION,
   );
+  for (const path of [
+    "plugin.json",
+    ".codex-plugin/plugin.json",
+    "package.json",
+  ])
+    assert.equal(JSON.parse(await readFile(path, "utf8")).version, VERSION);
 });

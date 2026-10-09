@@ -279,3 +279,5 @@ Not canonized: the directional handwritten wordmark did not ship; the implemente
 ## Feedback receipt
 
 Finish feedback saves the brief, full annotation data, and original image references. The receipt offers Copy for agent and New canvas. Copy status reports clipboard success only; the user pastes into their chosen agent chat. A collapsed handoff preview opens and selects its text when clipboard access is blocked. New canvas preserves the earlier feedback and closes its capture connections. At 440px and below, the two actions stack at full width.
+
+In the desktop plugin, Send to this chat is the primary receipt action when the host supports messages. Message accepted confirms host acceptance; Feedback read confirms retrieval of the saved feedback. Neither state claims that changes were applied. Copy for agent remains available below, alongside New canvas. Hosts without messaging show the clipboard action and an explanation. The narrow header uses an icon button to expand the embedded editor, preserving room for save status.

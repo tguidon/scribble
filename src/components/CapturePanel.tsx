@@ -120,6 +120,18 @@ export function CapturePanel({
       setBusy("");
     }
   };
+  const openWebpage = () => {
+    if (busy || !url.trim()) return;
+    void perform(
+      connection?.available
+        ? "Opening webpage…"
+        : "Installing capture tools and opening webpage…",
+      async () => {
+        await action("open", { kind: "web", url, width, height });
+        await refresh();
+      },
+    );
+  };
   useEffect(() => {
     heading.current?.focus();
     void perform("Checking sources…", refresh);
@@ -212,15 +224,17 @@ export function CapturePanel({
                 <form
                   onSubmit={(event) => {
                     event.preventDefault();
-                    void perform(
-                      connection?.available
-                        ? "Opening webpage…"
-                        : "Installing capture tools and opening webpage…",
-                      async () => {
-                        await action("open", { kind, url, width, height });
-                        await refresh();
-                      },
-                    );
+                    openWebpage();
+                  }}
+                  onKeyDown={(event) => {
+                    // Some plugin hosts disallow native form submission.
+                    if (
+                      event.key === "Enter" &&
+                      event.target instanceof HTMLInputElement
+                    ) {
+                      event.preventDefault();
+                      openWebpage();
+                    }
                   }}
                 >
                   <div className="capture-url-row">
@@ -241,8 +255,9 @@ export function CapturePanel({
                     </label>
                     <button
                       className="secondary capture-open"
-                      type="submit"
-                      disabled={!!busy}
+                      type="button"
+                      onClick={openWebpage}
+                      disabled={!!busy || !url.trim()}
                     >
                       <Globe size={17} />
                       {connection?.connected ? "Open this URL" : "Open webpage"}

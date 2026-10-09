@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { createServer } from "node:http";
-import { mkdtemp, rm, readFile } from "node:fs/promises";
+import { mkdtemp, rm, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { build } from "esbuild";
@@ -19,7 +19,21 @@ let http: Awaited<ReturnType<typeof startServer>>,
 test.beforeEach(async () => {
   project = await mkdtemp(join(tmpdir(), "scribble-plugin-browser-"));
   const root = join(project, ".scribble");
-  http = await startServer({ root, session: await createSession(root) });
+  const simCommand = join(project, "simulator.mjs");
+  http = await startServer({
+    root,
+    session: await createSession(root),
+    captureOptions: {
+      discovery: { list: async () => "" },
+      web: { headless: true, channel: "chrome" },
+      simulator: {
+        devices: async () => [
+          { id: "00000000-0000-0000-0000-000000000001", name: "Plugin iPhone" },
+        ],
+        command: { file: process.execPath, args: [simCommand] },
+      },
+    },
+  });
   plugin = createPlugin({ directory: join(project, "registry") });
   client = new Client({ name: "browser-test", version: "1" });
   const [front, back] = InMemoryTransport.createLinkedPair();
@@ -42,7 +56,33 @@ test.beforeEach(async () => {
   const editor = await readFile("plugin/dist/editor.html", "utf8");
   host = createServer(async (req, res) => {
     try {
-      if (req.url === "/host" || req.url?.startsWith("/host?")) {
+      if (req.url === "/fixture") {
+        res.setHeader("Content-Type", "text/html");
+        res.end(
+          '<title>Plugin capture fixture</title><h1>A live page</h1><input placeholder="Feedback target">',
+        );
+      } else if (req.url === "/config" || req.url === "/foreground") {
+        res.setHeader("Content-Type", "application/json");
+        res.end(
+          JSON.stringify({
+            orientation: "portrait",
+            bundleId: "dev.scribble.fixture",
+          }),
+        );
+      } else if (req.url === "/stream.mjpeg") {
+        const bytes = Buffer.from(
+          "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=",
+          "base64",
+        );
+        res.writeHead(200, {
+          "Content-Type": "multipart/x-mixed-replace; boundary=frame",
+        });
+        res.write(
+          `--frame\r\nContent-Type: image/png\r\nContent-Length: ${bytes.length}\r\n\r\n`,
+        );
+        res.write(bytes);
+        res.write("\r\n");
+      } else if (req.url === "/host" || req.url?.startsWith("/host?")) {
         const params = new URL(req.url, "http://fixture").searchParams;
         res.setHeader("Content-Type", "text/html");
         res.end(
@@ -83,8 +123,23 @@ test.beforeEach(async () => {
   });
   await new Promise<void>((resolve) => host.listen(0, "127.0.0.1", resolve));
   origin = `http://127.0.0.1:${(host.address() as { port: number }).port}`;
+  await writeFile(
+    simCommand,
+    `console.log(JSON.stringify(${JSON.stringify({ device: "00000000-0000-0000-0000-000000000001", url: origin, streamUrl: `${origin}/stream.mjpeg` })}))`,
+  );
 });
-test.afterEach(async () => {
+test.afterEach(async ({ page }, info) => {
+  if (info.status !== info.expectedStatus) {
+    console.error(
+      "Plugin state:",
+      await page
+        .frameLocator("iframe")
+        .locator("body")
+        .innerText()
+        .catch(() => "Unavailable"),
+    );
+    console.error("Plugin calls:", calls);
+  }
   await client.close();
   await plugin.close();
   await http.close();
@@ -183,3 +238,42 @@ test("host rejection leaves feedback saved and offers manual delivery", async ({
   ).toHaveCount(0);
   expect(messages).toEqual([]);
 });
+
+for (const kind of ["web", "simulator"])
+  test(`embedded ${kind} live preview crosses the MCP bridge and freezes a capture`, async ({
+    page,
+  }) => {
+    await page.goto(`${origin}/host`);
+    const ui = page.frameLocator("iframe");
+    await ui
+      .getByRole("button", { name: "Capture a webpage or simulator" })
+      .click();
+    if (kind === "web") {
+      await ui.getByLabel("Webpage URL").fill(`${origin}/fixture`);
+      await ui
+        .getByRole("button", { name: "Open webpage", exact: true })
+        .click();
+    } else {
+      await ui.getByRole("button", { name: "Simulator", exact: true }).click();
+      await ui.getByRole("button", { name: "Connect simulator" }).click();
+    }
+    await expect(
+      ui.getByRole("button", { name: "Capture & annotate" }),
+    ).toBeEnabled({ timeout: 20000 });
+    const image = ui.locator(".live-screen img");
+    await expect(image).toBeVisible();
+    expect(
+      await image.evaluate((element: HTMLImageElement) => element.naturalWidth),
+    ).toBeGreaterThan(0);
+    await ui.getByRole("button", { name: "Capture & annotate" }).click();
+    await expect(ui.locator(".image-stage image")).toBeVisible();
+    await ui.getByRole("button", { name: "Finish feedback" }).click();
+    await expect(
+      ui.getByRole("heading", { name: "Ready for your agent." }),
+    ).toBeVisible();
+    const feedback: any = await client.callTool({
+      name: "read_feedback",
+      arguments: { sessionId: result.structuredContent.sessionId },
+    });
+    expect(feedback.structuredContent.images[0].source.kind).toBe(kind);
+  });

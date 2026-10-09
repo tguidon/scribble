@@ -8,7 +8,7 @@ No account, hosted backend, or model API key is required.
 
 ![Scribble showing a screenshot marked with a pin, an arrow, and a rectangle, with comments alongside it.](docs/images/scribble.png)
 
-## Install
+## Install the skill
 
 Scribble requires **Node.js 22 or newer**. The skill includes the browser app and server. Screenshot uploads need no separate build or dependency installation. Live capture uses optional tools, described below.
 
@@ -28,6 +28,34 @@ npx skills add tguidon/scribble --agent codex claude-code
 
 Add `--global` to install across projects. The [skills CLI documentation](https://github.com/vercel-labs/skills) lists all installation flags.
 
+## Install the desktop plugin (preview)
+
+The plugin bundles the same editor and skill, plus MCP tools for opening canvases and reading feedback. It requires Node.js 22+ and a desktop host with local MCP support. Ordinary ChatGPT web is not supported by this local package.
+
+Add the GitHub marketplace and install Scribble:
+
+```sh
+codex plugin marketplace add tguidon/scribble
+codex plugin add scribble@scribble
+```
+
+You can also install Scribble from its marketplace in the desktop app's Plugins Directory. Restart the app if its new tools do not appear, then invoke `$scribble start` in your project chat. No npm install or build is required for the installed package.
+
+On hosts that support MCP Apps, Scribble opens an embedded editor. Choose **Finish feedback**, then **Send to this chat**. The host routes the message to the conversation that opened the canvas. **Message accepted** confirms host acceptance; **Feedback read** confirms that the agent retrieved the saved feedback. Neither means the requested changes are complete.
+
+The plugin checks host capabilities. If direct messages are unavailable or rejected, use **Copy for agent**. If the host does not render the editor, use the browser link returned by its tool; the standalone browser keeps its clipboard workflow. Desktop UI and messaging support can vary by host build. The plugin is a preview until the installed desktop workflow is verified.
+
+Each plugin launch creates a separate canvas. **New canvas** starts another round in the same editor. Canvases from separate chats have different IDs, even when they use the same project.
+
+To update the GitHub install:
+
+```sh
+codex plugin marketplace upgrade scribble
+codex plugin add scribble@scribble
+```
+
+Wait for **Draft saved** before updating, then reopen the editor. Installed plugins are cached copies; edits to a source checkout do not update them automatically. See [plugin development and verification](docs/plugin.md).
+
 ### Test a fixed release
 
 The `0.0.4` release uses clipboard handoff: finish feedback, copy its file references into your agent, and start another canvas without relaunching the skill. It also includes the split-view layout improvements.
@@ -40,7 +68,7 @@ npx skills add https://github.com/tguidon/scribble/tree/v0.0.4/skills/scribble
 
 This uses the skills CLI’s [direct repository path format](https://github.com/vercel-labs/skills#source-formats). Use a release tag to keep tests on a fixed version; the shorter install command follows the repository’s default branch.
 
-## Use Scribble
+## Use the standalone skill
 
 1. Run **`$scribble start` in Codex** or **`/scribble start` in Claude Code**.
 2. Open the session link from your agent.
@@ -196,18 +224,19 @@ Open the full session URL from the terminal. Keep the token after `#` in the URL
 
 | Command | Purpose |
 | --- | --- |
-| `npm run build` | Run TypeScript checks and build the browser app |
+| `npm run build` | Check TypeScript and build the browser app, plugin UI, and plugin runtime |
+| `npm run build:plugin` | Rebuild the embedded editor, bundled MCP SDK, and compatibility manifests |
 | `npm start` | Run the built app and open the browser |
 | `npm test` | Run server, storage, and launcher tests |
 | `npm run test:e2e` | Run browser tests with an installed Google Chrome |
 
 The complete skill is in `skills/scribble/`. The core server uses only Node built-ins. Optional capture adapters load Playwright or call serve-sim. Vite writes the browser build to `skills/scribble/app/`. The skills installer copies these files without a build step.
 
-After UI changes, run `npm run build`. Then commit the updated `skills/scribble/app/` directory with the source changes.
+After UI changes, run `npm run build`. Commit `skills/scribble/app/` and `plugin/dist/` with the source changes. Installed packages use these bundles without a build step.
 
 ### Publish a version
 
-Keep `package.json`, the root entries in `package-lock.json`, and `skills/scribble/version.json` on the same version. The tests check that they agree. The installed server reads the bundled version file without needing the development package.
+Keep `package.json`, the root entries in `package-lock.json`, `plugin.json`, and `skills/scribble/version.json` on the same version. Build to refresh the generated Codex compatibility manifest. The installed server reads the bundled version file without needing the development package. The plugin preview is available from `main`; the existing `v0.0.4` tag remains the standalone clipboard release.
 
 Build and test, commit the changes, then tag that commit as `vVERSION` and publish its GitHub release. Keep published tags fixed so a tagged installation remains reproducible.
 

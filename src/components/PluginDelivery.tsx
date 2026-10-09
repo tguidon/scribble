@@ -11,12 +11,17 @@ export function PluginDelivery() {
   useEffect(() => {
     if (state !== "accepted") return;
     let active = true;
+    let pending = false;
     const check = async () => {
+      if (pending) return;
+      pending = true;
       try {
         const receipt = await host.deliveryStatus();
         if (active && receipt.readAt) setState("read");
       } catch {
         /* The durable feedback and copy fallback remain available. */
+      } finally {
+        pending = false;
       }
     };
     void check();

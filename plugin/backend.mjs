@@ -178,6 +178,8 @@ export class PluginBackend {
   }
   async image(id, imageId) {
     const { root, session } = await this.lookup(id);
+    if (session.status !== "submitted")
+      throw new Error("The user has not finished this canvas yet.");
     const image = session.images.find((image) => image.id === imageId);
     if (!image) throw new Error("Image not found in this canvas.");
     return {
