@@ -1,0 +1,8 @@
+# Server lifecycle and recovery
+
+The launcher checks the server with an authenticated health request. It reuses a healthy server running the installed version, or starts one if needed. A version mismatch triggers authenticated shutdown and restart on the same port. Before upgrading an active server, have the user wait for **Draft saved**; reload open tabs afterward. No account or API key is needed.
+
+If sandbox permissions prevent a loopback server, request the normal local-server permission and retry the same command. Node.js 22+ is required. The installed skill includes the browser app and server; do not rebuild it or install project dependencies to launch it.
+
+The default storage directory is `.scribble` in the working project. Startup excludes the storage directory through Git’s local `info/exclude` file. If files are already tracked, it stops without removing them; explain the error before changing the index. For concurrent agents, use a different `--dir` for each and pass it to every command. The server stays available after submission for later invocations. Leave it running unless the user asks to stop it; use `node "SKILL_DIRECTORY/scripts/scribble.mjs" stop` with the same `--dir` to shut it down. Pre-versioning servers require a one-time manual stop after inspecting the PID reported by the launcher. After unread feedback is acknowledged, a later invocation creates a fresh session; `start --new` explicitly starts another while preserving the old one. Do not delete prior feedback automatically.
+

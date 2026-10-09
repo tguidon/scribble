@@ -42,7 +42,7 @@ This uses the skills CLI’s [direct repository path format](https://github.com/
 
 ## Use Scribble
 
-1. Run **`$scribble` in Codex** or **`/scribble` in Claude Code**.
+1. Run **`$scribble start` in Codex** or **`/scribble start` in Claude Code**.
 2. Open the session link from your agent.
 3. Upload, paste, or drag screenshots onto the canvas. To capture a running app, select **Capture live app**.
 4. Add pins, arrows, rectangles, or freehand marks.
@@ -51,6 +51,16 @@ This uses the skills CLI’s [direct repository path format](https://github.com/
 7. Select **Send to agent**.
 
 The agent receives your screenshots, mark positions, and comments in one feedback bundle. The canvas also supports undo, redo, zoom, and pan.
+
+The bare `$scribble` or `/scribble` command does the same thing. The agent runs the bundled launcher, opens the editor, and waits for your feedback. No project build or capture-tool installation is needed to open it.
+
+You can also add:
+
+- `start --new` to open a fresh draft while preserving earlier feedback.
+- `status` to check the current session and server.
+- `stop` to shut down Scribble without deleting saved feedback.
+
+For example, use `$scribble stop` in Codex or `/scribble stop` in Claude Code. A normal start resumes a draft or recovers unread feedback before opening another session.
 
 ## Capture a running app
 

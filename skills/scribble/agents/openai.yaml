@@ -1,6 +1,6 @@
 interface:
   display_name: "Scribble"
-  short_description: "Show your agent changes with annotated screenshots"
-  default_prompt: "Use $scribble to collect my visual feedback."
+  short_description: "Launch the editor and collect visual feedback"
+  default_prompt: "$scribble start — open the editor and collect my visual feedback."
 policy:
   allow_implicit_invocation: false
