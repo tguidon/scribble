@@ -2135,3 +2135,9 @@ kbd {
     flex-direction: column;
   }
 }
+.plugin-delivery {
+  width: min(100%, 34rem);
+  margin: 0 auto 1.5rem;
+}
+.plugin-delivery > button { width: 100%; }
+.plugin-delivery > button:disabled { opacity: 1; background: var(--blue); }

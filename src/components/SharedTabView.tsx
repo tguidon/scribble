@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Camera, MonitorUp, Copy } from "lucide-react";
 import type { TabShare, SharedSurface } from "../useTabShare";
+import { getEditorHost } from "../editorHost";
 
 export function SharedTabView({
   share,
@@ -203,7 +204,7 @@ export function SharedTabView({
               className="text-button"
               onClick={() => {
                 void navigator.clipboard
-                  .writeText(location.href)
+                  .writeText(getEditorHost()?.browserUrl || location.href)
                   .then(() => setCopied(true))
                   .catch(() =>
                     setError("Copy this session’s URL from the address bar."),

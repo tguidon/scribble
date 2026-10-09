@@ -13,6 +13,7 @@ import {
   AlertCircle,
   PencilLine,
   Camera,
+  Maximize2,
 } from "lucide-react";
 import { FeedbackReceipt } from "./components/FeedbackReceipt";
 import { Canvas } from "./components/Canvas";
@@ -21,6 +22,7 @@ import { Toolbar } from "./components/Toolbar";
 import { useTabShare } from "./useTabShare";
 import { useSession } from "./useSession";
 import { imageUrl } from "./api";
+import { getEditorHost } from "./editorHost";
 import { exampleFile } from "./example";
 import {
   INKS,
@@ -30,6 +32,7 @@ import {
   type CaptureKind,
 } from "./types";
 export default function App() {
+  const host = getEditorHost();
   const {
     session,
     error,
@@ -262,7 +265,13 @@ export default function App() {
       }}
     >
       <header className="app-header">
-        <a className="brand" href={location.href} aria-label="Scribble">
+        <a
+          className="brand"
+          href={host?.browserUrl || location.href}
+          target={host ? "_blank" : undefined}
+          rel="noreferrer"
+          aria-label="Scribble"
+        >
           <PencilLine size={24} strokeWidth={2.3} />
           <span>
             scribble<span className="brand-dot">.</span>
@@ -272,6 +281,22 @@ export default function App() {
           Show your agent what you mean.
         </span>
         <div className="header-actions">
+          {host?.expand && (
+            <button
+              className="icon-button"
+              aria-label="Expand canvas"
+              title="Expand canvas"
+              onClick={() =>
+                void host.expand!().catch(() =>
+                  setError(
+                    "This host could not expand the editor. Continue in this panel.",
+                  ),
+                )
+              }
+            >
+              <Maximize2 size={18} />
+            </button>
+          )}
           <span
             className={`save-status ${saveState === "offline" ? "offline" : ""}`}
             role="status"
@@ -689,7 +714,9 @@ export default function App() {
               </button>
               <span className="send-hint">
                 {session.images.length
-                  ? "Next, copy the handoff into your agent."
+                  ? host
+                    ? "Next, send the feedback to this chat."
+                    : "Next, copy the handoff into your agent."
                   : "Add a screenshot to get started."}
               </span>
             </div>

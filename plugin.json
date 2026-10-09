@@ -1,0 +1,26 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "scribble",
+  "version": "0.0.4",
+  "description": "Capture app screens, annotate them, and hand precise visual feedback to your coding agent.",
+  "author": { "name": "Taylor Guidon" },
+  "repository": "https://github.com/tguidon/scribble",
+  "homepage": "https://github.com/tguidon/scribble",
+  "extensions": {
+    "com.openai": {
+      "interface": {
+        "displayName": "Scribble",
+        "shortDescription": "Visual feedback for your coding agent",
+        "longDescription": "Capture local webpages and iOS simulators, annotate screenshots, and send feedback from an embedded canvas. Requires Node.js 22+ and a desktop host with local MCP support. The standalone browser editor remains available.",
+        "developerName": "Taylor Guidon",
+        "category": "Developer Tools",
+        "capabilities": ["Interactive", "Write"],
+        "websiteURL": "https://github.com/tguidon/scribble",
+        "defaultPrompt": [
+          "Open Scribble so I can give visual feedback on this project."
+        ],
+        "brandColor": "#3456c4"
+      }
+    }
+  }
+}

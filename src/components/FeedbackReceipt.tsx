@@ -2,8 +2,11 @@ import { useEffect, useRef, useState } from "react";
 import { Check, Copy, Plus } from "lucide-react";
 import { imageUrl, request } from "../api";
 import type { Session } from "../types";
+import { getEditorHost } from "../editorHost";
+import { PluginDelivery } from "./PluginDelivery";
 
 export function FeedbackReceipt({ session }: { session: Session }) {
+  const host = getEditorHost();
   const [text, setText] = useState("");
   const [loadError, setLoadError] = useState("");
   const [attempt, setAttempt] = useState(0);
@@ -65,7 +68,8 @@ export function FeedbackReceipt({ session }: { session: Session }) {
         headers: { "Content-Type": "application/json" },
         body: "{}",
       });
-      window.location.assign(next.url);
+      if (host) host.newCanvas(next.url);
+      else window.location.assign(next.url);
     } catch {
       setStarting(false);
       setStartError(
@@ -86,7 +90,9 @@ export function FeedbackReceipt({ session }: { session: Session }) {
         Ready for your agent.
       </h1>
       <p>
-        Copy the handoff, then paste it into your agent’s chat.
+        {host
+          ? "Send your feedback to this chat, or copy a handoff."
+          : "Copy the handoff, then paste it into your agent’s chat."}
         <br />
         Your screenshots and feedback stay saved on this device.
       </p>
@@ -104,9 +110,10 @@ export function FeedbackReceipt({ session }: { session: Session }) {
           {marks} mark{marks !== 1 ? "s" : ""}
         </span>
       </div>
+      {host && <PluginDelivery />}
       <div className="handoff-actions">
         <button
-          className="primary"
+          className={host?.canSend ? "secondary" : "primary"}
           onClick={() => void copy()}
           disabled={!text || copying}
         >

@@ -13,6 +13,10 @@ A bare `$scribble` / `/scribble` invocation or `scribble start` means **open the
 
 Resolve `SKILL_DIRECTORY` from the absolute path of this SKILL.md. For a launch request, the first operational action is to run this command from the user's project directory:
 
+**When the Scribble plugin tools are available:** call `open_canvas` with the absolute path of the user's current project instead of running the launcher below. Use its embedded editor when the host renders it, or share the returned `browserUrl` if it does not. Tell the user to finish feedback and choose **Send to this chat** in the plugin, or copy and paste from the browser. End your turn; do not poll. Each call creates a fresh canvas. See [plugin feedback](references/plugin.md) when the user sends a canvas ID or needs help with plugin delivery. The CLI commands below remain available for explicit `status` and `stop` requests.
+
+**Without plugin tools**, run:
+
 ```sh
 node "SKILL_DIRECTORY/scripts/scribble.mjs" start --detach --no-open
 ```

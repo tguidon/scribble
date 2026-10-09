@@ -12,7 +12,8 @@
   },
   "scripts": {
     "dev": "node bin/scribble.mjs start --dev --no-open",
-    "build": "tsc -b && vite build",
+    "build": "tsc -b && vite build && node scripts/build-plugin.mjs",
+    "build:plugin": "tsc -b && node scripts/build-plugin.mjs",
     "start": "node bin/scribble.mjs start",
     "test": "node --test test/*.test.mjs",
     "test:e2e": "playwright test",
@@ -24,13 +25,17 @@
     "react-dom": "^19.3.0"
   },
   "devDependencies": {
+    "@modelcontextprotocol/ext-apps": "^2.0.3",
+    "@modelcontextprotocol/sdk": "^1.32.1",
     "@playwright/test": "^1.63.0",
     "@types/node": "^26.6.4",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.1",
+    "esbuild": "^0.28.2",
     "prettier": "^3.9.9",
     "typescript": "^7.0.2",
-    "vite": "^8.3.2"
+    "vite": "^8.3.2",
+    "zod": "^4.6.5"
   }
 }

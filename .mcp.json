@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "scribble": {
+      "command": "node",
+      "args": [
+        "./plugin/mcp.mjs"
+      ],
+      "cwd": "."
+    }
+  }
+}

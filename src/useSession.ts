@@ -1,6 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { loadSession, request, saveDraft, sessionId, uploadImage } from "./api";
+import {
+  loadSession,
+  request,
+  saveDraft,
+  currentSessionId,
+  uploadImage,
+} from "./api";
 import type { CaptureMode, Draft, Session } from "./types";
+import { draftStorage } from "./draftStorage";
 import {
   draftBytes,
   MAX_DRAFT_BYTES,
@@ -13,8 +20,8 @@ type PendingSave = {
   id: string;
   generation: number;
 };
-const key = `scribble-draft-${sessionId}`;
 export function useSession() {
+  const key = `scribble-draft-${currentSessionId()}`;
   const [session, setSession] = useState<Session>();
   const [error, setError] = useState("");
   const [saveState, setSaveState] = useState<
@@ -46,9 +53,9 @@ export function useSession() {
     if (!value) return;
     try {
       if (saved.current === generation.current && !pending.current)
-        localStorage.removeItem(key);
+        draftStorage.removeItem(key);
       else
-        localStorage.setItem(
+        draftStorage.setItem(
           key,
           JSON.stringify({
             draft: { message: value.message, images: value.images },
@@ -70,7 +77,7 @@ export function useSession() {
         revision.current = value.revision;
         let local: Backup | undefined;
         try {
-          local = JSON.parse(localStorage.getItem(key) || "null");
+          local = JSON.parse(draftStorage.getItem(key) || "null");
         } catch {
           /* A broken browser cache must not block disk recovery. */
         }
@@ -303,14 +310,14 @@ export function useSession() {
           body: JSON.stringify({ revision: revision.current }),
         });
         update(result);
-        localStorage.removeItem(key);
+        draftStorage.removeItem(key);
       });
     } catch (e) {
       // A dropped response may follow a successful durable submission.
       const recovered = await loadSession().catch(() => undefined);
       if (recovered?.status === "submitted") {
         update(recovered);
-        localStorage.removeItem(key);
+        draftStorage.removeItem(key);
       } else setError((e as Error).message);
     } finally {
       setBusy(false);
@@ -337,7 +344,7 @@ export function useSession() {
       setTimeout(() => URL.revokeObjectURL(url), 1000);
     },
     useSavedDraft: () => {
-      localStorage.removeItem(key);
+      draftStorage.removeItem(key);
       setRecovery(undefined);
       setError("");
     },

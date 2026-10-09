@@ -1,14 +1,18 @@
 import type { Draft, Session } from "./types";
 import { version } from "../skills/scribble/version.json";
+import { getEditorHost } from "./editorHost";
 const params = new URLSearchParams(location.hash.slice(1));
 const token = params.get("token") || "";
-export const sessionId = params.get("session") || "";
+export const currentSessionId = () =>
+  getEditorHost()?.sessionId || params.get("session") || "";
 export async function apiResponse(path: string, options: RequestInit = {}) {
+  const host = getEditorHost();
+  if (host) return host.request(path, options);
   return fetch(`/api${path}`, {
     ...options,
     headers: {
       Authorization: `Bearer ${token}`,
-      "X-Scribble-Session": sessionId,
+      "X-Scribble-Session": currentSessionId(),
       "X-Scribble-Version": version,
       ...options.headers,
     },
@@ -32,10 +36,12 @@ export async function request<T>(
       ),
       { status: response.status },
     );
+  if (Array.isArray(data?.images)) await getEditorHost()?.hydrate(data.images);
   return data;
 }
 export const imageUrl = (id: string) =>
-  `/api/images/${id}?token=${encodeURIComponent(token)}&session=${encodeURIComponent(sessionId)}`;
+  getEditorHost()?.imageUrl(id) ||
+  `/api/images/${id}?token=${encodeURIComponent(token)}&session=${encodeURIComponent(currentSessionId())}`;
 export const loadSession = () => request<Session>("/session");
 export const saveDraft = (draft: Draft, revision: number, saveId: string) =>
   request<Session>("/draft", {
