@@ -19,7 +19,13 @@ function PluginEditor() {
     setDisplayMode(mode);
   };
   useEffect(() => {
+    const updateTheme = (theme?: string) => {
+      // Partial host updates (e.g. expanding the panel) must not reset theme.
+      if (theme === "light" || theme === "dark")
+        document.documentElement.dataset.theme = theme;
+    };
     app.onhostcontextchanged = (context) => {
+      updateTheme(context.theme);
       if (context.displayMode) updateDisplayMode(context.displayMode);
     };
     app.ontoolresult = (result) => {
@@ -36,6 +42,7 @@ function PluginEditor() {
     void app
       .connect()
       .then(() => {
+        updateTheme(app.getHostContext()?.theme);
         updateDisplayMode(app.getHostContext()?.displayMode || "inline");
         setConnected(true);
         if (!app.getHostCapabilities()?.serverTools)

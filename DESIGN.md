@@ -281,3 +281,11 @@ Not canonized: the directional handwritten wordmark did not ship; the implemente
 Finish feedback saves the brief, full annotation data, and original image references. The receipt offers Copy for agent and New canvas. Copy status reports clipboard success only; the user pastes into their chosen agent chat. A collapsed handoff preview opens and selects its text when clipboard access is blocked. New canvas preserves the earlier feedback and closes its capture connections. At 440px and below, the two actions stack at full width.
 
 In the desktop plugin, Send to this chat is the primary receipt action when the host supports messages. Message accepted confirms host acceptance; Feedback read confirms retrieval of the saved feedback. Neither state claims that changes were applied. Copy for agent remains available below, alongside New canvas. Hosts without messaging show the clipboard action and an explanation. The narrow header uses an icon button to expand the embedded editor, preserving room for save status.
+
+## Light and dark themes
+
+The plugin follows the Codex host theme, including changes while a canvas is open. The standalone browser editor follows the system color preference. Theme changes preserve the session, annotations, and current screen; opening the expanded editor or starting another canvas does not reset the theme.
+
+All application surfaces share semantic color tokens in `src/styles.css`. Light mode keeps warm paper and cream panels. Dark mode uses warm charcoal paper (`#22221f`), raised panels (`#292925`), soft ink (`#eeeae1`), and readable muted text (`#bcb7ab`). Cobalt text and focus indicators lighten to `#a4b8ff`; filled actions use a separate cobalt token so white labels retain contrast. Fields, native controls, selection, errors, success indicators, help, capture settings, and the feedback receipt follow the same scheme.
+
+Source screenshots, live frames, the fictional example, and annotation inks keep their original colors. Do not invert or tint source content to match the application. The screenshot stage remains white so transparent uploads render consistently with exported feedback.

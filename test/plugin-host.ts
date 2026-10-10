@@ -13,9 +13,11 @@ declare global {
       fitContent?: boolean;
       inline?: boolean;
       rejectExpand?: boolean;
+      theme?: "light" | "dark";
     };
     fixtureHeights: number[];
     fixtureDisplayMode: (mode: "inline" | "fullscreen") => void;
+    fixtureTheme: (theme: "light" | "dark") => void;
   }
 }
 const frame = document.querySelector("iframe")!;
@@ -49,6 +51,7 @@ const bridge = new AppBridge(
   },
   {
     hostContext: {
+      theme: window.fixture.theme,
       displayMode,
       availableDisplayModes: ["inline", "fullscreen"],
     },
@@ -68,6 +71,7 @@ window.fixtureDisplayMode = (mode) => {
   frame.style.height = mode === "fullscreen" ? "100vh" : "200px";
   bridge.setHostContext({ displayMode: mode });
 };
+window.fixtureTheme = (theme) => bridge.setHostContext({ theme });
 bridge.onrequestdisplaymode = async ({ mode }) => {
   if (window.fixture.rejectExpand) return { mode: "inline" };
   window.fixtureDisplayMode(mode as "inline" | "fullscreen");

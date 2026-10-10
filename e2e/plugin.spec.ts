@@ -99,7 +99,7 @@ test.beforeEach(async () => {
         const params = new URL(req.url, "http://fixture").searchParams;
         res.setHeader("Content-Type", "text/html");
         res.end(
-          `<html><body style="margin:0"><iframe title="Scribble plugin" sandbox="allow-scripts allow-downloads" style="border:0;width:100%;height:100vh"></iframe><script>window.fixture=${JSON.stringify({ result, canSend: !params.has("no-send"), reject: params.has("reject"), fitContent: params.has("fit-content"), inline: params.has("inline"), rejectExpand: params.has("reject-expand") }).replaceAll("<", "\\u003c")}</script><script type="module" src="/host.js"></script></body></html>`,
+          `<html><body style="margin:0"><iframe title="Scribble plugin" sandbox="allow-scripts allow-downloads" style="border:0;width:100%;height:100vh"></iframe><script>window.fixture=${JSON.stringify({ result, canSend: !params.has("no-send"), reject: params.has("reject"), fitContent: params.has("fit-content"), inline: params.has("inline"), rejectExpand: params.has("reject-expand"), theme: params.get("theme") || undefined }).replaceAll("<", "\\u003c")}</script><script type="module" src="/host.js"></script></body></html>`,
         );
       } else if (req.url === "/host.js") {
         res.setHeader("Content-Type", "text/javascript");
@@ -503,3 +503,100 @@ test("upload drop overlay stays inside the viewport after scrolling the expanded
   expect(box!.y).toBeGreaterThanOrEqual(0);
   expect(box!.y + box!.height).toBeLessThanOrEqual(800);
 });
+
+for (const width of [1440, 390])
+  for (const theme of ["light", "dark"] as const)
+    test(`host ${theme} theme stays consistent through the plugin flow at ${width}px`, async ({
+      page,
+    }) => {
+      const opposite = theme === "dark" ? "light" : "dark";
+      await page.emulateMedia({ colorScheme: opposite });
+      await page.setViewportSize({ width, height: 1000 });
+      await page.goto(`${origin}/host?inline&theme=${theme}`);
+      const ui = page.frameLocator("iframe");
+      const background =
+        theme === "dark" ? "rgb(34, 34, 31)" : "rgb(246, 243, 236)";
+      const checkTheme = async () => {
+        await expect(ui.locator("html")).toHaveCSS("color-scheme", theme);
+        await expect(ui.locator("body")).toHaveCSS(
+          "background-color",
+          background,
+        );
+        if (await ui.locator(".app-header").count())
+          await expect(ui.locator(".app-header")).toHaveCSS(
+            "background-color",
+            theme === "dark" ? "rgb(41, 41, 37)" : "rgb(253, 252, 248)",
+          );
+      };
+      const capture = async (name: string) => {
+        if (!process.env.SCRIBBLE_VISUAL_TEST) return;
+        // Host notifications and style assertions can complete before the
+        // embedded frame's compositor has painted the new color scheme.
+        await ui
+          .locator("body")
+          .evaluate(
+            () =>
+              new Promise<void>((resolve) =>
+                requestAnimationFrame(() =>
+                  requestAnimationFrame(() => resolve()),
+                ),
+              ),
+          );
+        await page.screenshot({
+          path: `.impeccable/review/theme-${theme}-${width}-${name}.png`,
+          animations: "disabled",
+        });
+      };
+      await expect(
+        ui.getByRole("button", { name: "Open canvas" }),
+      ).toBeVisible();
+      await checkTheme();
+      await capture("card");
+      await ui.getByRole("button", { name: "Open canvas" }).click();
+      await expect(
+        ui.getByRole("heading", { name: /A picture/ }),
+      ).toBeVisible();
+      await checkTheme(); // Display-mode-only updates must preserve the host theme.
+      await ui.getByRole("button", { name: "Capture live app" }).click();
+      await expect(ui.getByRole("textbox", { name: /URL/ })).toBeVisible();
+      await capture("web");
+      await ui.getByRole("button", { name: "Simulator", exact: true }).click();
+      await capture("simulator");
+      await ui.getByRole("button", { name: "Back to annotations" }).click();
+      await ui.getByRole("button", { name: "Try an example" }).click();
+      await expectDecodedScreenshot(ui.locator(".image-stage image"));
+      const original = await ui
+        .locator(".image-stage image")
+        .getAttribute("href");
+      await ui
+        .getByRole("textbox", { name: "The bigger picture" })
+        .fill("Keep this feedback while switching themes.");
+      await page.evaluate((theme) => window.fixtureTheme(theme), opposite);
+      await expect(ui.locator("html")).toHaveCSS("color-scheme", opposite);
+      await expect(
+        ui.getByRole("textbox", { name: "The bigger picture" }),
+      ).toHaveValue("Keep this feedback while switching themes.");
+      expect(await ui.locator(".image-stage image").getAttribute("href")).toBe(
+        original,
+      );
+      await page.evaluate((theme) => window.fixtureTheme(theme), theme);
+      await checkTheme();
+      await ui.locator("#root").evaluate((el) => el.scrollTo(0, 0));
+      await capture("editor");
+      await ui.getByRole("button", { name: "Finish feedback" }).click();
+      await expect(
+        ui.getByRole("heading", { name: "Ready for your agent." }),
+      ).toBeVisible();
+      await checkTheme();
+      await capture("receipt");
+      await ui.getByRole("button", { name: "Send to this chat" }).click();
+      await expect(
+        ui.getByRole("button", { name: "Message accepted" }),
+      ).toBeVisible();
+      await checkTheme();
+      await ui.getByRole("button", { name: "New canvas" }).click();
+      await expect(
+        ui.getByRole("heading", { name: /A picture/ }),
+      ).toBeVisible();
+      await checkTheme();
+    });

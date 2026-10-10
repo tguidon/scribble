@@ -716,3 +716,40 @@ test("blocked clipboard and a failed handoff load have explicit recovery", async
   await page.getByRole("button", { name: "New canvas" }).click();
   await expect(page.getByRole("heading", { name: /A picture/ })).toBeVisible();
 });
+
+test("standalone follows system theme changes through editing and receipt", async ({
+  page,
+}) => {
+  await page.emulateMedia({ colorScheme: "dark" });
+  await expect(page.locator("body")).toHaveCSS(
+    "background-color",
+    "rgb(34, 34, 31)",
+  );
+  await page.getByRole("button", { name: "Try an example" }).click();
+  await page
+    .getByRole("textbox", { name: "The bigger picture" })
+    .fill("Theme change preserves the draft.");
+  await page.emulateMedia({ colorScheme: "light" });
+  await expect(page.locator("body")).toHaveCSS(
+    "background-color",
+    "rgb(246, 243, 236)",
+  );
+  await expect(
+    page.getByRole("textbox", { name: "The bigger picture" }),
+  ).toHaveValue("Theme change preserves the draft.");
+  await page.getByRole("button", { name: "Finish feedback" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Ready for your agent." }),
+  ).toBeVisible();
+  await page.emulateMedia({ colorScheme: "dark" });
+  await expect(page.locator("body")).toHaveCSS(
+    "background-color",
+    "rgb(34, 34, 31)",
+  );
+  await page.getByRole("button", { name: "New canvas" }).click();
+  await expect(page.getByRole("heading", { name: /A picture/ })).toBeVisible();
+  await expect(page.locator("body")).toHaveCSS(
+    "background-color",
+    "rgb(34, 34, 31)",
+  );
+});
