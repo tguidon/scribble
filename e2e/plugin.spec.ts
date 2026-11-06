@@ -38,7 +38,7 @@ test.beforeEach(async () => {
     session: await createSession(root),
     captureOptions: {
       discovery: { list: async () => "" },
-      web: { headless: true, channel: "chrome" },
+      web: { headless: true },
       simulator: {
         devices: async () => [
           { id: "00000000-0000-0000-0000-000000000001", name: "Plugin iPhone" },

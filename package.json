@@ -1,6 +1,6 @@
 {
   "name": "scribble-feedback",
-  "version": "0.0.6",
+  "version": "0.0.7",
   "private": true,
   "type": "module",
   "description": "A local sketchbook for visual feedback to coding agents.",
@@ -15,7 +15,9 @@
     "build": "tsc -b && vite build && node scripts/build-plugin.mjs",
     "build:plugin": "tsc -b && node scripts/build-plugin.mjs",
     "start": "node bin/scribble.mjs start",
+    "pretest": "node scripts/check-test-environment.mjs",
     "test": "node --test test/*.test.mjs",
+    "pretest:e2e": "node scripts/check-test-environment.mjs",
     "test:e2e": "playwright test",
     "check": "npm run build && npm test"
   },

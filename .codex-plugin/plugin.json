@@ -1,6 +1,6 @@
 {
   "name": "scribble",
-  "version": "0.0.6",
+  "version": "0.0.7",
   "description": "Capture app screens, annotate them, and hand precise visual feedback to your coding agent.",
   "author": {
     "name": "Taylor Guidon"

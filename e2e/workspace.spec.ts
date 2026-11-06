@@ -78,6 +78,8 @@ test("complete visual feedback flow, recovery, and responsive layout", async ({
   await page.screenshot({
     path: ".impeccable/review/desktop.png",
     fullPage: true,
+    // Paint comments outside the viewport for the full-page review image.
+    style: ".comment { content-visibility: visible; }",
   });
   await page.setViewportSize({ width: 390, height: 844 });
   await page.locator("textarea").first().blur();
@@ -90,6 +92,7 @@ test("complete visual feedback flow, recovery, and responsive layout", async ({
   await page.screenshot({
     path: ".impeccable/review/mobile.png",
     fullPage: true,
+    style: ".comment { content-visibility: visible; }",
   });
   expect(
     await page.evaluate(
@@ -360,52 +363,96 @@ test("a genuine conflict preserves a downloadable backup until explicitly dismis
   await expect(message).toHaveValue("Saved in the other tab.");
 });
 
-test("an edit beyond the shared draft budget keeps the last valid draft", async ({
-  page,
-}) => {
-  const { MAX_DRAFT_BYTES, draftBytes } =
-    await import("../skills/scribble/scripts/lib/limits.mjs");
-  const params = new URLSearchParams(new URL(app.url).hash.slice(1));
-  const headers = { Authorization: `Bearer ${params.get("token")}` };
-  const origin = new URL(app.url).origin;
-  const image = Buffer.from(
-    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=",
-    "base64",
-  );
-  const draft = await (
-    await page.request.post(`${origin}/api/images?width=1&height=1`, {
-      headers,
-      data: image,
-    })
-  ).json();
-  draft.images[0].annotations = Array.from({ length: 450 }, (_, n) => ({
-    id: `pin-${n}`,
-    type: "pin",
-    color: "#c94b35",
-    points: [{ x: 0.5, y: 0.5 }],
-    comment: "x".repeat(10000),
-  }));
-  let remaining = draftBytes(draft) - MAX_DRAFT_BYTES + 100;
-  for (const mark of draft.images[0].annotations) {
-    const remove = Math.min(remaining, mark.comment.length);
-    mark.comment = mark.comment.slice(remove);
-    remaining -= remove;
-  }
-  expect(
-    (
-      await page.request.put(`${origin}/api/draft`, { headers, data: draft })
-    ).ok(),
-  ).toBe(true);
-  await page.reload();
-  const message = page.getByRole("textbox", { name: "The bigger picture" });
-  await message.fill("é".repeat(100));
-  await expect(page.getByRole("alert")).toContainText("4 MB limit");
-  await expect(message).toHaveValue("");
-  await message.fill("Still fits.");
-  await expect(page.getByText("Draft saved")).toBeVisible();
-  await page.reload();
-  await expect(message).toHaveValue("Still fits.");
-});
+for (const width of [1440, 390]) {
+  test(`a near-limit draft stays editable and survives reload at ${width}px`, async ({
+    page,
+  }) => {
+    test.setTimeout(15000);
+    await page.setViewportSize({ width, height: 1000 });
+    const { MAX_DRAFT_BYTES, draftBytes } =
+      await import("../skills/scribble/scripts/lib/limits.mjs");
+    const params = new URLSearchParams(new URL(app.url).hash.slice(1));
+    const headers = { Authorization: `Bearer ${params.get("token")}` };
+    const origin = new URL(app.url).origin;
+    const image = Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=",
+      "base64",
+    );
+    const draft = await (
+      await page.request.post(`${origin}/api/images?width=1&height=1`, {
+        headers,
+        data: image,
+      })
+    ).json();
+    draft.images[0].annotations = Array.from({ length: 450 }, (_, n) => ({
+      id: `pin-${n}`,
+      type: "pin",
+      color: "#c94b35",
+      points: [{ x: 0.5, y: 0.5 }],
+      // Long unbroken text exposed expensive layout of offscreen textareas.
+      comment: "x".repeat(10000),
+    }));
+    let remaining = draftBytes(draft) - MAX_DRAFT_BYTES + 100;
+    for (const mark of draft.images[0].annotations) {
+      const remove = Math.min(remaining, mark.comment.length);
+      mark.comment = mark.comment.slice(remove);
+      remaining -= remove;
+    }
+    expect(
+      (
+        await page.request.put(`${origin}/api/draft`, { headers, data: draft })
+      ).ok(),
+    ).toBe(true);
+    await page.reload();
+    const message = page.getByRole("textbox", { name: "The bigger picture" });
+    await message.fill("é".repeat(100));
+    await expect(page.getByRole("alert")).toContainText("4 MB limit");
+    await expect(message).toHaveValue("");
+    const saved = page.waitForResponse(
+      (response) =>
+        new URL(response.url()).pathname === "/api/draft" &&
+        response.request().method() === "PUT" &&
+        response.ok(),
+    );
+    await message.fill("Still fits.");
+    await saved;
+    await expect(page.getByText("Draft saved")).toBeVisible();
+    await page.reload();
+    await expect(message).toHaveValue("Still fits.");
+
+    // Comments outside the viewport must remain reachable and editable.
+    await page
+      .getByRole("button", { name: "Select mark 450", exact: true })
+      .click();
+    // Role visibility checks can force layout of every skipped textarea.
+    const lastComment = page.getByLabel("Comment for mark 450", {
+      exact: true,
+    });
+    const commentSaved = page.waitForResponse(
+      (response) =>
+        new URL(response.url()).pathname === "/api/draft" &&
+        response.request().method() === "PUT" &&
+        response.ok(),
+    );
+    await lastComment.fill(
+      "This comment is reachable at the end of a large draft.",
+    );
+    await commentSaved;
+    await expect(page.getByRole("status")).toHaveText("Draft saved");
+    const stored = await (
+      await page.request.get(`${origin}/api/session`, { headers })
+    ).json();
+    expect(stored.message).toBe("Still fits.");
+    expect(stored.images[0].annotations).toHaveLength(450);
+    expect(stored.images[0].annotations[449].comment).toBe(
+      "This comment is reachable at the end of a large draft.",
+    );
+    await page.reload();
+    await expect(lastComment).toHaveValue(
+      "This comment is reachable at the end of a large draft.",
+    );
+  });
+}
 
 test("existing numbered markers select and focus their feedback with drawing tools active", async ({
   page,

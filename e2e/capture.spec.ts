@@ -7,6 +7,8 @@ import { createSession } from "../skills/scribble/scripts/lib/store.mjs";
 import { startServer } from "../skills/scribble/scripts/lib/app.mjs";
 // Test-only permission automation selects our fixture tab, never a user window.
 test.use({
+  // Real tab capture needs the full browser's new headless mode.
+  channel: process.env.SCRIBBLE_TEST_CHANNEL || "chromium",
   launchOptions: {
     args: ["--auto-select-tab-capture-source-by-title=Local workspace"],
   },
@@ -68,7 +70,7 @@ test.beforeEach(async ({ page }) => {
         list: async () =>
           `p123\ncnode\nn127.0.0.1:${new URL(sourceUrl).port}\n`,
       },
-      web: { headless: true, channel: "chrome" },
+      web: { headless: true },
       simulator: {
         devices: async () => [device],
         command: { file: process.execPath, args: [command] },

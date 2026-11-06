@@ -4,7 +4,7 @@ export default defineConfig({
   workers: 1,
   timeout: 45000,
   use: {
-    channel: "chrome",
+    channel: process.env.SCRIBBLE_TEST_CHANNEL || undefined,
     headless: true,
     viewport: { width: 1440, height: 1000 },
     reducedMotion: "reduce",

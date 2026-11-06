@@ -230,7 +230,15 @@ Open the full session URL from the terminal. Keep the token after `#` in the URL
 | `npm run build:plugin` | Rebuild the embedded editor, bundled MCP SDK, and compatibility manifests |
 | `npm start` | Run the built app and open the browser |
 | `npm test` | Run server, storage, and launcher tests |
-| `npm run test:e2e` | Run browser tests with an installed Google Chrome |
+| `npm run test:e2e` | Run browser tests with Playwright's dedicated Chromium browsers |
+
+Before running tests, install Playwright's matching browsers:
+
+```sh
+npx playwright install chromium
+```
+
+Both test commands need permission to start browser processes and bind local server ports. They stop before starting workers if the environment blocks these requirements. The default tests do not launch your installed Chrome application. See [test setup and large-draft recovery](docs/testing.md) for browser setup, a Chrome compatibility command, and the resolved draft timeout.
 
 The complete skill is in `skills/scribble/`. The core server uses only Node built-ins. Optional capture adapters load Playwright or call serve-sim. Vite writes the browser build to `skills/scribble/app/`. The skills installer copies these files without a build step.
 

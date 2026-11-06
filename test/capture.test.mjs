@@ -85,7 +85,7 @@ test("controlled webpage captures preserve navigation, scroll, viewport, and fro
       '<title>Local review</title><body style="height:2200px;background:#f5f0e8"><button onclick="this.textContent=\'Changed\'">Continue</button><a href="/next">Next screen</a></body>',
     );
   });
-  const web = new WebCapture(root, { headless: true, channel: "chrome" });
+  const web = new WebCapture(root, { headless: true });
   t.after(() => web.close());
   await web.open({ url, width: 800, height: 600 });
   await web.page.getByRole("button").click();
@@ -140,7 +140,7 @@ test("webpage resize preserves the page and captures the new viewport", async (t
       '<title>Resize me</title><input><a href="/next">Next</a><style>@media(max-width:500px){body{background:rgb(1,2,3)}}</style>',
     );
   });
-  const web = new WebCapture(root, { headless: true, channel: "chrome" });
+  const web = new WebCapture(root, { headless: true });
   t.after(() => web.close());
   await assert.rejects(
     web.resize({ width: 390, height: 844 }),
@@ -256,7 +256,7 @@ test("capture API saves immutable images, retries without duplicates, and submit
   const app = await startServer({
     root,
     session,
-    captureOptions: { web: { headless: true, channel: "chrome" } },
+    captureOptions: { web: { headless: true } },
   });
   t.after(() => app.close());
   const origin = new URL(app.url).origin;
@@ -405,7 +405,7 @@ test("live webpage input maps normalized coordinates and releases interrupted dr
       `<!doctype html><input style="position:absolute;left:0;top:0;width:250px;height:80px"><button style="position:absolute;left:0;top:120px;width:250px;height:80px" onmousedown="document.body.dataset.down='yes'" onmouseup="document.body.dataset.down='no'">Touch</button><div style="height:3000px"></div>`,
     ),
   );
-  const web = new WebCapture(root, { headless: true, channel: "chrome" });
+  const web = new WebCapture(root, { headless: true });
   t.after(() => web.close());
   await web.open({ url, width: 800, height: 600 });
   const pointer = async (phase, y) =>
@@ -441,7 +441,7 @@ test("live streams require auth, stay isolated from saved drafts, and stop on di
   const app = await startServer({
     root,
     session,
-    captureOptions: { web: { headless: true, channel: "chrome" } },
+    captureOptions: { web: { headless: true } },
   });
   t.after(() => app.close());
   const origin = new URL(app.url).origin;

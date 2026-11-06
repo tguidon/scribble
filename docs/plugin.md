@@ -54,10 +54,13 @@ The GitHub source installs tracked files. Do not omit the built `plugin/dist/` o
 ## Verification
 
 ```sh
+npx playwright install chromium
 npm run build
 npm test
 npm run test:e2e
 ```
+
+Tests use Playwright's headless shell, plus its full Chromium browser for real tab sharing. They do not require an installed Google Chrome application. Both commands stop before test workers start if localhost or headless browser access fails. See [test setup and large-draft recovery](testing.md) for the timeout investigation and browser setup.
 
 The plugin tests exercise real MCP requests, isolated canvases, preserved images, a copied runtime without dependencies, and an opaque browser iframe using the official MCP Apps host bridge. The iframe blocks blob image URLs, matching Codex, and tests confirm that uploaded screenshots and live frames decode. Browser tests cover sending, read receipts, new canvases, rejected messages, and unsupported-host fallback. These tests do not prove a specific desktop build supports embedded UI or starts an idle chat.
 
