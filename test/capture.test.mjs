@@ -132,6 +132,51 @@ test("controlled webpage captures preserve navigation, scroll, viewport, and fro
   await assert.rejects(web.capture(), /Open a webpage/);
 });
 
+test("webpage resize preserves the page and captures the new viewport", async (t) => {
+  const root = await temp(t);
+  const url = await server(t, (_req, res) => {
+    res.setHeader("Content-Type", "text/html");
+    res.end(
+      '<title>Resize me</title><input><a href="/next">Next</a><style>@media(max-width:500px){body{background:rgb(1,2,3)}}</style>',
+    );
+  });
+  const web = new WebCapture(root, { headless: true, channel: "chrome" });
+  t.after(() => web.close());
+  await assert.rejects(
+    web.resize({ width: 390, height: 844 }),
+    /Open a webpage/,
+  );
+  await web.open({ url, width: 1280, height: 900 });
+  await web.page.getByRole("link").click();
+  await web.page.getByRole("textbox").fill("Keep this draft");
+  const page = web.page;
+  const generation = web.state().generation;
+  const state = await web.resize({ width: 390, height: 844 });
+  assert.equal(web.page, page);
+  assert.equal(state.url, url + "/next");
+  assert.equal(state.generation, generation + 1);
+  assert.equal(await page.getByRole("textbox").inputValue(), "Keep this draft");
+  assert.equal(
+    await page.evaluate(() => getComputedStyle(document.body).backgroundColor),
+    "rgb(1, 2, 3)",
+  );
+  const captured = await web.capture();
+  assert.deepEqual(captured.source.viewport, { width: 390, height: 844 });
+  assert.equal(captured.width, 390);
+  assert.equal(captured.height, 844);
+  for (const viewport of [
+    { width: 319, height: 844 },
+    { width: 390, height: 2561 },
+    { width: 390.5, height: 844 },
+    { width: "390", height: 844 },
+    { width: 390 },
+  ])
+    await assert.rejects(web.resize(viewport), /between 320 and 2560/);
+  assert.deepEqual(web.state(), state);
+  await page.goBack();
+  assert.equal(page.url(), url + "/");
+});
+
 test("simulator consumes exactly one bounded frame and detects rotation and disconnection", async (t) => {
   const root = await temp(t);
   let orientation = "portrait",
@@ -254,13 +299,55 @@ test("capture API saves immutable images, retries without duplicates, and submit
   const repeated = await (await call("/capture/snapshot", snapshot)).json();
   assert.equal(repeated.revision, captured.revision);
   assert.equal(repeated.images.length, 1);
+  const beforeResize = (await (await call("/capture/status")).json()).web;
+  const resized = await call("/capture/resize", {
+    kind: "web",
+    generation: beforeResize.generation,
+    width: 390,
+    height: 844,
+  });
+  assert.equal(resized.status, 200);
+  const resizedState = await resized.json();
+  assert.deepEqual(resizedState.viewport, { width: 390, height: 844 });
+  assert.equal(resizedState.url, pageUrl + "/");
+  assert.equal(
+    (
+      await call("/capture/resize", {
+        kind: "web",
+        generation: beforeResize.generation,
+        width: 768,
+        height: 1024,
+      })
+    ).status,
+    409,
+  );
+  assert.equal(
+    (
+      await call("/capture/resize", {
+        kind: "simulator",
+        width: 768,
+        height: 1024,
+      })
+    ).status,
+    400,
+  );
+  const resizedCapture = await (
+    await call("/capture/snapshot", {
+      kind: "web",
+      captureId: "phone-capture",
+      revision: captured.revision,
+    })
+  ).json();
+  assert.equal(resizedCapture.images[0].width, 800);
+  assert.equal(resizedCapture.images[1].width, 390);
+  assert.equal(resizedCapture.images[1].height, 844);
   assert.equal(
     (await call("/capture/snapshot", { ...snapshot, captureId: "stale" }))
       .status,
     409,
   );
   const annotated = {
-    revision: captured.revision,
+    revision: resizedCapture.revision,
     message: "Improve this screen",
     images: [
       {
@@ -276,6 +363,7 @@ test("capture API saves immutable images, retries without duplicates, and submit
           },
         ],
       },
+      resizedCapture.images[1],
     ],
   };
   const saved = await (

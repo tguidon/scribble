@@ -4,6 +4,7 @@ import { request, apiResponse } from "../api";
 import { readLiveFrames } from "../liveStream";
 import { createImageSource, releaseImageSource } from "../imageSource";
 import type { CaptureKind } from "../types";
+import { ViewportPicker, type Viewport } from "./ViewportPicker";
 
 type Input = {
   type: string;
@@ -28,6 +29,8 @@ type Props = {
   busy: boolean;
   onCapture: () => Promise<void>;
   onError: (message: string) => void;
+  viewport?: Viewport;
+  onViewportChange: (viewport: Viewport) => void;
 };
 
 export function LiveView({
@@ -39,6 +42,8 @@ export function LiveView({
   generation,
   inputWarning,
   onReconnect,
+  viewport,
+  onViewportChange,
 }: Props) {
   const [attempt, setAttempt] = useState(0);
   const [frameUrl, setFrameUrl] = useState<string>();
@@ -292,6 +297,13 @@ export function LiveView({
         <p className="capture-error" role="status">
           {inputWarning}
         </p>
+      )}
+      {kind === "web" && viewport && (
+        <ViewportPicker
+          viewport={viewport}
+          disabled={busy || pending}
+          onChange={onViewportChange}
+        />
       )}
       <div
         className={`live-screen live-screen-${kind}`}

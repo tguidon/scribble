@@ -130,6 +130,8 @@ The optional packages live in `.scribble/capture-runtime/`. Chromium uses Playwr
 
 Scribble streams a browser viewport directly into its canvas. This also works with pages that block iframe embedding. Use the back and reload controls above the screen to navigate. Each capture records the URL, page title, viewport dimensions, scroll position, and capture time.
 
+Use **Desktop**, **Laptop**, **Tablet**, or **Phone** above the live screen to check a different viewport. The presets use 1920 × 1080, 1280 × 900, 768 × 1024, and 390 × 844 pixels. Switching sizes keeps the current page open, including form input. For another size, expand **Webpage settings → Viewport size**, enter dimensions, and select **Apply size**. These controls resize the webpage viewport; shared browser tabs use the original tab's size.
+
 The capture browser has a separate temporary profile. It does not share your normal browser’s logins. Public and local HTTP or HTTPS URLs are supported. You can enter `example.com` or `localhost:3000` without a scheme. File URLs and URLs with embedded credentials are rejected.
 
 Scribble checks local development-server ports and lists those that return HTML. Select **Refresh sources** after starting another app. If automatic discovery is unavailable, enter the URL directly.

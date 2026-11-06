@@ -242,6 +242,7 @@ export async function startServer({
             req.method === "POST" &&
             [
               "/api/capture/input",
+              "/api/capture/resize",
               "/api/capture/open",
               "/api/capture/focus",
               "/api/capture/disconnect",

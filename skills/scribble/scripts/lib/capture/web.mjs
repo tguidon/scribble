@@ -3,6 +3,16 @@ import { webpageUrl, imageDimensions, captureError } from "./common.mjs";
 
 import { streamHeaders, writeFrame, validateInput } from "./live.mjs";
 
+function viewportSize({ width, height }) {
+  if (
+    ![width, height].every((n) => Number.isInteger(n) && n >= 320 && n <= 2560)
+  )
+    throw captureError(
+      "Choose viewport dimensions between 320 and 2560 pixels.",
+    );
+  return { width, height };
+}
+
 export class WebCapture {
   constructor(root, options = {}) {
     this.root = root;
@@ -61,16 +71,10 @@ export class WebCapture {
   }
   async open(input) {
     const url = webpageUrl(input.url).href;
-    const width = input.width ?? 1280,
-      height = input.height ?? 900;
-    if (
-      ![width, height].every(
-        (n) => Number.isInteger(n) && n >= 320 && n <= 2560,
-      )
-    )
-      throw captureError(
-        "Choose viewport dimensions between 320 and 2560 pixels.",
-      );
+    const { width, height } = viewportSize({
+      width: input.width ?? 1280,
+      height: input.height ?? 900,
+    });
     await this.release();
     await this.stopStream?.();
     this.generation = (this.generation || 0) + 1;
@@ -132,6 +136,16 @@ export class WebCapture {
       );
     }
     webpageUrl(page.url());
+    return this.state();
+  }
+  async resize(input) {
+    const viewport = viewportSize(input);
+    const page = this.currentPage();
+    if (!page) throw captureError("Open a webpage before resizing it.", 409);
+    await this.release();
+    await page.setViewportSize(viewport);
+    await this.stopStream?.();
+    this.generation = (this.generation || 0) + 1;
     return this.state();
   }
   async focus() {

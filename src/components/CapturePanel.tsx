@@ -11,6 +11,7 @@ import { checkCaptureRuntime, request } from "../api";
 import { SharedTabView } from "./SharedTabView";
 import type { TabShare, SharedSurface } from "../useTabShare";
 import { LiveView } from "./LiveView";
+import { ViewportPicker, type Viewport } from "./ViewportPicker";
 import type { CaptureKind } from "../types";
 
 type Connection = {
@@ -37,7 +38,7 @@ type Props = {
   onSharedCapture: (file: File, surface: SharedSurface) => Promise<void>;
 };
 const action = (name: string, body: object) =>
-  request(`/capture/${name}`, {
+  request<Connection>(`/capture/${name}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -131,6 +132,21 @@ export function CapturePanel({
         await refresh();
       },
     );
+  };
+  const resizeWebpage = (viewport: Viewport) => {
+    if (busy) return;
+    void perform("Resizing webpage…", async () => {
+      const next = await action("resize", {
+        kind: "web",
+        generation: connection?.generation,
+        ...viewport,
+      });
+      setStatus((current) =>
+        current ? { ...current, web: { ...current.web, ...next } } : current,
+      );
+      setWidth(viewport.width);
+      setHeight(viewport.height);
+    });
   };
   useEffect(() => {
     heading.current?.focus();
@@ -233,7 +249,12 @@ export function CapturePanel({
                       event.target instanceof HTMLInputElement
                     ) {
                       event.preventDefault();
-                      openWebpage();
+                      if (
+                        connection?.connected &&
+                        event.target.type === "number"
+                      )
+                        resizeWebpage({ width, height });
+                      else openWebpage();
                     }
                   }}
                 >
@@ -299,6 +320,16 @@ export function CapturePanel({
                       <p className="capture-hint">{discoveryMessage}</p>
                     )}
                   </div>
+                  {!connection?.connected && (
+                    <ViewportPicker
+                      viewport={{ width, height }}
+                      disabled={!!busy}
+                      onChange={({ width, height }) => {
+                        setWidth(width);
+                        setHeight(height);
+                      }}
+                    />
+                  )}
                   <details className="viewport-settings">
                     <summary>
                       Viewport size{" "}
@@ -337,6 +368,16 @@ export function CapturePanel({
                         />
                       </label>
                     </div>
+                    {connection?.connected && (
+                      <button
+                        className="secondary capture-open"
+                        type="button"
+                        disabled={!!busy}
+                        onClick={() => resizeWebpage({ width, height })}
+                      >
+                        Apply size
+                      </button>
+                    )}
                   </details>
                 </form>
               ) : (
@@ -410,6 +451,8 @@ export function CapturePanel({
                 <LiveView
                   key={`${kind}-${connection.generation}-${connection.device?.id || connection.url}-${connection.viewport?.width}-${connection.viewport?.height}`}
                   kind={kind}
+                  viewport={kind === "web" ? connection.viewport : undefined}
+                  onViewportChange={resizeWebpage}
                   generation={connection.generation || 0}
                   inputWarning={connection.inputWarning}
                   onReconnect={

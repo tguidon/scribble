@@ -90,7 +90,7 @@ export function createCaptures(root, options = {}) {
             await ensureCapture(root, input.kind);
           return source.open(input);
         }
-        if (action === "input") {
+        if (action === "input" || action === "resize") {
           if (
             input.generation !== undefined &&
             input.generation !== source.state().generation
@@ -99,7 +99,12 @@ export function createCaptures(root, options = {}) {
               "The source changed. Reconnect the live view.",
               409,
             );
-          return source.input(input);
+          if (action === "input") return source.input(input);
+          if (input.kind !== "web")
+            throw captureError(
+              "Viewport resizing is only available for webpages.",
+            );
+          return source.resize(input);
         }
         if (action === "focus" && input.kind === "web") return source.focus();
         if (action === "disconnect") {

@@ -1708,6 +1708,55 @@ kbd {
   text-underline-offset: 3px;
   font: inherit;
 }
+.viewport-picker {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin-block: 16px;
+}
+.viewport-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.viewport-presets button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 40px;
+  padding: 8px 12px;
+  border-radius: 7px;
+  color: var(--muted);
+  font-size: var(--text-label);
+}
+.viewport-presets button:hover:not(:disabled) {
+  background: var(--hover);
+  color: var(--ink);
+}
+.viewport-presets button[aria-pressed="true"],
+.viewport-presets button[aria-pressed="true"]:hover:not(:disabled) {
+  background: var(--blue-light);
+  color: var(--blue);
+}
+.viewport-size {
+  color: var(--muted);
+  font-size: var(--text-label);
+  font-variant-numeric: tabular-nums;
+}
+@media (max-width: 600px) {
+  .viewport-presets {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    width: 100%;
+  }
+  .viewport-presets button {
+    flex-direction: column;
+    gap: 4px;
+    padding: 8px 4px;
+  }
+}
 .viewport-settings {
   margin-top: 16px;
 }

@@ -86,6 +86,14 @@ test("MCP canvas isolation, feedback delivery, original images, and new rounds",
     });
     assert.equal(rejected.isError, true, path);
   }
+  const resizeWithoutPage = await api(
+    one,
+    "/capture/resize",
+    "POST",
+    JSON.stringify({ kind: "web", width: 390, height: 844 }),
+  );
+  assert.equal(resizeWithoutPage.status, 409);
+  assert.match(resizeWithoutPage.data.error, /Open a webpage/);
   const upload = await api(
     one,
     "/images?width=1&height=1&name=proof.png",

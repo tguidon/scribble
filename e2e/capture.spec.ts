@@ -176,6 +176,123 @@ test("local capture opens, annotates, resumes, captures again, and submits both 
   expect(bundle.images[1].source.url).toBe(sourceUrl + "/details");
 });
 
+test("viewport presets resize the live webpage, preserve input, and survive capture", async ({
+  page,
+}) => {
+  await page
+    .getByRole("button", { name: "Capture live app", exact: true })
+    .click();
+  const presets = page.getByRole("group", { name: "Webpage viewport" });
+  await expect(
+    presets.getByRole("button", { name: "Laptop", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await presets.getByRole("button", { name: "Tablet", exact: true }).click();
+  await page.getByLabel("Webpage URL").fill(sourceUrl);
+  await page.getByRole("button", { name: "Open webpage", exact: true }).click();
+  const capture = page.getByRole("button", { name: "Capture & annotate" });
+  await expect(capture).toBeEnabled();
+  const screen = page.getByRole("img", {
+    name: "Live webpage screen",
+    exact: true,
+  });
+  const box = (await screen.boundingBox())!;
+  await page.mouse.click(
+    box.x + (box.width * 150) / 768,
+    box.y + (box.height * 310) / 1024,
+  );
+  await page.keyboard.type("Preserved across sizes");
+  await expect(capture).toBeEnabled();
+  const sessionUrl = new URL(app.url);
+  const params = new URLSearchParams(sessionUrl.hash.slice(1));
+  const headers = { Authorization: `Bearer ${params.get("token")}` };
+  for (const [name, width, height] of [
+    ["Desktop", 1920, 1080],
+    ["Laptop", 1280, 900],
+    ["Tablet", 768, 1024],
+    ["Phone", 390, 844],
+  ] as const) {
+    await presets.getByRole("button", { name, exact: true }).click();
+    await expect(
+      presets.getByRole("button", { name, exact: true }),
+    ).toHaveAttribute("aria-pressed", "true");
+    await expect(capture).toBeEnabled();
+    await expect(page.locator(".viewport-size")).toHaveText(
+      `${width} × ${height} px`,
+    );
+    const response = await page.request.get(
+      sessionUrl.origin + "/api/capture/status",
+      { headers },
+    );
+    expect((await response.json()).web.viewport).toEqual({ width, height });
+    if (name === "Desktop")
+      await page.screenshot({
+        path: ".impeccable/review/viewport-desktop.png",
+        fullPage: true,
+      });
+  }
+  await page.route("**/api/capture/resize", async (route) => {
+    await route.fulfill({
+      status: 502,
+      json: { error: "Resize failed. Try again." },
+    });
+    await page.unroute("**/api/capture/resize");
+  });
+  await presets.getByRole("button", { name: "Tablet", exact: true }).click();
+  await expect(page.getByRole("alert")).toContainText(
+    "Resize failed. Try again.",
+  );
+  await expect(
+    presets.getByRole("button", { name: "Phone", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await presets.getByRole("button", { name: "Tablet", exact: true }).click();
+  await expect(capture).toBeEnabled();
+  await presets.getByRole("button", { name: "Phone", exact: true }).click();
+  await expect(capture).toBeEnabled();
+  await expect(page.getByRole("alert")).toHaveCount(0);
+  await page.screenshot({
+    path: ".impeccable/review/viewport-phone.png",
+    fullPage: true,
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(
+    presets.getByRole("button", { name: "Phone", exact: true }),
+  ).toBeVisible();
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  await page.screenshot({
+    path: ".impeccable/review/viewport-mobile.png",
+    fullPage: true,
+  });
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.getByText("Webpage settings", { exact: true }).click();
+  await page.getByText("Viewport size", { exact: false }).click();
+  await page.getByRole("spinbutton", { name: "Width" }).fill("1000");
+  await page.getByRole("spinbutton", { name: "Height" }).fill("700");
+  await page.getByRole("button", { name: "Apply size" }).click();
+  await expect(page.locator(".viewport-size")).toHaveText("1000 × 700 px");
+  await expect(capture).toBeEnabled();
+  await expect(presets.locator('[aria-pressed="true"]')).toHaveCount(0);
+  await presets.getByRole("button", { name: "Phone", exact: true }).click();
+  await expect(capture).toBeEnabled();
+  await capture.click();
+  await expect(
+    page.getByRole("button", { name: "Open Preserved across sizes.png" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Resume live capture" }).click();
+  await expect(
+    presets.getByRole("button", { name: "Phone", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(capture).toBeEnabled();
+  await page.reload();
+  await page.getByRole("button", { name: "Resume live capture" }).click();
+  await expect(
+    presets.getByRole("button", { name: "Phone", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+});
+
 test("simulator selection captures into the same editor and supports disconnect", async ({
   page,
 }) => {
