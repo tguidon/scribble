@@ -36,11 +36,9 @@ export async function request<T>(
       ),
       { status: response.status },
     );
-  if (Array.isArray(data?.images)) await getEditorHost()?.hydrate(data.images);
   return data;
 }
 export const imageUrl = (id: string) =>
-  getEditorHost()?.imageUrl(id) ||
   `/api/images/${id}?token=${encodeURIComponent(token)}&session=${encodeURIComponent(currentSessionId())}`;
 export const loadSession = () => request<Session>("/session");
 export const saveDraft = (draft: Draft, revision: number, saveId: string) =>

@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { Check, Copy, Plus } from "lucide-react";
-import { imageUrl, request } from "../api";
+import { request } from "../api";
 import type { Session } from "../types";
 import { getEditorHost } from "../editorHost";
+import { ScreenshotImage } from "./ScreenshotImage";
 import { PluginDelivery } from "./PluginDelivery";
 
 export function FeedbackReceipt({ session }: { session: Session }) {
@@ -98,7 +99,7 @@ export function FeedbackReceipt({ session }: { session: Session }) {
       </p>
       <div className="receipt-images">
         {session.images.map((image) => (
-          <img key={image.id} src={imageUrl(image.id)} alt={image.name} />
+          <ScreenshotImage key={image.id} id={image.id} alt={image.name} />
         ))}
       </div>
       <div className="receipt-details">

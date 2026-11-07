@@ -9,7 +9,7 @@ import {
   ArrowUpRight,
 } from "lucide-react";
 import type { Annotation, Point, Screenshot, Tool } from "../types";
-import { imageUrl } from "../api";
+import { useImageSource } from "../useImageSource";
 import { AnnotationShape } from "./AnnotationShape";
 import { frameBatcher } from "../frameBatcher.mjs";
 type Props = {
@@ -38,6 +38,7 @@ export function Canvas({
   disabled,
   children,
 }: Props) {
+  const imageSource = useImageSource(image?.id);
   const viewport = useRef<HTMLDivElement>(null);
   const svg = useRef<SVGSVGElement>(null);
   const [size, setSize] = useState({
@@ -282,6 +283,12 @@ export function Canvas({
           clearGhost();
         }}
       >
+        {imageSource.error && (
+          <div className="image-load-error" role="alert">
+            {imageSource.error}{" "}
+            <button onClick={imageSource.retry}>Retry image</button>
+          </div>
+        )}
         {image ? (
           <div
             className="image-transform"
@@ -317,7 +324,7 @@ export function Canvas({
               }}
             >
               <image
-                href={imageUrl(image.id)}
+                href={imageSource.url}
                 width={image.width}
                 height={image.height}
               />

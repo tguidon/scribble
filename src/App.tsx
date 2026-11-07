@@ -21,7 +21,7 @@ import { CapturePanel } from "./components/CapturePanel";
 import { Toolbar } from "./components/Toolbar";
 import { useTabShare } from "./useTabShare";
 import { useSession } from "./useSession";
-import { imageUrl } from "./api";
+import { ScreenshotImage } from "./components/ScreenshotImage";
 import { getEditorHost } from "./editorHost";
 import { exampleFile } from "./example";
 import {
@@ -516,7 +516,7 @@ function Editor({ controller }: { controller: ReturnType<typeof useSession> }) {
                     }}
                   >
                     <div className="thumbnail">
-                      <img src={imageUrl(item.id)} alt="" />
+                      <ScreenshotImage id={item.id} alt="" retryable={false} />
                       <span className="image-number">{index + 1}</span>
                       {item.annotations.length > 0 && (
                         <span className="annotation-count">

@@ -16,6 +16,7 @@ let calls: string[];
 // still occupy their full canvas rectangle.
 async function expectDecodedScreenshot(image: Locator) {
   await expect(image).toBeVisible();
+  await expect(image).toHaveAttribute("href", /^data:image\//);
   const size = await image.evaluate(async (element) => {
     const bitmap = new Image();
     bitmap.src = element.getAttribute("href")!;
@@ -230,6 +231,48 @@ for (const width of [1440, 390])
       });
     expect(errors).toEqual([]);
   });
+
+test("image failures do not reject saved uploads or edits and retry independently", async ({
+  page,
+}) => {
+  let failImages = true;
+  let uploads = 0;
+  await page.route("**/tool", async (route) => {
+    const params = route.request().postDataJSON();
+    if (params.name === "editor_request") {
+      if (params.arguments.path.startsWith("/images?")) uploads++;
+      if (failImages && params.arguments.path.startsWith("/images/")) {
+        await route.fulfill({
+          json: {
+            isError: true,
+            content: [{ type: "text", text: "Image temporarily unavailable" }],
+          },
+        });
+        return;
+      }
+    }
+    await route.continue();
+  });
+  await page.goto(`${origin}/host`);
+  const ui = page.frameLocator("iframe");
+  await ui.getByRole("button", { name: "Try an example" }).click();
+  await expect(ui.getByText("Draft saved", { exact: true })).toBeVisible();
+  await expect(ui.getByRole("alert")).toContainText(
+    "Image temporarily unavailable",
+  );
+  await ui
+    .getByLabel("The bigger picture")
+    .fill("Saved despite image download failure");
+  await expect(ui.getByText("Draft saved", { exact: true })).toBeVisible();
+  failImages = false;
+  await ui.getByRole("button", { name: "Retry image", exact: true }).click();
+  await expectDecodedScreenshot(ui.locator(".image-stage image"));
+  expect(uploads).toBe(1);
+  await page.reload();
+  await expect(ui.getByLabel("The bigger picture")).toHaveValue(
+    "Saved despite image download failure",
+  );
+});
 
 test("uploaded screenshot decodes with desktop CSP and survives reopening the plugin", async ({
   page,

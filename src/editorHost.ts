@@ -1,3 +1,5 @@
+import type { ImageCache } from "./imageCache";
+
 // The standalone editor has no host. The plugin supplies this adapter before
 // mounting React, keeping the canvas independent of any chat product SDK.
 export type EditorHost = {
@@ -5,8 +7,7 @@ export type EditorHost = {
   browserUrl: string;
   canSend: boolean;
   request(path: string, options?: RequestInit): Promise<Response>;
-  imageUrl(id: string): string;
-  hydrate(images: { id: string }[]): Promise<void>;
+  images: ImageCache;
   newCanvas(url: string): void;
   sendFeedback(): Promise<void>;
   deliveryStatus(): Promise<{

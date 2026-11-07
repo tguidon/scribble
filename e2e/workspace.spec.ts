@@ -21,6 +21,9 @@ test("a stale tab cannot upload and overwrite another tab's message", async ({
   page,
 }) => {
   await page.getByRole("button", { name: "Try an example" }).click();
+  await expect(
+    page.getByRole("button", { name: "Open Example — Fieldnotes.png" }),
+  ).toBeVisible();
   await expect(page.getByText("Draft saved", { exact: true })).toBeVisible();
   const origin = new URL(app.url).origin;
   const params = new URLSearchParams(new URL(app.url).hash.slice(1));
@@ -32,7 +35,7 @@ test("a stale tab cannot upload and overwrite another tab's message", async ({
     headers,
     data: { ...draft, message: "Newer feedback from another tab" },
   });
-  expect(updated.ok()).toBe(true);
+  expect(updated.ok(), await updated.text()).toBe(true);
   const buffer = Buffer.from(
     await page.evaluate(() => {
       const canvas = document.createElement("canvas");

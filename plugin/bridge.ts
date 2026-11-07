@@ -1,6 +1,7 @@
 import { App } from "@modelcontextprotocol/ext-apps";
 import type { EditorHost } from "../src/editorHost";
 import { version } from "../skills/scribble/version.json";
+import { createImageCache } from "../src/imageCache";
 import { createImageSource, releaseImageSource } from "../src/imageSource";
 
 export type Connection = { sessionId: string; token: string; url: string };
@@ -23,7 +24,15 @@ export function createEditorHost(
   connection: Connection,
   change: (connection: Connection) => void,
 ): EditorHost & { dispose(): void } {
-  const images = new Map<string, string>();
+  const images = createImageCache(async (id, signal) => {
+    const response = await request(`/images/${id}`, { signal });
+    if (!response.ok) throw new Error("Could not load this screenshot.");
+    const blob = await response.blob();
+    return createImageSource(
+      new Uint8Array(await blob.arrayBuffer()),
+      blob.type,
+    );
+  }, releaseImageSource);
   const auth = { sessionId: connection.sessionId, token: connection.token };
   type Receipt = { acceptedAt: string | null; readAt: string | null };
   let acceptedAt: string | null = null;
@@ -128,29 +137,7 @@ export function createEditorHost(
     browserUrl: connection.url,
     canSend: !!app.getHostCapabilities()?.message?.text,
     request,
-    imageUrl: (id) => images.get(id) || "",
-    async hydrate(items) {
-      for (const image of items) {
-        if (images.has(image.id)) continue;
-        const response = await request(`/images/${image.id}`);
-        if (!response.ok)
-          throw new Error("Could not load a screenshot. Reopen this canvas.");
-        const blob = await response.blob();
-        images.set(
-          image.id,
-          createImageSource(
-            new Uint8Array(await blob.arrayBuffer()),
-            blob.type,
-          ),
-        );
-      }
-      const keep = new Set(items.map((image) => image.id));
-      for (const [id, url] of images)
-        if (!keep.has(id)) {
-          releaseImageSource(url);
-          images.delete(id);
-        }
-    },
+    images,
     newCanvas(url) {
       const next = new URL(url, connection.url);
       const params = new URLSearchParams(next.hash.slice(1));
@@ -217,8 +204,7 @@ export function createEditorHost(
         }
       : {}),
     dispose() {
-      for (const url of images.values()) releaseImageSource(url);
-      images.clear();
+      images.dispose();
     },
   };
 }
