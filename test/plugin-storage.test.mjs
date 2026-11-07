@@ -78,7 +78,7 @@ test("New canvas excludes private storage after Git is initialized", async (t) =
   const image = await backend.request(
     connection.sessionId,
     connection.token,
-    "/images?width=1&height=1&name=proof.png",
+    "/images?revision=0&imageId=uploaded-image&width=1&height=1&name=proof.png",
     "POST",
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=",
     true,

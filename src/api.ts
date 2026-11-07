@@ -49,7 +49,11 @@ export const saveDraft = (draft: Draft, revision: number, saveId: string) =>
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ ...draft, revision, saveId }),
   });
-export async function uploadImage(file: File): Promise<Session> {
+export async function uploadImage(
+  file: File,
+  revision: number,
+  imageId: string,
+): Promise<Session> {
   if (!["image/png", "image/jpeg", "image/webp"].includes(file.type))
     throw new Error(`${file.name}: choose a PNG, JPEG, or WebP image.`);
   if (file.size > 20 * 1024 * 1024)
@@ -65,6 +69,8 @@ export async function uploadImage(file: File): Promise<Session> {
     width: String(width),
     height: String(height),
     name: file.name,
+    revision: String(revision),
+    imageId,
   });
   return request<Session>(`/images?${query}`, { method: "POST", body: file });
 }

@@ -17,6 +17,54 @@ test.afterEach(async () => {
   await app.close();
   await rm(root, { recursive: true, force: true });
 });
+test("a stale tab cannot upload and overwrite another tab's message", async ({
+  page,
+}) => {
+  await page.getByRole("button", { name: "Try an example" }).click();
+  await expect(page.getByText("Draft saved", { exact: true })).toBeVisible();
+  const origin = new URL(app.url).origin;
+  const params = new URLSearchParams(new URL(app.url).hash.slice(1));
+  const headers = { Authorization: `Bearer ${params.get("token")}` };
+  const draft = await (
+    await page.request.get(`${origin}/api/session`, { headers })
+  ).json();
+  const updated = await page.request.put(`${origin}/api/draft`, {
+    headers,
+    data: { ...draft, message: "Newer feedback from another tab" },
+  });
+  expect(updated.ok()).toBe(true);
+  const buffer = Buffer.from(
+    await page.evaluate(() => {
+      const canvas = document.createElement("canvas");
+      canvas.width = canvas.height = 32;
+      canvas.getContext("2d")!.fillRect(0, 0, 32, 32);
+      return canvas.toDataURL().split(",")[1];
+    }),
+    "base64",
+  );
+  await page
+    .getByLabel("Upload screenshots")
+    .setInputFiles({ name: "new.png", mimeType: "image/png", buffer });
+  await expect(page.getByRole("alert")).toContainText("changed in another tab");
+  const saved = await (
+    await page.request.get(`${origin}/api/session`, { headers })
+  ).json();
+  expect(saved.message).toBe("Newer feedback from another tab");
+  expect(saved.images).toHaveLength(1);
+  await page.reload();
+  await expect(page.getByLabel("The bigger picture")).toHaveValue(
+    saved.message,
+  );
+  await page
+    .getByLabel("Upload screenshots")
+    .setInputFiles({ name: "new.png", mimeType: "image/png", buffer });
+  await expect(
+    page.getByRole("button", { name: "Open new.png", exact: true }),
+  ).toBeVisible();
+  await expect(page.getByLabel("The bigger picture")).toHaveValue(
+    saved.message,
+  );
+});
 test("complete visual feedback flow, recovery, and responsive layout", async ({
   page,
 }) => {
@@ -379,10 +427,13 @@ for (const width of [1440, 390]) {
       "base64",
     );
     const draft = await (
-      await page.request.post(`${origin}/api/images?width=1&height=1`, {
-        headers,
-        data: image,
-      })
+      await page.request.post(
+        `${origin}/api/images?revision=0&imageId=uploaded-image&width=1&height=1`,
+        {
+          headers,
+          data: image,
+        },
+      )
     ).json();
     draft.images[0].annotations = Array.from({ length: 450 }, (_, n) => ({
       id: `pin-${n}`,

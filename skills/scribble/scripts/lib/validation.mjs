@@ -4,12 +4,18 @@ const finite = (n) => typeof n === "number" && Number.isFinite(n);
 function check(condition, message) {
   if (!condition) throw Object.assign(new Error(message), { status: 400 });
 }
+export function checkRevision(revision, session) {
+  if (!Number.isInteger(revision) || revision !== session.revision)
+    throw Object.assign(
+      new Error(
+        "This session changed in another tab. Reload to get the latest draft.",
+      ),
+      { status: 409 },
+    );
+}
 export function validateDraft(body, session) {
   check(body && typeof body === "object", "Expected a feedback draft.");
-  check(
-    body.revision === session.revision,
-    "This session changed in another tab. Reload to get the latest draft.",
-  );
+  checkRevision(body.revision, session);
   check(
     typeof body.message === "string" && body.message.length <= 20000,
     "Keep the overall message under 20,000 characters.",

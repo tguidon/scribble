@@ -81,11 +81,14 @@ test("finished feedback remains available while new launches open a fresh canvas
     "base64",
   );
   const draft = await (
-    await fetch(`${url.origin}/api/images?width=1&height=1&name=one.png`, {
-      method: "POST",
-      headers,
-      body: png,
-    })
+    await fetch(
+      `${url.origin}/api/images?revision=0&imageId=uploaded-image&width=1&height=1&name=one.png`,
+      {
+        method: "POST",
+        headers,
+        body: png,
+      },
+    )
   ).json();
   await fetch(`${url.origin}/api/submit`, {
     method: "POST",

@@ -43,6 +43,22 @@ export function useSession() {
     current.current = value;
     setSession(value);
   }, []);
+  // All committed mutations advance the same revision. Only an autosave may
+  // acknowledge an older local generation while newer edits remain in memory.
+  const accept = useCallback(
+    (response: Session, acknowledged = generation.current) => {
+      revision.current = response.revision;
+      saved.current = acknowledged;
+      const newer = generation.current !== acknowledged && current.current;
+      update(
+        newer
+          ? { ...response, message: newer.message, images: newer.images }
+          : response,
+      );
+      setSaveState(newer ? "saving" : "saved");
+    },
+    [update],
+  );
   const enqueue = useCallback(<T>(task: () => Promise<T>): Promise<T> => {
     const promise = queue.current.then(task);
     queue.current = promise.catch(() => {});
@@ -133,14 +149,8 @@ export function useSession() {
               operation.revision,
               operation.id,
             );
-            revision.current = response.revision;
-            saved.current = operation.generation;
             pending.current = undefined;
-            update({
-              ...current.current!,
-              revision: response.revision,
-              updatedAt: response.updatedAt,
-            });
+            accept(response, operation.generation);
             backup();
             if (saved.current === generation.current) {
               setSaveState("saved");
@@ -161,7 +171,7 @@ export function useSession() {
           }
         }
       }),
-    [enqueue, update, backup],
+    [enqueue, accept, backup],
   );
   useEffect(() => {
     if (
@@ -217,13 +227,16 @@ export function useSession() {
         return await enqueue(async () => {
           let result = current.current;
           for (const file of files) {
-            const response = await uploadImage(file);
-            revision.current = response.revision;
-            result = {
-              ...response,
-              message: current.current?.message || response.message,
-            };
-            update(result);
+            const imageId = crypto.randomUUID();
+            try {
+              result = await uploadImage(file, revision.current, imageId);
+            } catch (error) {
+              const recovered = await loadSession().catch(() => undefined);
+              if (!recovered?.images.some((image) => image.id === imageId))
+                throw error;
+              result = recovered;
+            }
+            accept(result);
           }
           return result;
         });
@@ -233,7 +246,7 @@ export function useSession() {
         setBusy(false);
       }
     },
-    [enqueue, flush, update],
+    [enqueue, flush, accept],
   );
   const capture = useCallback(
     async (kind: CaptureMode, file?: File, surface?: string) => {
@@ -286,17 +299,15 @@ export function useSession() {
               throw error;
             result = recovered;
           }
-          revision.current = result.revision;
           pendingCapture.current = undefined;
-          update(result);
-          setSaveState("saved");
+          accept(result);
           return result;
         });
       } finally {
         setBusy(false);
       }
     },
-    [enqueue, flush, update, recovery],
+    [enqueue, flush, accept, recovery],
   );
   const submit = useCallback(async () => {
     setBusy(true);
@@ -309,20 +320,20 @@ export function useSession() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ revision: revision.current }),
         });
-        update(result);
+        accept(result);
         draftStorage.removeItem(key);
       });
     } catch (e) {
       // A dropped response may follow a successful durable submission.
       const recovered = await loadSession().catch(() => undefined);
       if (recovered?.status === "submitted") {
-        update(recovered);
+        accept(recovered);
         draftStorage.removeItem(key);
       } else setError((e as Error).message);
     } finally {
       setBusy(false);
     }
-  }, [enqueue, flush, update]);
+  }, [enqueue, flush, accept]);
   return {
     session,
     error,

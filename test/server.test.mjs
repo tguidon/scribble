@@ -32,10 +32,13 @@ async function setup(t) {
 }
 test("uploads, saves, submits once, and preserves a readable feedback bundle", async (t) => {
   const { call, root, session } = await setup(t);
-  const upload = await call("/api/images?width=1&height=1&name=test.png", {
-    method: "POST",
-    body: png,
-  });
+  const upload = await call(
+    "/api/images?revision=0&imageId=uploaded-image&width=1&height=1&name=test.png",
+    {
+      method: "POST",
+      body: png,
+    },
+  );
   assert.equal(upload.status, 201);
   const draft = await upload.json();
   draft.message = "Make this clearer.";
@@ -55,7 +58,7 @@ test("uploads, saves, submits once, and preserves a readable feedback bundle", a
   assert.equal(
     (await call("/api/draft", { method: "PUT", body: JSON.stringify(draft) }))
       .status,
-    400,
+    409,
   );
   const sent = await call("/api/submit", {
     method: "POST",
@@ -82,15 +85,21 @@ test("rejects unauthenticated, cross-origin, oversized coordinates and active im
   );
   assert.equal(
     (
-      await call("/api/images?width=1&height=1", {
-        method: "POST",
-        body: '<svg onload="alert(1)"/>',
-      })
+      await call(
+        "/api/images?revision=0&imageId=uploaded-image&width=1&height=1",
+        {
+          method: "POST",
+          body: '<svg onload="alert(1)"/>',
+        },
+      )
     ).status,
     400,
   );
   const draft = await (
-    await call("/api/images?width=1&height=1", { method: "POST", body: png })
+    await call(
+      "/api/images?revision=0&imageId=uploaded-image&width=1&height=1",
+      { method: "POST", body: png },
+    )
   ).json();
   draft.images[0].annotations = [
     {
@@ -135,10 +144,13 @@ test("one server handles isolated sessions and recovers a committed receipt", as
   );
   assert.equal((await call("/api/session")).status, 200);
   const uploaded = await (
-    await call("/api/images?width=1&height=1", {
-      method: "POST",
-      body: png,
-    })
+    await call(
+      "/api/images?revision=0&imageId=uploaded-image&width=1&height=1",
+      {
+        method: "POST",
+        body: png,
+      },
+    )
   ).json();
   const before = await loadSession(root, session.id);
   assert.equal(
@@ -187,10 +199,13 @@ test("clipboard handoffs survive new canvases, reloads, and legacy receipts", as
     409,
   );
   const draft = await (
-    await call("/api/images?width=1&height=1&name=test.png", {
-      method: "POST",
-      body: png,
-    })
+    await call(
+      "/api/images?revision=0&imageId=uploaded-image&width=1&height=1&name=test.png",
+      {
+        method: "POST",
+        body: png,
+      },
+    )
   ).json();
   assert.equal(
     (

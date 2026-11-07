@@ -82,12 +82,49 @@ test("a save can be retried after a lost response and after a server restart", a
   assert.equal((await next.json()).message, "Newer edit");
   assert.equal((await loadSession(root, session.id)).revision, 2);
 });
+test("uploads require a current revision and retry the same image without duplicates", async (t) => {
+  const { call, root, session } = await setup(t);
+  const saved = await (
+    await call("/api/draft", {
+      method: "PUT",
+      body: JSON.stringify({
+        revision: 0,
+        images: [],
+        message: "Another tab's feedback",
+      }),
+    })
+  ).json();
+  const upload = (revision, imageId = "retry-image") =>
+    call(
+      `/api/images?width=1&height=1&revision=${revision}&imageId=${imageId}`,
+      { method: "POST", body: png },
+    );
+  assert.equal((await upload(0)).status, 409);
+  assert.equal(
+    (
+      await call("/api/images?width=1&height=1&imageId=missing-revision", {
+        method: "POST",
+        body: png,
+      })
+    ).status,
+    409,
+  );
+  assert.equal((await loadSession(root, session.id)).images.length, 0);
+  const first = await (await upload(saved.revision)).json();
+  const retry = await (await upload(saved.revision)).json();
+  assert.equal(retry.revision, first.revision);
+  assert.equal(retry.images.length, 1);
+  assert.equal(retry.message, "Another tab's feedback");
+});
 test("slow uploads do not block health, reads, other sessions, or launcher reuse", async (t) => {
   const { root, session, app, origin, headers, call } = await setup(t);
-  const slow = httpRequest(origin + "/api/images?width=1&height=1", {
-    method: "POST",
-    headers: { ...headers, "Content-Length": png.length + 1 },
-  });
+  const slow = httpRequest(
+    origin + "/api/images?revision=0&imageId=uploaded-image&width=1&height=1",
+    {
+      method: "POST",
+      headers: { ...headers, "Content-Length": png.length + 1 },
+    },
+  );
   slow.on("error", () => {});
   const completed = new Promise((resolve) =>
     slow.on("response", (r) => {
@@ -160,7 +197,10 @@ test("only one server can own a storage directory and failure releases ownership
 test("draft byte budget agrees with validation and reports a draft-specific error", async (t) => {
   const { call } = await setup(t);
   const draft = await (
-    await call("/api/images?width=1&height=1", { method: "POST", body: png })
+    await call(
+      "/api/images?revision=0&imageId=uploaded-image&width=1&height=1",
+      { method: "POST", body: png },
+    )
   ).json();
   const annotations = Array.from({ length: 450 }, (_, i) => ({
     id: `pin-${i}`,

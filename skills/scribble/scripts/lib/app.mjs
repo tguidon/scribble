@@ -12,7 +12,7 @@ import {
   loadSubmission,
   safeId,
 } from "./store.mjs";
-import { imageKind, validateDraft } from "./validation.mjs";
+import { imageKind, validateDraft, checkRevision } from "./validation.mjs";
 import { draftBytes, MAX_DRAFT_BYTES, DRAFT_TOO_LARGE } from "./limits.mjs";
 import { acquireServerLease } from "./lock.mjs";
 import { VERSION, SERVER_PROTOCOL } from "./version.mjs";
@@ -322,30 +322,28 @@ export async function startServer({
             ].includes(url.pathname)
           ) {
             const capture = shared || url.pathname === "/api/capture/snapshot";
-            const operation = shared
-              ? {
-                  captureId: url.searchParams.get("captureId"),
-                  revision: Number(url.searchParams.get("revision")),
-                  kind: "shared",
-                }
-              : input;
-            if (capture) {
-              if (!safeId(operation?.captureId))
-                fail(400, "Invalid capture ID.");
-              const previous = session.images.find(
-                (image) => image.id === operation.captureId,
-              );
-              if (previous) {
-                if (previous.source?.kind !== operation.kind)
-                  fail(409, "This capture ID belongs to another source.");
-                return reply(res, 200, publicSession(session));
-              }
-              if (operation.revision !== session.revision)
-                fail(
-                  409,
-                  "The draft changed. Reload before capturing another screen.",
-                );
+            const operation =
+              capture && !shared
+                ? {
+                    id: input?.captureId,
+                    revision: input?.revision,
+                    kind: input?.kind,
+                  }
+                : {
+                    id: url.searchParams.get(shared ? "captureId" : "imageId"),
+                    revision: Number(url.searchParams.get("revision") ?? NaN),
+                    kind: shared ? "shared" : "upload",
+                  };
+            if (!safeId(operation.id)) fail(400, "Invalid image operation ID.");
+            const previous = session.images.find(
+              (image) => image.id === operation.id,
+            );
+            if (previous) {
+              if ((previous.source?.kind ?? "upload") !== operation.kind)
+                fail(409, "This image operation ID belongs to another source.");
+              return reply(res, 200, publicSession(session));
             }
+            checkRevision(operation.revision, session);
             if (session.images.length >= 30)
               fail(400, "A session can have up to 30 screenshots.");
             const surface = url.searchParams.get("surface");
@@ -379,7 +377,7 @@ export async function startServer({
               fail(400, "Image dimensions exceed the 40 megapixel limit.");
             const bytes = snapshot?.bytes ?? input;
             const kind = imageKind(bytes);
-            const id = capture ? operation.captureId : randomUUID();
+            const id = operation.id;
             const image = {
               id,
               name: (
@@ -441,8 +439,7 @@ export async function startServer({
             return reply(res, 200, publicSession(session));
           }
           if (req.method === "POST" && url.pathname === "/api/submit") {
-            if (input.revision !== session.revision)
-              fail(409, "The draft changed. Save it again before finishing.");
+            checkRevision(input.revision, session);
             if (!session.images.length)
               fail(400, "Add at least one screenshot before finishing.");
             const submittedAt = new Date().toISOString();
