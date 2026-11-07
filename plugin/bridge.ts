@@ -25,6 +25,9 @@ export function createEditorHost(
 ): EditorHost & { dispose(): void } {
   const images = new Map<string, string>();
   const auth = { sessionId: connection.sessionId, token: connection.token };
+  type Receipt = { acceptedAt: string | null; readAt: string | null };
+  let acceptedAt: string | null = null;
+  let sending: Promise<void> | undefined;
   async function call<T>(
     name: string,
     args: Record<string, unknown>,
@@ -160,24 +163,52 @@ export function createEditorHost(
       });
     },
     async sendFeedback() {
-      const result = await app.sendMessage(
-        {
-          role: "user",
-          content: [
-            {
-              type: "text",
-              text: `Apply my Scribble feedback from canvas ${connection.sessionId}. Use Scribble's read_feedback tool with sessionId "${connection.sessionId}", then inspect every original image with read_image before making changes. Follow my feedback within this task's scope and verify the result.`,
-            },
-          ],
-        },
-        { timeout: 15000 },
-      );
-      if (result.isError)
-        throw new Error(
-          "This host declined the message. Copy the handoff and paste it into this chat.",
+      if (sending) return sending;
+      if (acceptedAt) return;
+      const operation = (async () => {
+        const previous = await call<Receipt>("delivery_status", {});
+        if (previous.acceptedAt || previous.readAt) {
+          acceptedAt = previous.acceptedAt || previous.readAt;
+          return;
+        }
+        const result = await app.sendMessage(
+          {
+            role: "user",
+            content: [
+              {
+                type: "text",
+                text: `Apply my Scribble feedback from canvas ${connection.sessionId}. Use Scribble's read_feedback tool with sessionId "${connection.sessionId}", then inspect every original image with read_image before making changes. Follow my feedback within this task's scope and verify the result.`,
+              },
+            ],
+          },
+          { timeout: 15000 },
         );
+        if (result.isError)
+          throw new Error(
+            "This host declined the message. Copy the handoff and paste it into this chat.",
+          );
+        // Acceptance is certain even if persisting its receipt fails. Keep the
+        // button disabled and retry recording it during delivery polling.
+        acceptedAt = new Date().toISOString();
+        await call("record_delivery", {}).catch(() => {});
+      })();
+      sending = operation;
+      try {
+        await operation;
+      } finally {
+        sending = undefined;
+      }
     },
-    deliveryStatus: () => call("delivery_status", {}),
+    async deliveryStatus() {
+      // A remounted receipt must not offer Send while the original send is
+      // still waiting for the host's acknowledgement.
+      await sending?.catch(() => {});
+      const receipt = await call<Receipt>("delivery_status", {});
+      acceptedAt ||= receipt.acceptedAt || receipt.readAt;
+      if (acceptedAt && !receipt.acceptedAt && !receipt.readAt)
+        await call("record_delivery", {}).catch(() => {});
+      return { ...receipt, acceptedAt: receipt.acceptedAt || acceptedAt };
+    },
     ...(app.getHostContext()?.availableDisplayModes?.includes("fullscreen")
       ? {
           expand: async () => {

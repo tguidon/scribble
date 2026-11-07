@@ -18,6 +18,7 @@ import {
   SERVER_PROTOCOL,
 } from "../skills/scribble/scripts/lib/version.mjs";
 import { prepareHandoff } from "../skills/scribble/scripts/lib/handoff.mjs";
+import { excludeStorage } from "../skills/scribble/scripts/lib/git-exclude.mjs";
 
 const exec = promisify(execFile);
 const launcher = fileURLToPath(
@@ -56,6 +57,7 @@ export class PluginBackend {
     if (!(await stat(project)).isDirectory())
       throw new Error("Choose a project directory.");
     const root = join(project, ".scribble");
+    await excludeStorage(root);
     const session = await createSession(root, title);
     await this.register(root, session.id);
     return this.connection(session.id);
@@ -108,7 +110,7 @@ export class PluginBackend {
     return record;
   }
   async request(id, token, path, method = "GET", data, binary = false) {
-    await this.authorize(id, token);
+    const { root } = await this.authorize(id, token);
     const url = new URL(path, "http://scribble.invalid");
     const routes = {
       GET: /^\/(session|health|handoff|feedback|images\/[a-zA-Z0-9-]+|capture\/(status|apps|devices))$/,
@@ -121,6 +123,8 @@ export class PluginBackend {
       !routes[method]?.test(url.pathname)
     )
       throw new Error("Unsupported editor operation.");
+    if (method === "POST" && url.pathname === "/sessions")
+      await excludeStorage(root);
     // Credentials are always supplied by this adapter, never forwarded from a URL.
     for (const key of ["token", "session", "version"])
       url.searchParams.delete(key);
@@ -192,8 +196,25 @@ export class PluginBackend {
   }
   async delivery(id, token) {
     const { root } = await this.authorize(id, token);
-    return await readJson(join(sessionDir(root, id), "plugin-read.json")).catch(
-      () => ({ readAt: null }),
-    );
+    const dir = sessionDir(root, id);
+    const [accepted, read] = await Promise.all([
+      readJson(join(dir, "plugin-delivery.json")).catch(() => null),
+      readJson(join(dir, "plugin-read.json")).catch(() => null),
+    ]);
+    return {
+      acceptedAt: accepted?.acceptedAt || null,
+      readAt: read?.readAt || null,
+    };
+  }
+  async recordDelivery(id, token) {
+    const { root, session } = await this.authorize(id, token);
+    if (session.status !== "submitted")
+      throw new Error("Finish feedback before recording its delivery.");
+    const existing = await this.delivery(id, token);
+    if (!existing.acceptedAt)
+      await atomicJson(join(sessionDir(root, id), "plugin-delivery.json"), {
+        acceptedAt: new Date().toISOString(),
+      });
+    return this.delivery(id, token);
   }
 }

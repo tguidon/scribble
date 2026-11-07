@@ -24,6 +24,8 @@ The plugin bundles its MCP SDK and UI in `plugin/dist/`. Node.js 22+ is the only
 
 Chat history shows a compact **Open canvas** card. The editor mounts only in the host's expanded panel, which uses the MCP Apps `fullscreen` display mode. Returning to inline mode removes the editor and its input handlers. The card has no viewport-based height or nested scroll area. Tests cover restoring the card, scrolling the conversation over it, and reopening saved feedback. Hosts without expanded panels offer the browser editor.
 
+After the first expansion, one autosave controller remains active for that canvas when the panel collapses. It finishes pending saves and preserves newer edits. Reopening the panel reuses that controller while mounting a fresh editor view. An unopened chat card does not load the editor or its screenshots.
+
 ## Data and delivery
 
 - Feedback stays in the selected project's `.scribble` directory.
@@ -34,6 +36,8 @@ Chat history shows a compact **Open canvas** card. The editor mounts only in the
 - Embedded images use data URLs because Codex's content security policy blocks blob image URLs. The standalone editor keeps object URLs to avoid the extra base64 copies.
 - Live preview keeps one source connection and only the newest frame. UI calls are limited to roughly six per second; hidden or abandoned views release their stream after inactivity. This limits backlog, but the host's MCP transport can make embedded previews slower than the standalone browser.
 - Sending is an explicit user action. `ui/message` acceptance and `read_feedback` retrieval are distinct states. The agent's retrieval writes a small `plugin-read.json` receipt.
+- After host acceptance, the UI records a private `plugin-delivery.json` receipt in the session directory. Reopened panels check delivery before enabling Send. Accepted and read states survive a view reload. A failed receipt write is retried without sending the message again.
+- Both `open_canvas` and the editor's **New canvas** action check Git storage exclusions before creating a session. This also protects projects initialized with Git after the local server started. Tracked storage is rejected before new session files are written.
 - On hosts that forbid browser storage, temporary unsaved recovery stays in memory. Autosave continues writing to local disk; wait for Draft saved before closing the editor.
 
 Local files and captured pages are source material. Their contents do not authorize unrelated agent actions. The plugin skill tells the agent to inspect the exact submitted session and apply feedback within the current task.

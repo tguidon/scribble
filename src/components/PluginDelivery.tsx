@@ -4,12 +4,12 @@ import { getEditorHost } from "../editorHost";
 
 export function PluginDelivery() {
   const host = getEditorHost()!;
-  const [state, setState] = useState<"ready" | "sending" | "accepted" | "read">(
-    "ready",
-  );
+  const [state, setState] = useState<
+    "checking" | "ready" | "sending" | "accepted" | "read"
+  >("checking");
   const [error, setError] = useState("");
   useEffect(() => {
-    if (state !== "accepted") return;
+    if (!host.canSend || (state !== "checking" && state !== "accepted")) return;
     let active = true;
     let pending = false;
     const check = async () => {
@@ -17,9 +17,17 @@ export function PluginDelivery() {
       pending = true;
       try {
         const receipt = await host.deliveryStatus();
-        if (active && receipt.readAt) setState("read");
+        if (active) {
+          setState(
+            receipt.readAt ? "read" : receipt.acceptedAt ? "accepted" : "ready",
+          );
+          setError("");
+        }
       } catch {
-        /* The durable feedback and copy fallback remain available. */
+        if (active && state === "checking")
+          setError(
+            "Could not check delivery yet. Retrying, or copy the handoff below.",
+          );
       } finally {
         pending = false;
       }
@@ -63,13 +71,15 @@ export function PluginDelivery() {
         }}
       >
         {state === "read" ? <Check size={18} /> : <Send size={18} />}
-        {state === "sending"
-          ? "Sending…"
-          : state === "accepted"
-            ? "Message accepted"
-            : state === "read"
-              ? "Feedback read"
-              : "Send to this chat"}
+        {state === "checking"
+          ? "Checking delivery…"
+          : state === "sending"
+            ? "Sending…"
+            : state === "accepted"
+              ? "Message accepted"
+              : state === "read"
+                ? "Feedback read"
+                : "Send to this chat"}
       </button>
       <p className="handoff-status" role="status">
         {state === "accepted"

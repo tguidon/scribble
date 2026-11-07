@@ -31,7 +31,12 @@ import {
   type Tool,
   type CaptureKind,
 } from "./types";
-export default function App() {
+export default function App({ active = true }: { active?: boolean } = {}) {
+  const controller = useSession();
+  return active ? <Editor controller={controller} /> : null;
+}
+
+function Editor({ controller }: { controller: ReturnType<typeof useSession> }) {
   const host = getEditorHost();
   const {
     session,
@@ -47,7 +52,7 @@ export default function App() {
     capture,
     submit,
     flush,
-  } = useSession();
+  } = controller;
   const busy = working || !!recovery;
   const [captureOpen, setCaptureOpen] = useState(false);
   const [webMode, setWebMode] = useState<"direct" | "shared">("direct");

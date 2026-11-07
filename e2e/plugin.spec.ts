@@ -279,6 +279,10 @@ test("restored chat cards stay compact, allow chat scrolling, and reopen the sav
   await page.setViewportSize({ width: 720, height: 1000 });
   await page.goto(`${origin}/host?inline&fit-content`);
   const ui = page.frameLocator("iframe");
+  await expect(
+    ui.getByRole("button", { name: "Open canvas", exact: true }),
+  ).toBeEnabled();
+  expect(calls).toHaveLength(0);
   await ui.getByRole("button", { name: "Open canvas", exact: true }).click();
   await ui.getByRole("button", { name: "Try an example" }).click();
   await expectDecodedScreenshot(ui.locator(".image-stage image"));
@@ -600,3 +604,179 @@ for (const width of [1440, 390])
       ).toBeVisible();
       await checkTheme();
     });
+
+test("delayed autosave preserves newer edits across repeated panel collapses", async ({
+  page,
+}) => {
+  await page.goto(`${origin}/host`);
+  const ui = page.frameLocator("iframe");
+  await ui.getByRole("button", { name: "Try an example" }).click();
+  await expect(ui.getByText("Draft saved", { exact: true })).toBeVisible();
+  let release!: () => void;
+  let intercepted!: () => void;
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const waiting = new Promise<void>((resolve) => {
+    intercepted = resolve;
+  });
+  let first = true;
+  let completed!: () => void;
+  const firstCompleted = new Promise<void>((resolve) => {
+    completed = resolve;
+  });
+  await page.route("**/tool", async (route) => {
+    const params = route.request().postDataJSON();
+    if (
+      first &&
+      params.name === "editor_request" &&
+      params.arguments.path === "/draft"
+    ) {
+      first = false;
+      intercepted();
+      await held;
+      const response = await route.fetch();
+      await route.fulfill({ response });
+      completed();
+    } else await route.continue();
+  });
+  const message = ui.getByRole("textbox", { name: "The bigger picture" });
+  await message.fill("First edit held in an old autosave");
+  await waiting;
+  await page.evaluate(() => (window as any).fixtureDisplayMode("inline"));
+  await ui.getByRole("button", { name: "Open canvas", exact: true }).click();
+  await expect(message).toHaveValue("First edit held in an old autosave");
+  await message.fill("Newer edit after reopening");
+  release();
+  await firstCompleted;
+  // Let the old hook handle its success before the new 500ms debounce fires.
+  await page.waitForTimeout(50);
+  await page.evaluate(() => (window as any).fixtureDisplayMode("inline"));
+  await ui.getByRole("button", { name: "Open canvas", exact: true }).click();
+  await expect(message).toHaveValue("Newer edit after reopening");
+  await expect(ui.getByText("Draft saved", { exact: true })).toBeVisible();
+  await page.reload();
+  await expect(message).toHaveValue("Newer edit after reopening");
+});
+
+test("delivery acceptance and read receipts survive panel collapse and reload", async ({
+  page,
+}) => {
+  await page.goto(`${origin}/host`);
+  const ui = page.frameLocator("iframe");
+  await ui.getByRole("button", { name: "Try an example" }).click();
+  await ui.getByRole("button", { name: "Finish feedback" }).click();
+  await ui.getByRole("button", { name: "Send to this chat" }).click();
+  await expect(
+    ui.getByRole("button", { name: "Message accepted" }),
+  ).toBeDisabled();
+  await page.evaluate(() => (window as any).fixtureDisplayMode("inline"));
+  await ui.getByRole("button", { name: "Open canvas", exact: true }).click();
+  await expect(
+    ui.getByRole("button", { name: "Message accepted" }),
+  ).toBeDisabled();
+  await page.reload();
+  await expect(
+    ui.getByRole("button", { name: "Message accepted" }),
+  ).toBeDisabled();
+  expect(messages).toHaveLength(1);
+  await client.callTool({
+    name: "read_feedback",
+    arguments: { sessionId: result.structuredContent.sessionId },
+  });
+  await expect(
+    ui.getByRole("button", { name: "Feedback read" }),
+  ).toBeDisabled();
+  await page.reload();
+  await expect(
+    ui.getByRole("button", { name: "Feedback read" }),
+  ).toBeDisabled();
+  expect(messages).toHaveLength(1);
+  await ui.getByRole("button", { name: "New canvas" }).click();
+  await ui.getByRole("button", { name: "Try an example" }).click();
+  await ui.getByRole("button", { name: "Finish feedback" }).click();
+  await expect(
+    ui.getByRole("button", { name: "Send to this chat" }),
+  ).toBeEnabled();
+});
+
+test("closing the panel while sending never enables a duplicate send", async ({
+  page,
+}) => {
+  await page.goto(`${origin}/host`);
+  const ui = page.frameLocator("iframe");
+  await ui.getByRole("button", { name: "Try an example" }).click();
+  await ui.getByRole("button", { name: "Finish feedback" }).click();
+  let release!: () => void;
+  let intercepted!: () => void;
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const waiting = new Promise<void>((resolve) => {
+    intercepted = resolve;
+  });
+  await page.route("**/message", async (route) => {
+    intercepted();
+    await held;
+    await route.continue();
+  });
+  await ui.getByRole("button", { name: "Send to this chat" }).click();
+  await waiting;
+  await page.evaluate(() => (window as any).fixtureDisplayMode("inline"));
+  await ui.getByRole("button", { name: "Open canvas", exact: true }).click();
+  await expect(
+    ui.getByRole("button", { name: "Checking delivery…" }),
+  ).toBeDisabled();
+  await expect(
+    ui.getByRole("button", { name: "Send to this chat" }),
+  ).toHaveCount(0);
+  release();
+  await expect(
+    ui.getByRole("button", { name: "Message accepted" }),
+  ).toBeDisabled();
+  expect(messages).toHaveLength(1);
+});
+
+test("accepted delivery retries receipt storage without sending again", async ({
+  page,
+}) => {
+  await page.goto(`${origin}/host`);
+  const ui = page.frameLocator("iframe");
+  await ui.getByRole("button", { name: "Try an example" }).click();
+  await ui.getByRole("button", { name: "Finish feedback" }).click();
+  let records = 0;
+  await page.route("**/tool", async (route) => {
+    const params = route.request().postDataJSON();
+    if (params.name === "record_delivery" && ++records === 1) {
+      await route.fulfill({
+        json: {
+          isError: true,
+          content: [
+            { type: "text", text: "Temporary receipt storage failure" },
+          ],
+        },
+      });
+    } else await route.continue();
+  });
+  await ui.getByRole("button", { name: "Send to this chat" }).click();
+  await expect(
+    ui.getByRole("button", { name: "Message accepted" }),
+  ).toBeDisabled();
+  await expect.poll(() => records).toBeGreaterThan(1);
+  await expect
+    .poll(
+      async () =>
+        (
+          await plugin.backend.delivery(
+            result._meta.scribble.sessionId,
+            result._meta.scribble.token,
+          )
+        ).acceptedAt,
+    )
+    .toBeTruthy();
+  await page.reload();
+  await expect(
+    ui.getByRole("button", { name: "Message accepted" }),
+  ).toBeDisabled();
+  expect(messages).toHaveLength(1);
+});

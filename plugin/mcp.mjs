@@ -178,6 +178,24 @@ export function createPlugin(options = {}) {
     ),
   );
   server.registerTool(
+    "record_delivery",
+    {
+      title: "Record Scribble delivery",
+      description: "Record that the host accepted finished feedback. UI only.",
+      inputSchema: auth,
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+      _meta: { ui: { visibility: ["app"] } },
+    },
+    guarded(async ({ sessionId, token }) =>
+      privateResult(await backend.recordDelivery(sessionId, token)),
+    ),
+  );
+  server.registerTool(
     "delivery_status",
     {
       title: "Scribble receipt",

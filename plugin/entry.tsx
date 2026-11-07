@@ -6,6 +6,16 @@ import { app, createEditorHost, type Connection } from "./bridge";
 import "../src/styles.css";
 import "./editor.css";
 
+function RetainedCanvas({ active }: { active: boolean }) {
+  const [opened, setOpened] = useState(active);
+  useEffect(() => {
+    if (active) setOpened(true);
+  }, [active]);
+  // Keep one autosave controller after opening, while unmounting the editor's
+  // DOM, live streams, and input handlers whenever the panel is collapsed.
+  return opened || active ? <App active={active} /> : null;
+}
+
 function PluginEditor() {
   const [connection, setConnection] = useState<Connection>();
   const [error, setError] = useState("");
@@ -91,63 +101,66 @@ function PluginEditor() {
         <p role="status">Connecting your canvas to this chat…</p>
       </main>
     );
-  if (displayMode !== "fullscreen")
-    return (
-      <main className="plugin-launcher">
-        <h1>Scribble</h1>
-        <p>
-          Open your canvas to capture screens, add notes, and send feedback to
-          this chat.
-        </p>
-        {app
-          .getHostContext()
-          ?.availableDisplayModes?.includes("fullscreen") && (
-          <button
-            className="primary"
-            disabled={opening || !connected}
-            onClick={async () => {
-              setOpening(true);
-              setLaunchError("");
-              try {
-                const result = await app.requestDisplayMode({
-                  mode: "fullscreen",
-                });
-                if (result.mode !== "fullscreen")
-                  throw new Error("The host did not open the editor.");
-                updateDisplayMode(result.mode);
-              } catch {
-                setLaunchError(
-                  "Could not open the editor panel. Try again or open the browser editor.",
-                );
-              } finally {
-                setOpening(false);
-              }
-            }}
-          >
-            {opening ? "Opening…" : "Open canvas"}
-          </button>
-        )}
-        {launchError && <p role="alert">{launchError}</p>}
-        {(launchError ||
-          !app
+  return (
+    <>
+      <RetainedCanvas key={ready} active={displayMode === "fullscreen"} />
+      {displayMode !== "fullscreen" && (
+        <main className="plugin-launcher">
+          <h1>Scribble</h1>
+          <p>
+            Open your canvas to capture screens, add notes, and send feedback to
+            this chat.
+          </p>
+          {app
             .getHostContext()
-            ?.availableDisplayModes?.includes("fullscreen")) && (
-          <button
-            onClick={() =>
-              void app
-                .openLink({ url: connection.url })
-                .catch(() =>
+            ?.availableDisplayModes?.includes("fullscreen") && (
+            <button
+              className="primary"
+              disabled={opening || !connected}
+              onClick={async () => {
+                setOpening(true);
+                setLaunchError("");
+                try {
+                  const result = await app.requestDisplayMode({
+                    mode: "fullscreen",
+                  });
+                  if (result.mode !== "fullscreen")
+                    throw new Error("The host did not open the editor.");
+                  updateDisplayMode(result.mode);
+                } catch {
                   setLaunchError(
-                    "Could not open the browser editor. Use the browser link in the tool result.",
-                  ),
-                )
-            }
-          >
-            Open browser editor
-          </button>
-        )}
-      </main>
-    );
-  return <App key={ready} />;
+                    "Could not open the editor panel. Try again or open the browser editor.",
+                  );
+                } finally {
+                  setOpening(false);
+                }
+              }}
+            >
+              {opening ? "Opening…" : "Open canvas"}
+            </button>
+          )}
+          {launchError && <p role="alert">{launchError}</p>}
+          {(launchError ||
+            !app
+              .getHostContext()
+              ?.availableDisplayModes?.includes("fullscreen")) && (
+            <button
+              onClick={() =>
+                void app
+                  .openLink({ url: connection.url })
+                  .catch(() =>
+                    setLaunchError(
+                      "Could not open the browser editor. Use the browser link in the tool result.",
+                    ),
+                  )
+              }
+            >
+              Open browser editor
+            </button>
+          )}
+        </main>
+      )}
+    </>
+  );
 }
 createRoot(document.getElementById("root")!).render(<PluginEditor />);

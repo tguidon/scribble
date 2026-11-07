@@ -9,7 +9,10 @@ export type EditorHost = {
   hydrate(images: { id: string }[]): Promise<void>;
   newCanvas(url: string): void;
   sendFeedback(): Promise<void>;
-  deliveryStatus(): Promise<{ readAt: string | null }>;
+  deliveryStatus(): Promise<{
+    acceptedAt: string | null;
+    readAt: string | null;
+  }>;
   expand?: () => Promise<void>;
 };
 let host: EditorHost | undefined;

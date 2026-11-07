@@ -35,6 +35,10 @@ test("MCP canvas isolation, feedback delivery, original images, and new rounds",
     tools.tools.find((t) => t.name === "editor_request")._meta.ui.visibility,
     ["app"],
   );
+  assert.deepEqual(
+    tools.tools.find((t) => t.name === "record_delivery")._meta.ui.visibility,
+    ["app"],
+  );
   const resource = await client.readResource({
     uri: "ui://scribble/editor.html",
   });
@@ -50,6 +54,16 @@ test("MCP canvas isolation, feedback delivery, original images, and new rounds",
   const one = first._meta.scribble,
     two = second._meta.scribble;
   assert.notEqual(one.sessionId, two.sessionId);
+  const prematureDelivery = await client.callTool({
+    name: "record_delivery",
+    arguments: { sessionId: one.sessionId, token: one.token },
+  });
+  assert.equal(prematureDelivery.isError, true);
+  const unauthorizedDelivery = await client.callTool({
+    name: "record_delivery",
+    arguments: { sessionId: one.sessionId, token: two.token },
+  });
+  assert.equal(unauthorizedDelivery.isError, true);
   const api = async (auth, path, method = "GET", data, binary = false) => {
     const response = await client.callTool({
       name: "editor_request",
@@ -135,6 +149,20 @@ test("MCP canvas isolation, feedback delivery, original images, and new rounds",
     arguments: { sessionId: one.sessionId, token: one.token },
   });
   assert.equal(pending._meta.scribble.readAt, null);
+  assert.equal(pending._meta.scribble.acceptedAt, null);
+  const delivered = await client.callTool({
+    name: "record_delivery",
+    arguments: { sessionId: one.sessionId, token: one.token },
+  });
+  assert.ok(delivered._meta.scribble.acceptedAt);
+  const deliveredAgain = await client.callTool({
+    name: "record_delivery",
+    arguments: { sessionId: one.sessionId, token: one.token },
+  });
+  assert.equal(
+    deliveredAgain._meta.scribble.acceptedAt,
+    delivered._meta.scribble.acceptedAt,
+  );
   const feedback = await client.callTool({
     name: "read_feedback",
     arguments: { sessionId: one.sessionId },
@@ -163,6 +191,10 @@ test("MCP canvas isolation, feedback delivery, original images, and new rounds",
   assert.equal((await api(fresh, "/session")).data.images.length, 0);
   // Reconnecting MCP retains the exact previous canvas and read receipt.
   const reconnected = new PluginBackend({ directory });
+  assert.equal(
+    (await reconnected.delivery(one.sessionId, one.token)).acceptedAt,
+    delivered._meta.scribble.acceptedAt,
+  );
   assert.match(
     (await reconnected.feedback(one.sessionId)).brief,
     /Make this readable/,
