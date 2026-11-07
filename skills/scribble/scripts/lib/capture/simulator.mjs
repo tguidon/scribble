@@ -1,3 +1,4 @@
+import { readMultipartFrames } from "./frame-parser.mjs";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { simCommand } from "./runtime.mjs";
@@ -5,7 +6,7 @@ import { localUrl, imageDimensions, captureError } from "./common.mjs";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { SimulatorInput } from "./sim-input.mjs";
-import { validateInput } from "./live.mjs";
+import { validateInput } from "./contracts.mjs";
 const exec = promisify(execFile);
 
 export async function bootedDevices() {
@@ -41,65 +42,36 @@ export async function readFrame(url) {
       "The simulator stream is unavailable. Reconnect the simulator.",
       502,
     );
-  const reader = response.body.getReader();
-  let buffer = Buffer.alloc(0),
-    headerEnd = -1,
-    length;
   try {
-    while (true) {
-      const { value, done } = await reader.read();
-      if (done)
-        throw captureError(
-          "The simulator stream ended before a frame arrived. Reconnect and try again.",
-          502,
-        );
-      buffer = Buffer.concat([buffer, value]);
-      if (headerEnd < 0) {
-        headerEnd = buffer.indexOf("\r\n\r\n");
-        if (headerEnd >= 0) {
-          const match = /content-length:\s*(\d+)/i.exec(
-            buffer.toString("ascii", 0, headerEnd),
-          );
-          length = Number(match?.[1]);
-          if (!length || length > 20 * 1024 * 1024)
-            throw captureError(
-              "The simulator returned an invalid or oversized frame.",
-              502,
-            );
-        } else if (buffer.length > 8192)
-          throw captureError(
-            "The simulator returned an invalid stream header.",
-            502,
-          );
-      }
-      if (headerEnd >= 0 && buffer.length >= headerEnd + 4 + length) {
-        const bytes = buffer.subarray(headerEnd + 4, headerEnd + 4 + length);
-        imageDimensions(bytes);
-        return bytes;
-      }
-      if (buffer.length > 20 * 1024 * 1024 + 8192)
-        throw captureError("The simulator frame exceeds 20 MB.", 502);
+    for await (const bytes of readMultipartFrames(response.body)) {
+      const frame = Buffer.from(bytes);
+      imageDimensions(frame);
+      return frame;
     }
-  } finally {
-    await reader.cancel().catch(() => {});
+  } catch (error) {
+    if (error.status) throw error;
+    throw captureError(error.message, 502);
   }
 }
 export class SimulatorCapture {
   constructor(root, options = {}) {
     this.root = root;
+    this.generation = 0;
     this.options = options;
     this.connection = null;
   }
+  /** @returns {import("./contracts.mjs").SimulatorConnection} */
   state() {
     return this.connection
       ? {
+          kind: "simulator",
           connected: true,
-          generation: this.generation || 0,
+          generation: this.generation,
           inputWarning: this.inputWarning || undefined,
           device: this.connection.device,
           previewUrl: this.connection.previewUrl,
         }
-      : { connected: false };
+      : { kind: "simulator", connected: false };
   }
   async devices() {
     return (this.options.devices || bootedDevices)();
@@ -133,7 +105,7 @@ export class SimulatorCapture {
         409,
       );
     await this.close();
-    this.generation = (this.generation || 0) + 1;
+    this.generation = this.generation + 1;
     const result = await this.run(["--detach", "-q", device.id]);
     if (result.device !== device.id || !result.streamUrl || !result.url)
       throw captureError(

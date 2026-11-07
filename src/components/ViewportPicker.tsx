@@ -1,6 +1,7 @@
 import { Laptop, Monitor, Smartphone, Tablet } from "lucide-react";
 
-export type Viewport = { width: number; height: number };
+import type { Viewport } from "../../skills/scribble/scripts/lib/capture/contracts.mjs";
+export type { Viewport } from "../../skills/scribble/scripts/lib/capture/contracts.mjs";
 
 const presets = [
   { label: "Desktop", width: 1920, height: 1080, icon: Monitor },

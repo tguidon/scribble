@@ -1,3 +1,4 @@
+import type { CaptureKind } from "./types";
 import type { ImageCache } from "./imageCache";
 
 // The standalone editor has no host. The plugin supplies this adapter before
@@ -8,6 +9,11 @@ export type EditorHost = {
   canSend: boolean;
   request(path: string, options?: RequestInit): Promise<Response>;
   images: ImageCache;
+  frames(
+    kind: CaptureKind,
+    generation: number,
+    signal: AbortSignal,
+  ): AsyncIterable<Uint8Array>;
   newCanvas(url: string): void;
   sendFeedback(): Promise<void>;
   deliveryStatus(): Promise<{

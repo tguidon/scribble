@@ -7,26 +7,14 @@ import {
   AlertCircle,
   MonitorUp,
 } from "lucide-react";
-import { checkCaptureRuntime, request } from "../api";
+import { captureCommand, checkCaptureRuntime, request } from "../api";
 import { SharedTabView } from "./SharedTabView";
 import type { TabShare, SharedSurface } from "../useTabShare";
 import { LiveView } from "./LiveView";
 import { ViewportPicker, type Viewport } from "./ViewportPicker";
 import type { CaptureKind } from "../types";
 
-type Connection = {
-  available: boolean;
-  connected: boolean;
-  generation?: number;
-  inputWarning?: string;
-  setupCommand: string;
-  supported?: boolean;
-  url?: string;
-  viewport?: { width: number; height: number };
-  device?: { id: string; name: string };
-  previewUrl?: string;
-};
-type Status = Record<CaptureKind, Connection>;
+import type { CaptureStatus as Status } from "../../skills/scribble/scripts/lib/capture/contracts.mjs";
 type Props = {
   kind: CaptureKind;
   setKind: (kind: CaptureKind) => void;
@@ -37,12 +25,6 @@ type Props = {
   share: TabShare;
   onSharedCapture: (file: File, surface: SharedSurface) => Promise<void>;
 };
-const action = (name: string, body: object) =>
-  request<Connection>(`/capture/${name}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
 export function CapturePanel({
   kind,
   setKind,
@@ -78,12 +60,12 @@ export function CapturePanel({
     await checkCaptureRuntime();
     const next = await request<Status>("/capture/status");
     setStatus(next);
-    if (next.web.connected && next.web.url) setUrl(next.web.url);
-    if (next.web.viewport) {
+    if (next.web.connected) {
+      setUrl(next.web.url);
       setWidth(next.web.viewport.width);
       setHeight(next.web.viewport.height);
     }
-    if (next.simulator.device) setDeviceId(next.simulator.device.id);
+    if (next.simulator.connected) setDeviceId(next.simulator.device.id);
     if (kind === "web") {
       const result = await request<{
         apps: { url: string; title: string }[];
@@ -128,17 +110,25 @@ export function CapturePanel({
         ? "Opening webpage…"
         : "Installing capture tools and opening webpage…",
       async () => {
-        await action("open", { kind: "web", url, width, height });
+        await captureCommand({
+          action: "open",
+          kind: "web",
+          url,
+          width,
+          height,
+        });
         await refresh();
       },
     );
   };
   const resizeWebpage = (viewport: Viewport) => {
-    if (busy) return;
+    const web = status?.web;
+    if (busy || !web?.connected) return;
     void perform("Resizing webpage…", async () => {
-      const next = await action("resize", {
+      const next = await captureCommand({
+        action: "resize",
         kind: "web",
-        generation: connection?.generation,
+        generation: web.generation,
         ...viewport,
       });
       setStatus((current) =>
@@ -232,7 +222,7 @@ export function CapturePanel({
                 <span>
                   {kind === "web" ? "Webpage settings" : "Simulator settings"}
                 </span>
-                {connection?.connected && kind === "web" && (
+                {connection?.connected && connection.kind === "web" && (
                   <span className="capture-source-label">{connection.url}</span>
                 )}
               </summary>
@@ -402,7 +392,7 @@ export function CapturePanel({
                     </select>
                   </label>
                   <p className="capture-hint">
-                    {connection?.supported
+                    {status?.simulator.supported
                       ? devices.length
                         ? "Choose a device to navigate and capture its screen here."
                         : "Open Simulator and boot a device, then refresh this list."
@@ -410,14 +400,20 @@ export function CapturePanel({
                   </p>
                   <button
                     className="secondary capture-open"
-                    disabled={!!busy || !deviceId || !connection?.supported}
+                    disabled={
+                      !!busy || !deviceId || !status?.simulator.supported
+                    }
                     onClick={() =>
                       void perform(
                         connection?.available
                           ? "Connecting simulator…"
                           : "Installing serve-sim and connecting…",
                         async () => {
-                          await action("open", { kind, deviceId });
+                          await captureCommand({
+                            action: "open",
+                            kind: "simulator",
+                            deviceId,
+                          });
                           await refresh();
                         },
                       )
@@ -430,7 +426,7 @@ export function CapturePanel({
               )}
               {connection &&
                 !connection.available &&
-                (kind === "web" || connection.supported) && (
+                (connection.kind === "web" || status.simulator.supported) && (
                   <p className="capture-hint">
                     First use installs{" "}
                     {kind === "web" ? "the browser tools" : "serve-sim"}{" "}
@@ -449,28 +445,35 @@ export function CapturePanel({
             {connection?.connected && (
               <div className="capture-preview">
                 <LiveView
-                  key={`${kind}-${connection.generation}-${connection.device?.id || connection.url}-${connection.viewport?.width}-${connection.viewport?.height}`}
+                  key={`${connection.kind}-${connection.generation}`}
                   kind={kind}
-                  viewport={kind === "web" ? connection.viewport : undefined}
+                  viewport={
+                    connection.kind === "web" ? connection.viewport : undefined
+                  }
                   onViewportChange={resizeWebpage}
-                  generation={connection.generation || 0}
-                  inputWarning={connection.inputWarning}
+                  generation={connection.generation}
+                  inputWarning={
+                    connection.kind === "simulator"
+                      ? connection.inputWarning
+                      : undefined
+                  }
                   onReconnect={
-                    kind === "simulator"
+                    connection.kind === "simulator"
                       ? () =>
                           perform("Reconnecting simulator…", async () => {
-                            await action("open", {
-                              kind,
-                              deviceId: connection.device?.id,
+                            await captureCommand({
+                              action: "open",
+                              kind: "simulator",
+                              deviceId: connection.device.id,
                             });
                             await refresh();
                           })
                       : undefined
                   }
                   title={
-                    kind === "web"
+                    connection.kind === "web"
                       ? "Live webpage"
-                      : connection.device?.name || "Live simulator"
+                      : connection.device.name
                   }
                   busy={!!busy}
                   onError={setError}
@@ -483,7 +486,7 @@ export function CapturePanel({
                   disabled={!!busy}
                   onClick={() =>
                     void perform("Disconnecting…", async () => {
-                      await action("disconnect", { kind });
+                      await captureCommand({ action: "disconnect", kind });
                       await refresh();
                     })
                   }

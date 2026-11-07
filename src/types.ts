@@ -18,7 +18,8 @@ export type Screenshot = {
   annotations: Annotation[];
   source?: CaptureSource;
 };
-export type CaptureKind = "web" | "simulator";
+import type { CaptureKind } from "../skills/scribble/scripts/lib/capture/contracts.mjs";
+export type { CaptureKind } from "../skills/scribble/scripts/lib/capture/contracts.mjs";
 export type CaptureMode = CaptureKind | "shared";
 export type CaptureSource = {
   capturedAt: string;

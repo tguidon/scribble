@@ -237,6 +237,13 @@ test("multiple uploads, invalid files, removal, keyboard pin and retryable save 
   await page
     .getByRole("button", { name: "Remove Second.png" })
     .click({ force: true });
+  await page.keyboard.press("Escape");
+  await expect(
+    page.getByRole("button", { name: "Remove", exact: true }),
+  ).toHaveCount(0);
+  await page
+    .getByRole("button", { name: "Remove Second.png" })
+    .click({ force: true });
   await page.getByRole("button", { name: "Remove", exact: true }).click();
   await expect(
     page.getByRole("button", { name: "Open Second.png" }),

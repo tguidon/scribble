@@ -1,25 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowLeft, Camera, Home, RefreshCw } from "lucide-react";
-import { request, apiResponse } from "../api";
-import { readLiveFrames } from "../liveStream";
+import { captureCommand, liveFrames } from "../api";
 import { createImageSource, releaseImageSource } from "../imageSource";
 import type { CaptureKind } from "../types";
 import { ViewportPicker, type Viewport } from "./ViewportPicker";
 
-type Input = {
-  type: string;
-  phase?: string;
-  x?: number;
-  y?: number;
-  dx?: number;
-  dy?: number;
-  key?: string;
-  text?: string;
-  control?: boolean;
-  meta?: boolean;
-  shift?: boolean;
-  alt?: boolean;
-};
+import type { CaptureInput as Input } from "../../skills/scribble/scripts/lib/capture/contracts.mjs";
 type Props = {
   kind: CaptureKind;
   title: string;
@@ -69,35 +55,31 @@ export function LiveView({
     );
     setReady(false);
     setFailed(false);
-    void apiResponse(`/capture/stream?kind=${kind}&generation=${generation}`, {
-      signal: abort.signal,
-    })
-      .then((response) =>
-        readLiveFrames(response, (bytes) => {
-          clearTimeout(watchdog);
-          watchdog = window.setTimeout(
-            () =>
-              abort.abort(
-                new Error("The live stream stopped. Reconnect to try again."),
-              ),
-            20000,
-          );
-          if (performance.now() - lastFrame < 65) return;
-          lastFrame = performance.now();
-          releaseImageSource(previousUrl);
-          previousUrl = currentUrl;
-          currentUrl = createImageSource(bytes, "image/jpeg");
-          setFrameUrl(currentUrl);
-        }),
-      )
-      .catch((error) => {
-        if (!active) return;
-        if (abort.signal.aborted && abort.signal.reason?.name === "AbortError")
-          return;
-        setFailed(true);
-        setReady(false);
-        errorHandler.current((abort.signal.reason || error).message);
-      });
+    void (async () => {
+      for await (const bytes of liveFrames(kind, generation, abort.signal)) {
+        clearTimeout(watchdog);
+        watchdog = window.setTimeout(
+          () =>
+            abort.abort(
+              new Error("The live stream stopped. Reconnect to try again."),
+            ),
+          20000,
+        );
+        if (performance.now() - lastFrame < 65) continue;
+        lastFrame = performance.now();
+        releaseImageSource(previousUrl);
+        previousUrl = currentUrl;
+        currentUrl = createImageSource(bytes, "image/jpeg");
+        setFrameUrl(currentUrl);
+      }
+    })().catch((error) => {
+      if (!active) return;
+      if (abort.signal.aborted && abort.signal.reason?.name === "AbortError")
+        return;
+      setFailed(true);
+      setReady(false);
+      errorHandler.current((abort.signal.reason || error).message);
+    });
     return () => {
       active = false;
       abort.abort();
@@ -130,19 +112,13 @@ export function LiveView({
       )
         queue.current[queue.current.length - 1] = input;
       else if (input.type === "wheel" && last?.type === "wheel") {
-        last.dx = Math.max(
-          -2000,
-          Math.min(2000, (last.dx || 0) + (input.dx || 0)),
-        );
-        last.dy = Math.max(
-          -2000,
-          Math.min(2000, (last.dy || 0) + (input.dy || 0)),
-        );
+        last.dx = Math.max(-2000, Math.min(2000, last.dx + input.dx));
+        last.dy = Math.max(-2000, Math.min(2000, last.dy + input.dy));
       } else {
         if (
           queue.current.length >= 64 &&
           input.type !== "release" &&
-          input.phase !== "up"
+          !(input.type === "pointer" && input.phase === "up")
         )
           return;
         queue.current.push(input);
@@ -154,22 +130,28 @@ export function LiveView({
         try {
           while (queue.current.length) {
             const next = queue.current.shift()!;
-            await request("/capture/input", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ kind, generation, ...next }),
-              signal: AbortSignal.timeout(20000),
-            });
+            await captureCommand(
+              {
+                action: "input",
+                kind,
+                generation,
+                ...next,
+              },
+              { signal: AbortSignal.timeout(20000) },
+            );
           }
         } catch (error) {
           queue.current = [];
           // A failed up request must never leave a mouse button or touch held.
-          void request("/capture/input", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ kind, generation, type: "release" }),
-            keepalive: true,
-          }).catch(() => {});
+          void captureCommand(
+            {
+              action: "input",
+              kind,
+              generation,
+              type: "release",
+            },
+            { keepalive: true },
+          ).catch(() => {});
           if (mounted.current) errorHandler.current((error as Error).message);
         } finally {
           running.current = false;

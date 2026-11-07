@@ -9,103 +9,109 @@ import { createServer } from "node:http";
 import { stopServer } from "../skills/scribble/scripts/lib/lifecycle.mjs";
 const exec = promisify(execFile);
 
-test("installed versions restart on the same origin, preserve drafts, and stop safely", async (t) => {
-  const temp = await mkdtemp(join(tmpdir(), "scribble-upgrade-"));
-  const skill = join(temp, "skill");
-  const root = join(temp, "data");
-  await cp(resolve("skills/scribble"), skill, { recursive: true });
-  const cli = join(skill, "scripts/scribble.mjs");
-  const run = async (...args) =>
-    JSON.parse(
-      (
-        await exec(process.execPath, [cli, ...args, "--dir", root], {
-          cwd: temp,
-        })
-      ).stdout,
-    );
-  const pids = new Set();
-  t.after(async () => {
-    for (const pid of pids) {
-      try {
-        process.kill(pid, "SIGTERM");
-      } catch {}
-    }
-    await new Promise((r) => setTimeout(r, 200));
-    await rm(temp, { recursive: true, force: true });
-  });
-  // Simulate an installed server from before clipboard handoff (protocol 1).
-  const protocolFile = join(skill, "scripts/lib/version.mjs");
-  const currentProtocol = await readFile(protocolFile, "utf8");
-  await writeFile(
-    protocolFile,
-    currentProtocol.replace("SERVER_PROTOCOL = 2", "SERVER_PROTOCOL = 1"),
-  );
-  const first = await run("start", "--detach", "--no-open");
-  pids.add(first.pid);
-  const url = new URL(first.url);
-  const headers = {
-    Authorization: `Bearer ${new URLSearchParams(url.hash.slice(1)).get("token")}`,
-    "X-Scribble-Session": first.sessionId,
-  };
-  const call = (path, options = {}) =>
-    fetch(url.origin + path, {
-      ...options,
-      headers: { ...headers, ...options.headers },
+for (const oldProtocol of [1, 2]) {
+  test(`installed protocol ${oldProtocol} restarts on the same origin, preserves drafts, and stops safely`, async (t) => {
+    const temp = await mkdtemp(join(tmpdir(), "scribble-upgrade-"));
+    const skill = join(temp, "skill");
+    const root = join(temp, "data");
+    await cp(resolve("skills/scribble"), skill, { recursive: true });
+    const cli = join(skill, "scripts/scribble.mjs");
+    const run = async (...args) =>
+      JSON.parse(
+        (
+          await exec(process.execPath, [cli, ...args, "--dir", root], {
+            cwd: temp,
+          })
+        ).stdout,
+      );
+    const pids = new Set();
+    t.after(async () => {
+      for (const pid of pids) {
+        try {
+          process.kill(pid, "SIGTERM");
+        } catch {}
+      }
+      await new Promise((r) => setTimeout(r, 200));
+      await rm(temp, { recursive: true, force: true });
     });
-  assert.equal((await call("/api/shutdown", { method: "POST" })).status, 409);
-  assert.equal(
-    (
-      await call("/api/shutdown", {
-        method: "POST",
-        headers: {
-          Authorization: "Bearer wrong",
-          "X-Scribble-Instance": first.instanceId,
-        },
-      })
-    ).status,
-    401,
-  );
-  assert.equal((await call("/api/health")).status, 200);
-  const saved = await call("/api/draft", {
-    method: "PUT",
-    body: JSON.stringify({
-      revision: 0,
-      message: "Keep this draft",
-      images: [],
-      saveId: "before-upgrade",
-    }),
+    // Protocol 2 also exercises a protocol-only upgrade without a version bump.
+    const releaseFile = join(skill, "version.json");
+    const currentRelease = JSON.parse(await readFile(releaseFile, "utf8"));
+    await writeFile(
+      releaseFile,
+      JSON.stringify({ ...currentRelease, serverProtocol: oldProtocol }),
+    );
+    const first = await run("start", "--detach", "--no-open");
+    pids.add(first.pid);
+    assert.equal(first.protocol, oldProtocol);
+    const url = new URL(first.url);
+    const headers = {
+      Authorization: `Bearer ${new URLSearchParams(url.hash.slice(1)).get("token")}`,
+      "X-Scribble-Session": first.sessionId,
+    };
+    const call = (path, options = {}) =>
+      fetch(url.origin + path, {
+        ...options,
+        headers: { ...headers, ...options.headers },
+      });
+    assert.equal((await call("/api/shutdown", { method: "POST" })).status, 409);
+    assert.equal(
+      (
+        await call("/api/shutdown", {
+          method: "POST",
+          headers: {
+            Authorization: "Bearer wrong",
+            "X-Scribble-Instance": first.instanceId,
+          },
+        })
+      ).status,
+      401,
+    );
+    assert.equal((await call("/api/health")).status, 200);
+    const saved = await call("/api/draft", {
+      method: "PUT",
+      body: JSON.stringify({
+        revision: 0,
+        message: "Keep this draft",
+        images: [],
+        saveId: "before-upgrade",
+      }),
+    });
+    assert.equal(saved.status, 200);
+    const releaseVersion = oldProtocol === 1 ? "9.0.0-test" : first.version;
+    await writeFile(
+      releaseFile,
+      JSON.stringify({ ...currentRelease, version: releaseVersion }),
+    );
+    const upgraded = await run("start", "--detach", "--no-open");
+    pids.add(upgraded.pid);
+    assert.notEqual(upgraded.pid, first.pid);
+    assert.notEqual(upgraded.instanceId, first.instanceId);
+    assert.equal(upgraded.version, releaseVersion);
+    assert.equal(upgraded.url, first.url);
+    assert.equal(
+      (await (await call("/api/session")).json()).message,
+      "Keep this draft",
+    );
+    assert.equal(
+      (await run("start", "--detach", "--no-open")).pid,
+      upgraded.pid,
+    );
+    assert.equal((await run("status")).server.version, releaseVersion);
+    assert.equal((await run("stop")).stopped, true);
+    assert.equal((await run("stop")).alreadyStopped, true);
+    assert.equal(
+      JSON.parse(
+        await readFile(join(root, "sessions", first.sessionId, "session.json")),
+      ).message,
+      "Keep this draft",
+    );
+    const resumed = await run("start", "--detach", "--no-open");
+    pids.add(resumed.pid);
+    assert.equal(resumed.sessionId, first.sessionId);
+    await run("stop");
   });
-  assert.equal(saved.status, 200);
-  await writeFile(
-    join(skill, "version.json"),
-    JSON.stringify({ version: "9.0.0-test" }),
-  );
-  await writeFile(protocolFile, currentProtocol);
-  const upgraded = await run("start", "--detach", "--no-open");
-  pids.add(upgraded.pid);
-  assert.notEqual(upgraded.pid, first.pid);
-  assert.notEqual(upgraded.instanceId, first.instanceId);
-  assert.equal(upgraded.version, "9.0.0-test");
-  assert.equal(upgraded.url, first.url);
-  assert.equal(
-    (await (await call("/api/session")).json()).message,
-    "Keep this draft",
-  );
-  assert.equal((await run("start", "--detach", "--no-open")).pid, upgraded.pid);
-  assert.equal((await run("status")).server.version, "9.0.0-test");
-  assert.equal((await run("stop")).stopped, true);
-  assert.equal((await run("stop")).alreadyStopped, true);
-  assert.equal(
-    JSON.parse(
-      await readFile(join(root, "sessions", first.sessionId, "session.json")),
-    ).message,
-    "Keep this draft",
-  );
-  const resumed = await run("start", "--detach", "--no-open");
-  pids.add(resumed.pid);
-  assert.equal(resumed.sessionId, first.sessionId);
-  await run("stop");
-});
+}
 
 test("stop refuses unverified process identities and legacy shutdown", async (t) => {
   const root = await mkdtemp(join(tmpdir(), "scribble-legacy-"));

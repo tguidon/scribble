@@ -1,5 +1,11 @@
-import type { Draft, Session } from "./types";
-import { version } from "../skills/scribble/version.json";
+import type {
+  CaptureCommand,
+  WebConnection,
+  SimulatorConnection,
+} from "../skills/scribble/scripts/lib/capture/contracts.mjs";
+import { readMultipartFrames } from "../skills/scribble/scripts/lib/capture/frame-parser.mjs";
+import type { CaptureKind, Draft, Session } from "./types";
+import { version, serverProtocol } from "../skills/scribble/version.json";
 import { getEditorHost } from "./editorHost";
 const params = new URLSearchParams(location.hash.slice(1));
 const token = params.get("token") || "";
@@ -74,9 +80,9 @@ export async function uploadImage(
 }
 
 export async function checkCaptureRuntime() {
-  let health: { version?: string };
+  let health: { version?: string; protocol?: number };
   try {
-    health = await request<{ version?: string }>("/health");
+    health = await request<typeof health>("/health");
   } catch (error) {
     if ((error as { status?: number }).status === 404)
       throw new Error(
@@ -84,8 +90,50 @@ export async function checkCaptureRuntime() {
       );
     throw error;
   }
-  if (health.version !== version)
+  if (health.version !== version || health.protocol !== serverProtocol)
     throw new Error(
       "The Scribble app and server versions differ. Run the Scribble skill again, then reload this tab. Saved feedback is preserved.",
     );
+}
+
+export async function* liveFrames(
+  kind: CaptureKind,
+  generation: number,
+  signal: AbortSignal,
+) {
+  const host = getEditorHost();
+  if (host) {
+    yield* host.frames(kind, generation, signal);
+    return;
+  }
+  const response = await apiResponse(
+    `/capture/stream?kind=${kind}&generation=${generation}`,
+    { signal },
+  );
+  if (!response.ok || !response.body) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(
+      error.error || "The live view disconnected. Reconnect to try again.",
+    );
+  }
+  yield* readMultipartFrames(response.body);
+}
+
+type EditorCaptureCommand = Exclude<CaptureCommand, { action: "snapshot" }>;
+export function captureCommand<C extends EditorCaptureCommand>(
+  { action, ...body }: C,
+  options: Pick<RequestInit, "signal" | "keepalive"> = {},
+) {
+  return request<
+    C["kind"] extends "web"
+      ? WebConnection
+      : C["kind"] extends "simulator"
+        ? SimulatorConnection
+        : WebConnection | SimulatorConnection
+  >(`/capture/${action}`, {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
 }

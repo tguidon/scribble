@@ -1,21 +1,13 @@
+import { viewportSize, validateInput } from "./contracts.mjs";
 import { playwright } from "./runtime.mjs";
 import { webpageUrl, imageDimensions, captureError } from "./common.mjs";
 
-import { streamHeaders, writeFrame, validateInput } from "./live.mjs";
-
-function viewportSize({ width, height }) {
-  if (
-    ![width, height].every((n) => Number.isInteger(n) && n >= 320 && n <= 2560)
-  )
-    throw captureError(
-      "Choose viewport dimensions between 320 and 2560 pixels.",
-    );
-  return { width, height };
-}
+import { streamHeaders, writeFrame } from "./live.mjs";
 
 export class WebCapture {
   constructor(root, options = {}) {
     this.root = root;
+    this.generation = 0;
     this.options = options;
     this.context = null;
     this.page = null;
@@ -54,16 +46,18 @@ export class WebCapture {
       );
     return this.guards.get(page);
   }
+  /** @returns {import("./contracts.mjs").WebConnection} */
   state() {
     const page = this.currentPage();
     return page
       ? {
+          kind: "web",
           connected: true,
           url: page.url(),
           viewport: page.viewportSize(),
-          generation: this.generation || 0,
+          generation: this.generation,
         }
-      : { connected: false };
+      : { kind: "web", connected: false };
   }
   currentPage() {
     if (this.page?.isClosed()) this.page = null;
@@ -77,7 +71,7 @@ export class WebCapture {
     });
     await this.release();
     await this.stopStream?.();
-    this.generation = (this.generation || 0) + 1;
+    this.generation = this.generation + 1;
     if (!this.context) {
       const { chromium } = playwright(this.root);
       const options = {
@@ -145,7 +139,7 @@ export class WebCapture {
     await this.release();
     await page.setViewportSize(viewport);
     await this.stopStream?.();
-    this.generation = (this.generation || 0) + 1;
+    this.generation = this.generation + 1;
     return this.state();
   }
   async focus() {

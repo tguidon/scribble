@@ -60,55 +60,6 @@ export function createEditorHost(
     return result as T;
   }
   async function request(path: string, options: RequestInit = {}) {
-    if (path.startsWith("/capture/stream?")) {
-      const params = new URLSearchParams(path.split("?")[1]);
-      const abort = new AbortController();
-      const cancel = () => abort.abort(options.signal?.reason);
-      options.signal?.addEventListener("abort", cancel, { once: true });
-      if (options.signal?.aborted) cancel();
-      let after = 0;
-      return new Response(
-        new ReadableStream<Uint8Array>({
-          async pull(controller) {
-            try {
-              if (abort.signal.aborted) throw abort.signal.reason;
-              const result = await call<{
-                sequence: number;
-                frame: string | null;
-              }>(
-                "live_frame",
-                {
-                  kind: params.get("kind"),
-                  generation: Number(params.get("generation")),
-                  after,
-                },
-                abort.signal,
-              );
-              if (result.frame) {
-                const bytes = decode(result.frame);
-                controller.enqueue(
-                  new TextEncoder().encode(
-                    `--frame\r\nContent-Type: image/jpeg\r\nContent-Length: ${bytes.length}\r\n\r\n`,
-                  ),
-                );
-                controller.enqueue(bytes);
-                controller.enqueue(new TextEncoder().encode("\r\n"));
-              }
-              after = result.sequence;
-              // Bound IPC traffic even when the source produces 60 frames/sec.
-              await new Promise((resolve) => setTimeout(resolve, 150));
-            } catch (error) {
-              options.signal?.removeEventListener("abort", cancel);
-              controller.error(error);
-            }
-          },
-          cancel() {
-            options.signal?.removeEventListener("abort", cancel);
-            abort.abort();
-          },
-        }),
-      );
-    }
     const binary = options.body instanceof Blob;
     if (options.body && !binary && typeof options.body !== "string")
       throw new Error("Unsupported editor request body.");
@@ -138,6 +89,21 @@ export function createEditorHost(
     canSend: !!app.getHostCapabilities()?.message?.text,
     request,
     images,
+    async *frames(kind, generation, signal) {
+      let after = 0;
+      while (true) {
+        signal.throwIfAborted();
+        const result = await call<{ sequence: number; frame: string | null }>(
+          "live_frame",
+          { kind, generation, after },
+          signal,
+        );
+        after = result.sequence;
+        if (result.frame) yield decode(result.frame);
+        // Bound IPC traffic even when the source produces 60 frames/sec.
+        await new Promise((resolve) => setTimeout(resolve, 150));
+      }
+    },
     newCanvas(url) {
       const next = new URL(url, connection.url);
       const params = new URLSearchParams(next.hash.slice(1));

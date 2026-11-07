@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Camera, ChevronDown, Plus, ShieldCheck, X } from "lucide-react";
 import { ScreenshotImage } from "./ScreenshotImage";
 import type { EditorController } from "../useEditorController";
@@ -20,6 +20,14 @@ export function ScreenshotRail({
   } = controller;
   const [screenshotsExpanded, setScreenshotsExpanded] = useState(false);
   const [removeId, setRemoveId] = useState<string>();
+  useEffect(() => {
+    if (!removeId) return;
+    const dismiss = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setRemoveId(undefined);
+    };
+    window.addEventListener("keydown", dismiss);
+    return () => window.removeEventListener("keydown", dismiss);
+  }, [removeId]);
   if (!session) return null;
   return (
     <nav className="screenshot-rail" aria-label="Screenshots">
@@ -92,11 +100,7 @@ export function ScreenshotRail({
         ))}
       </div>
       <div className="screenshot-actions">
-        <button
-          className="add-screenshot"
-          onClick={() => onUpload()}
-          disabled={busy}
-        >
+        <button className="add-screenshot" onClick={onUpload} disabled={busy}>
           <Plus size={21} />
           <span>Add images</span>
         </button>

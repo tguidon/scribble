@@ -104,10 +104,10 @@ test("MCP canvas isolation, feedback delivery, original images, and new rounds",
     one,
     "/capture/resize",
     "POST",
-    JSON.stringify({ kind: "web", width: 390, height: 844 }),
+    JSON.stringify({ kind: "web", generation: 0, width: 390, height: 844 }),
   );
   assert.equal(resizeWithoutPage.status, 409);
-  assert.match(resizeWithoutPage.data.error, /Open a webpage/);
+  assert.match(resizeWithoutPage.data.error, /source changed/);
   const upload = await api(
     one,
     "/images?revision=0&imageId=uploaded-image&width=1&height=1&name=proof.png",

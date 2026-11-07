@@ -1,31 +1,31 @@
-// Bounded MJPEG parsing works in WebKit when transported as octet-stream.
-export async function readLiveFrames(
-  response: Response,
-  onFrame: (bytes: Uint8Array) => void,
-) {
-  if (!response.ok || !response.body) {
-    const error = await response.json().catch(() => ({}));
-    throw new Error(
-      error.error || "The live view disconnected. Reconnect to try again.",
-    );
-  }
-  const reader = response.body.getReader();
-  let buffer = new Uint8Array(0);
+// The browser, plugin relay, and simulator snapshot reader consume the same
+// bounded multipart format. This module has no Node or DOM dependencies.
+export const MAX_FRAME_BYTES = 20 * 1024 * 1024;
+const MAX_HEADER_BYTES = 8192;
+
+/** @param {ReadableStream<Uint8Array>} body */
+export async function* readMultipartFrames(body) {
+  const reader = body.getReader();
   const decoder = new TextDecoder();
+  let buffer = new Uint8Array(0);
   try {
     while (true) {
-      const { done, value } = await reader.read();
+      const { value, done } = await reader.read();
       if (done)
         throw new Error("The live view disconnected. Reconnect to try again.");
       const joined = new Uint8Array(buffer.length + value.length);
       joined.set(buffer);
       joined.set(value, buffer.length);
       buffer = joined;
-      if (buffer.length > 21 * 1024 * 1024)
+      if (buffer.length > MAX_FRAME_BYTES + MAX_HEADER_BYTES)
         throw new Error("The live frame is too large. Reconnect to try again.");
       while (buffer.length) {
         let end = -1;
-        for (let i = 0; i < Math.min(buffer.length - 3, 8192); i++) {
+        for (
+          let i = 0;
+          i < Math.min(buffer.length - 3, MAX_HEADER_BYTES);
+          i++
+        ) {
           if (
             buffer[i] === 13 &&
             buffer[i + 1] === 10 &&
@@ -37,10 +37,8 @@ export async function readLiveFrames(
           }
         }
         if (end < 0) {
-          if (buffer.length > 8192)
-            throw new Error(
-              "Invalid live stream header. Reconnect to try again.",
-            );
+          if (buffer.length > MAX_HEADER_BYTES)
+            throw new Error("Invalid live frame header.");
           break;
         }
         const length = Number(
@@ -48,14 +46,15 @@ export async function readLiveFrames(
             decoder.decode(buffer.subarray(0, end)),
           )?.[1],
         );
-        if (!length || length > 20 * 1024 * 1024)
-          throw new Error("Invalid live frame. Reconnect to try again.");
+        if (!Number.isInteger(length) || length < 1 || length > MAX_FRAME_BYTES)
+          throw new Error("Invalid or oversized live frame length.");
         if (buffer.length < end + 4 + length) break;
-        onFrame(buffer.slice(end + 4, end + 4 + length));
+        yield buffer.slice(end + 4, end + 4 + length);
         buffer = buffer.slice(end + 4 + length);
       }
     }
   } finally {
     await reader.cancel().catch(() => {});
+    reader.releaseLock();
   }
 }

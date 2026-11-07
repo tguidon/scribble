@@ -1,3 +1,4 @@
+import { validateCaptureCommand } from "./contracts.mjs";
 import { WebCapture } from "./web.mjs";
 import { SimulatorCapture } from "./simulator.mjs";
 import {
@@ -38,6 +39,7 @@ export function createCaptures(root, options = {}) {
     return operation;
   }
   return {
+    /** @returns {Promise<import("./contracts.mjs").CaptureStatus>} */
     async status(id) {
       const current = sources(id);
       let webAvailable = false,
@@ -81,38 +83,32 @@ export function createCaptures(root, options = {}) {
       });
     },
     command(id, action, input) {
-      if (!["web", "simulator"].includes(input?.kind))
-        throw captureError("Choose a webpage or simulator.");
+      input = validateCaptureCommand(action, input);
       return run(id, async (sources) => {
         const source = sources[input.kind];
-        if (action === "open") {
-          if (!(input.kind === "simulator" && options.simulator?.command))
-            await ensureCapture(root, input.kind);
-          return source.open(input);
+        switch (input.action) {
+          case "open":
+            if (!(input.kind === "simulator" && options.simulator?.command))
+              await ensureCapture(root, input.kind);
+            return source.open(input);
+          case "input":
+          case "resize":
+            if (input.generation !== source.state().generation)
+              throw captureError(
+                "The source changed. Reconnect the live view.",
+                409,
+              );
+            return input.action === "input"
+              ? source.input(input)
+              : source.resize(input);
+          case "focus":
+            return source.focus();
+          case "disconnect":
+            await source.close();
+            return source.state();
+          case "snapshot":
+            return source.capture();
         }
-        if (action === "input" || action === "resize") {
-          if (
-            input.generation !== undefined &&
-            input.generation !== source.state().generation
-          )
-            throw captureError(
-              "The source changed. Reconnect the live view.",
-              409,
-            );
-          if (action === "input") return source.input(input);
-          if (input.kind !== "web")
-            throw captureError(
-              "Viewport resizing is only available for webpages.",
-            );
-          return source.resize(input);
-        }
-        if (action === "focus" && input.kind === "web") return source.focus();
-        if (action === "disconnect") {
-          await source.close();
-          return source.state();
-        }
-        if (action === "snapshot") return source.capture();
-        throw captureError("Unknown capture action.");
       });
     },
     async release(id) {

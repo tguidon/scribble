@@ -1,3 +1,5 @@
+import { readMultipartFrames } from "../skills/scribble/scripts/lib/capture/frame-parser.mjs";
+
 // Keep one live connection per canvas/source. UI tool calls take only the newest
 // frame; slow hosts never build up a queue of stale screenshots.
 export class FrameRelay {
@@ -75,33 +77,10 @@ export class FrameRelay {
         },
       );
       if (!response.ok) throw new Error((await response.json()).error);
-      let buffer = Buffer.alloc(0);
-      for await (const chunk of response.body) {
-        buffer = Buffer.concat([buffer, chunk]);
-        if (buffer.length > 21 * 1024 * 1024)
-          throw new Error("Live frame exceeds 20 MB.");
-        while (buffer.length) {
-          const end = buffer.indexOf("\r\n\r\n");
-          if (end < 0) {
-            if (buffer.length > 8192)
-              throw new Error("Invalid live frame header.");
-            break;
-          }
-          const length = Number(
-            /content-length:\s*(\d+)/i.exec(
-              buffer.subarray(0, end).toString(),
-            )?.[1],
-          );
-          if (!length || length > 20 * 1024 * 1024)
-            throw new Error("Invalid live frame length.");
-          if (buffer.length < end + 4 + length) break;
-          stream.frame = buffer
-            .subarray(end + 4, end + 4 + length)
-            .toString("base64");
-          stream.sequence++;
-          buffer = buffer.subarray(end + 4 + length);
-          for (const wake of stream.waiters) wake();
-        }
+      for await (const bytes of readMultipartFrames(response.body)) {
+        stream.frame = Buffer.from(bytes).toString("base64");
+        stream.sequence++;
+        for (const wake of stream.waiters) wake();
       }
       throw new Error("Live view disconnected. Choose Reconnect.");
     } finally {

@@ -16,8 +16,16 @@ const emptyHistory = (): History => ({ past: [], future: [] });
 // Document commands and interaction choices share the canvas lifetime. Mounted
 // views own only DOM effects and transient affordances such as open dialogs.
 export function useEditorController() {
-  const persistence = useSession();
-  const { session, change, recovery, busy: working, setError } = persistence;
+  const {
+    session,
+    change,
+    upload,
+    capture,
+    recovery,
+    busy: working,
+    setError,
+    ...persistence
+  } = useSession();
   const [captureOpen, setCaptureOpen] = useState(false);
   const [captureKind, setCaptureKind] = useState<CaptureKind>("web");
   const [webMode, setWebMode] = useState<"direct" | "shared">("direct");
@@ -80,21 +88,24 @@ export function useEditorController() {
   const addFiles = useCallback(
     async (files: File[]) => {
       if (disabled || !files.length) return;
-      acceptImages(await persistence.upload(files));
+      acceptImages(await upload(files));
     },
-    [disabled, persistence.upload, acceptImages],
+    [disabled, upload, acceptImages],
   );
   const captureImage = async (
     kind: CaptureMode,
     file?: File,
     surface?: string,
   ) => {
-    const result = await persistence.capture(kind, file, surface);
+    const result = await capture(kind, file, surface);
     acceptImages(result);
     setCaptureOpen(false);
   };
   return {
     ...persistence,
+    session,
+    recovery,
+    setError,
     busy,
     working,
     submitted,

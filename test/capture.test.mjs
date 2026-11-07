@@ -495,7 +495,14 @@ test("live streams require auth, stay isolated from saved drafts, and stop on di
   while (!done) ({ done } = await reader.read());
   abort.abort();
   assert.equal(
-    (await post("input", { kind: "web", type: "text", text: "late" })).status,
+    (
+      await post("input", {
+        kind: "web",
+        generation: 1,
+        type: "text",
+        text: "late",
+      })
+    ).status,
     409,
   );
 });
