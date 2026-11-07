@@ -6,7 +6,9 @@ import { join } from "node:path";
 import {
   createSession,
   loadSession,
+  atomicJson,
 } from "../skills/scribble/scripts/lib/store.mjs";
+import { PluginBackend } from "../plugin/backend.mjs";
 import { startServer } from "../skills/scribble/scripts/lib/app.mjs";
 const png = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=",
@@ -132,6 +134,48 @@ test("one server handles isolated sessions and recovers a committed receipt", as
     401,
   );
   assert.equal((await call("/api/session")).status, 200);
+  const uploaded = await (
+    await call("/api/images?width=1&height=1", {
+      method: "POST",
+      body: png,
+    })
+  ).json();
+  const before = await loadSession(root, session.id);
+  assert.equal(
+    (
+      await call("/api/submit", {
+        method: "POST",
+        body: JSON.stringify({ revision: uploaded.revision }),
+      })
+    ).status,
+    200,
+  );
+  // Simulate interruption after the immutable submission commits.
+  await atomicJson(join(root, "sessions", session.id, "session.json"), before);
+  assert.equal((await loadSession(root, session.id)).status, "submitted");
+  assert.equal((await (await call("/api/session")).json()).status, "submitted");
+  const plugin = new PluginBackend({ directory: join(root, "registry") });
+  await plugin.register(root, session.id);
+  assert.equal(
+    (await plugin.feedback(session.id)).bundle.sessionId,
+    session.id,
+  );
+  assert.equal(
+    (await plugin.image(session.id, uploaded.images[0].id)).data,
+    png.toString("base64"),
+  );
+  assert.ok(
+    (await plugin.recordDelivery(session.id, session.token)).acceptedAt,
+  );
+  assert.equal(
+    (
+      await call("/api/capture/open", {
+        method: "POST",
+        body: JSON.stringify({ kind: "web", url: "localhost:3000" }),
+      })
+    ).status,
+    409,
+  );
 });
 
 test("clipboard handoffs survive new canvases, reloads, and legacy receipts", async (t) => {

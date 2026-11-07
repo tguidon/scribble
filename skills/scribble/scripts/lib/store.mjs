@@ -39,7 +39,28 @@ export async function createSession(root, title = "A little visual direction") {
   return session;
 }
 export async function loadSession(root, id) {
-  return readJson(join(sessionDir(root, id), "session.json"));
+  const [session, submission] = await Promise.all([
+    readJson(join(sessionDir(root, id), "session.json")),
+    loadSubmission(root, id),
+  ]);
+  // feedback.json is the commit marker. session.json may lag after an
+  // interrupted submission; every reader must observe the committed state.
+  return submission
+    ? {
+        ...session,
+        status: "submitted",
+        submittedAt: submission.submittedAt,
+        updatedAt: submission.submittedAt,
+      }
+    : session;
+}
+export async function loadSubmission(root, id) {
+  return readJson(join(sessionDir(root, id), "feedback.json")).catch(
+    (error) => {
+      if (error.code === "ENOENT") return null;
+      throw error;
+    },
+  );
 }
 export async function latestSession(root, draftOnly = false) {
   const dirs = await readdir(join(root, "sessions")).catch(() => []);

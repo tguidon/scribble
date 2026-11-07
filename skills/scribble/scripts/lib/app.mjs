@@ -9,6 +9,7 @@ import {
   publicSession,
   sessionDir,
   loadSession,
+  loadSubmission,
   safeId,
 } from "./store.mjs";
 import { imageKind, validateDraft } from "./validation.mjs";
@@ -260,17 +261,7 @@ export async function startServer({
           const persist = async () => {
             await atomicJson(join(dir, "session.json"), session);
           };
-          const receipt = await readFile(join(dir, "feedback.json"), "utf8")
-            .then(JSON.parse)
-            .catch((e) => {
-              if (e.code === "ENOENT") return null;
-              throw e;
-            });
-          if (receipt && session.status !== "submitted") {
-            session.status = "submitted";
-            session.submittedAt = receipt.submittedAt;
-            if (req.method !== "GET") await persist();
-          }
+          const receipt = await loadSubmission(root, id);
           if (req.method === "GET" && url.pathname === "/api/session")
             return reply(res, 200, publicSession(session));
           if (req.method === "GET" && url.pathname.startsWith("/api/images/")) {

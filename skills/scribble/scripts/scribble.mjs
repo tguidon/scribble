@@ -200,17 +200,6 @@ async function start() {
     : !values.new && (await latestSession(root));
   if (!values.session && session?.status === "submitted") session = null;
   if (!session) session = await createSession(root, values.title);
-  const dir = sessionDir(root, session.id);
-  // Recover a crash between writing the submission marker and updating session metadata.
-  const receipt = await readJson(join(dir, "feedback.json")).catch((e) => {
-    if (e.code === "ENOENT") return null;
-    throw e;
-  });
-  if (receipt && session.status !== "submitted") {
-    session.status = "submitted";
-    session.submittedAt = receipt.submittedAt;
-    await atomicJson(join(dir, "session.json"), session);
-  }
   if (values.detach) {
     await mkdir(root, { recursive: true });
     const args = [

@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import {
   createSession,
   loadSession,
+  loadSubmission,
   sessionDir,
   atomicJson,
   readJson,
@@ -172,7 +173,7 @@ export class PluginBackend {
   async feedback(id) {
     const { root } = await this.lookup(id);
     const dir = sessionDir(root, id);
-    const bundle = await readJson(join(dir, "feedback.json")).catch(() => null);
+    const bundle = await loadSubmission(root, id);
     if (!bundle) throw new Error("The user has not finished this canvas yet.");
     const handoff = await prepareHandoff(bundle, dir);
     const brief = await readFile(handoff.briefPath, "utf8");
