@@ -2,17 +2,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ArrowUpRight,
   Check,
-  ChevronDown,
   CircleHelp,
   ImagePlus,
-  MessageCircle,
-  Plus,
-  ShieldCheck,
-  Trash2,
   X,
   AlertCircle,
   PencilLine,
-  Camera,
   Maximize2,
 } from "lucide-react";
 import { FeedbackReceipt } from "./components/FeedbackReceipt";
@@ -20,110 +14,63 @@ import { Canvas } from "./components/Canvas";
 import { CapturePanel } from "./components/CapturePanel";
 import { Toolbar } from "./components/Toolbar";
 import { useTabShare } from "./useTabShare";
-import { useSession } from "./useSession";
-import { ScreenshotImage } from "./components/ScreenshotImage";
+import {
+  useEditorController,
+  type EditorController,
+} from "./useEditorController";
+import { ScreenshotRail } from "./components/ScreenshotRail";
+import { FeedbackPanel } from "./components/FeedbackPanel";
 import { getEditorHost } from "./editorHost";
 import { exampleFile } from "./example";
-import {
-  INKS,
-  type Annotation,
-  type Draft,
-  type Tool,
-  type CaptureKind,
-} from "./types";
+import type { Annotation, Tool } from "./types";
 export default function App({ active = true }: { active?: boolean } = {}) {
-  const controller = useSession();
+  const controller = useEditorController();
   return active ? <Editor controller={controller} /> : null;
 }
 
-function Editor({ controller }: { controller: ReturnType<typeof useSession> }) {
+function Editor({ controller }: { controller: EditorController }) {
   const host = getEditorHost();
   const {
     session,
     error,
     setError,
     saveState,
-    busy: working,
     recovery,
     downloadRecovery,
     useSavedDraft,
-    change,
-    upload,
-    capture,
-    submit,
     flush,
+    working,
+    submitted,
+    disabled,
+    captureOpen,
+    setCaptureOpen,
+    webMode,
+    setWebMode,
+    captureKind,
+    setCaptureKind,
+    image,
+    selected,
+    setSelected,
+    tool,
+    setTool,
+    color,
+    setColor,
+    undo,
+    redo,
+    canUndo,
+    canRedo,
+    addFiles,
+    captureImage,
   } = controller;
-  const busy = working || !!recovery;
-  const [captureOpen, setCaptureOpen] = useState(false);
-  const [webMode, setWebMode] = useState<"direct" | "shared">("direct");
-  const tabShare = useTabShare();
-  const [captureKind, setCaptureKind] = useState<CaptureKind>("web");
-  const [activeId, setActiveId] = useState<string>();
-  const [selected, setSelected] = useState<string | null>(null);
-  const [tool, setTool] = useState<Tool>("pin");
-  const [color, setColor] = useState(INKS[0].color);
-  const [past, setPast] = useState<Draft[]>([]);
-  const [future, setFuture] = useState<Draft[]>([]);
   const [help, setHelp] = useState(false);
-  const [screenshotsExpanded, setScreenshotsExpanded] = useState(false);
   const [dragging, setDragging] = useState(false);
-  const [removeId, setRemoveId] = useState<string>();
   const input = useRef<HTMLInputElement>(null);
-  const comments = useRef<HTMLDivElement>(null);
   const dragDepth = useRef(0);
-  const typing = useRef<string | null>(null);
-  const image =
-    session?.images.find((i) => i.id === activeId) || session?.images[0];
-  const totalMarks =
-    session?.images.reduce((n, i) => n + i.annotations.length, 0) || 0;
-  const submitted = session?.status === "submitted";
-  const disabled = busy || !session || submitted || captureOpen;
+  const tabShare = useTabShare();
+  useEffect(() => controller.endEdit, [controller.endEdit]);
   useEffect(() => {
     if (submitted) tabShare.stop();
   }, [submitted, tabShare.stop]);
-  const currentDraft = useCallback(
-    (): Draft => ({ message: session!.message, images: session!.images }),
-    [session],
-  );
-  const checkpoint = useCallback(() => {
-    if (!session) return;
-    setPast((p) => [...p.slice(-99), currentDraft()]);
-    setFuture([]);
-  }, [session, currentDraft]);
-  const edit = useCallback(
-    (next: Draft, record = true) => {
-      if (change(next) && record) checkpoint();
-    },
-    [checkpoint, change],
-  );
-  const undo = useCallback(() => {
-    if (!past.length || disabled) return;
-    const previous = past.at(-1)!;
-    setFuture((f) => [currentDraft(), ...f]);
-    setPast((p) => p.slice(0, -1));
-    change(previous);
-    setSelected(null);
-  }, [past, disabled, currentDraft, change]);
-  const redo = useCallback(() => {
-    if (!future.length || disabled) return;
-    setPast((p) => [...p, currentDraft()]);
-    change(future[0]);
-    setFuture((f) => f.slice(1));
-    setSelected(null);
-  }, [future, disabled, currentDraft, change]);
-  const addFiles = useCallback(
-    async (files: File[]) => {
-      if (disabled || !files.length) return;
-      const result = await upload(files);
-      setPast([]);
-      setFuture([]);
-      if (result?.images.length) {
-        setActiveId(result.images.at(-1)!.id);
-        setSelected(null);
-      }
-    },
-    [disabled, upload],
-  );
   useEffect(() => {
     const paste = (e: ClipboardEvent) => {
       if (
@@ -168,7 +115,6 @@ function Editor({ controller }: { controller: ReturnType<typeof useSession> }) {
       if (e.key === "Escape") {
         setSelected(null);
         setHelp(false);
-        setRemoveId(undefined);
       }
     };
     window.addEventListener("paste", paste);
@@ -193,59 +139,8 @@ function Editor({ controller }: { controller: ReturnType<typeof useSession> }) {
       });
   }, []);
   const addMark = (mark: Annotation) => {
-    if (!image || !session || disabled) return;
-    if (image.annotations.length >= 500) {
-      setError(
-        "This screenshot has 500 marks. Add another screenshot to continue.",
-      );
-      return;
-    }
-    edit({
-      ...currentDraft(),
-      images: session.images.map((i) =>
-        i.id === image.id ? { ...i, annotations: [...i.annotations, mark] } : i,
-      ),
-    });
-    selectMark(mark.id);
+    if (controller.addMark(mark)) selectMark(mark.id);
   };
-  function updateComment(id: string, value: string) {
-    if (typing.current !== id) {
-      checkpoint();
-      typing.current = id;
-    }
-    edit(
-      {
-        ...currentDraft(),
-        images: session!.images.map((i) => ({
-          ...i,
-          annotations: i.annotations.map((a) =>
-            a.id === id ? { ...a, comment: value } : a,
-          ),
-        })),
-      },
-      false,
-    );
-  }
-  function deleteMark(id: string) {
-    edit({
-      ...currentDraft(),
-      images: session!.images.map((i) => ({
-        ...i,
-        annotations: i.annotations.filter((a) => a.id !== id),
-      })),
-    });
-    if (selected === id) setSelected(null);
-  }
-  function removeImage(id: string) {
-    change({
-      ...currentDraft(),
-      images: session!.images.filter((i) => i.id !== id),
-    });
-    setPast([]);
-    setFuture([]);
-    setRemoveId(undefined);
-    setSelected(null);
-  }
   return (
     <div
       className={`app ${dragging ? "dragging" : ""}`}
@@ -460,125 +355,18 @@ function Editor({ controller }: { controller: ReturnType<typeof useSession> }) {
           webMode={webMode}
           setWebMode={setWebMode}
           share={tabShare}
-          onSharedCapture={async (file, surface) => {
-            const result = await capture("shared", file, surface);
-            setPast([]);
-            setFuture([]);
-            setSelected(null);
-            setActiveId(result.images.at(-1)?.id);
-            setCaptureOpen(false);
-          }}
+          onSharedCapture={(file, surface) =>
+            captureImage("shared", file, surface)
+          }
           onBack={() => setCaptureOpen(false)}
-          onCapture={async (kind) => {
-            const result = await capture(kind);
-            setPast([]);
-            setFuture([]);
-            setSelected(null);
-            setActiveId(result.images.at(-1)?.id);
-            setCaptureOpen(false);
-          }}
+          onCapture={captureImage}
         />
       ) : (
         <main className="workspace">
-          <nav className="screenshot-rail" aria-label="Screenshots">
-            <div className="rail-heading">
-              <span>Screenshots</span>
-              <span className="count">{session.images.length}</span>
-            </div>
-            <button
-              className="screenshot-toggle"
-              aria-label="Screenshots"
-              aria-expanded={screenshotsExpanded}
-              aria-controls="screenshot-list"
-              disabled={!session.images.length}
-              onClick={() => setScreenshotsExpanded((open) => !open)}
-            >
-              Screenshots <span className="count">{session.images.length}</span>
-              <ChevronDown size={16} />
-            </button>
-            <div
-              id="screenshot-list"
-              className={`screenshot-list ${screenshotsExpanded ? "expanded" : ""}`}
-            >
-              {session.images.map((item, index) => (
-                <div
-                  className={`screenshot-item ${image?.id === item.id ? "current" : ""}`}
-                  key={item.id}
-                >
-                  <button
-                    className="thumbnail-button"
-                    aria-label={`Open ${item.name}`}
-                    aria-current={image?.id === item.id ? "true" : undefined}
-                    onClick={() => {
-                      setActiveId(item.id);
-                      setSelected(null);
-                      setScreenshotsExpanded(false);
-                    }}
-                  >
-                    <div className="thumbnail">
-                      <ScreenshotImage id={item.id} alt="" retryable={false} />
-                      <span className="image-number">{index + 1}</span>
-                      {item.annotations.length > 0 && (
-                        <span className="annotation-count">
-                          {item.annotations.length}
-                        </span>
-                      )}
-                    </div>
-                    <span className="thumbnail-name">{item.name}</span>
-                  </button>
-                  <button
-                    className="remove-screenshot"
-                    aria-label={`Remove ${item.name}`}
-                    disabled={busy}
-                    onClick={() => setRemoveId(item.id)}
-                  >
-                    <X size={12} />
-                  </button>
-                  {removeId === item.id && (
-                    <div className="remove-confirm">
-                      <span>Remove this screenshot and its marks?</span>
-                      <button onClick={() => removeImage(item.id)}>
-                        Remove
-                      </button>
-                      <button onClick={() => setRemoveId(undefined)}>
-                        Keep
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-            <div className="screenshot-actions">
-              <button
-                className="add-screenshot"
-                onClick={() => input.current?.click()}
-                disabled={busy}
-              >
-                <Plus size={21} />
-                <span>Add images</span>
-              </button>
-              <button
-                className="capture-shortcut"
-                onClick={() => setCaptureOpen(true)}
-                disabled={disabled}
-              >
-                <Camera size={19} />
-                <span>
-                  {session.images.some((image) => image.source)
-                    ? "Resume live capture"
-                    : "Capture live app"}
-                </span>
-              </button>
-            </div>
-            <div className="rail-footer">
-              <ShieldCheck size={16} />
-              <span>
-                Just you and
-                <br />
-                your local canvas.
-              </span>
-            </div>
-          </nav>
+          <ScreenshotRail
+            controller={controller}
+            onUpload={() => input.current?.click()}
+          />
           <Canvas
             image={image}
             tool={tool}
@@ -602,130 +390,12 @@ function Editor({ controller }: { controller: ReturnType<typeof useSession> }) {
               setColor={setColor}
               undo={undo}
               redo={redo}
-              canUndo={past.length > 0}
-              canRedo={future.length > 0}
+              canUndo={canUndo}
+              canRedo={canRedo}
               disabled={disabled || !image}
             />
           </Canvas>
-          <aside className="feedback-panel" aria-label="Feedback">
-            <div className="feedback-heading">
-              <h2>The details</h2>
-              <span className="count">{image?.annotations.length || 0}</span>
-            </div>
-            <p className="panel-intro">A little context goes a long way.</p>
-            <div className="comments" ref={comments}>
-              {image?.annotations.length ? (
-                image.annotations.map((mark, index) => (
-                  <article
-                    className={`comment ${selected === mark.id ? "active" : ""}`}
-                    key={mark.id}
-                  >
-                    <div className="comment-header">
-                      <button
-                        className="comment-number"
-                        style={{ background: mark.color }}
-                        aria-label={`Select mark ${index + 1}`}
-                        onClick={() => setSelected(mark.id)}
-                      >
-                        {index + 1}
-                      </button>
-                      <span>
-                        {mark.type === "pin"
-                          ? "Pin"
-                          : mark.type === "freehand"
-                            ? "Drawing"
-                            : mark.type === "arrow"
-                              ? "Arrow"
-                              : "Rectangle"}
-                      </span>
-                      <button
-                        className="icon-button delete-mark"
-                        aria-label={`Delete mark ${index + 1}`}
-                        disabled={busy}
-                        onClick={() => deleteMark(mark.id)}
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
-                    <textarea
-                      id={`comment-${mark.id}`}
-                      aria-label={`Comment for mark ${index + 1}`}
-                      placeholder="What should change here?"
-                      maxLength={10000}
-                      value={mark.comment}
-                      disabled={busy}
-                      onFocus={() => setSelected(mark.id)}
-                      onBlur={() => {
-                        typing.current = null;
-                      }}
-                      onChange={(e) => updateComment(mark.id, e.target.value)}
-                      rows={3}
-                    />
-                  </article>
-                ))
-              ) : (
-                <div className="comments-empty">
-                  <MessageCircle size={25} strokeWidth={1.5} />
-                  <h3>Give your marks a voice.</h3>
-                  <p>
-                    {image
-                      ? "Drop a pin or draw on your screenshot. Add a note here to tell your agent what to change."
-                      : "Add a screenshot, mark what matters, and leave a note for your agent."}
-                  </p>
-                  <div className="annotation-example">
-                    <span>1</span>
-                    <span>“A bit more breathing room here.”</span>
-                  </div>
-                </div>
-              )}
-            </div>
-            <div className="overall">
-              <label htmlFor="overall-message">
-                The bigger picture <span>optional</span>
-              </label>
-              <textarea
-                id="overall-message"
-                value={session.message}
-                maxLength={20000}
-                disabled={busy}
-                placeholder="What are we working toward? Add any overall direction…"
-                onBlur={() => {
-                  typing.current = null;
-                }}
-                onChange={(e) => {
-                  if (typing.current !== "overall") {
-                    checkpoint();
-                    typing.current = "overall";
-                  }
-                  edit({ ...currentDraft(), message: e.target.value }, false);
-                }}
-                rows={4}
-              />
-              <div className="send-summary">
-                <span>
-                  {session.images.length} screenshot
-                  {session.images.length !== 1 ? "s" : ""} · {totalMarks} mark
-                  {totalMarks !== 1 ? "s" : ""}
-                </span>
-                <ChevronDown size={13} />
-              </div>
-              <button
-                className="primary send-button"
-                disabled={!session.images.length || busy}
-                onClick={() => void submit()}
-              >
-                {working ? "Saving your feedback…" : "Finish feedback"}
-                <Check size={16} />
-              </button>
-              <span className="send-hint">
-                {session.images.length
-                  ? host
-                    ? "Next, send the feedback to this chat."
-                    : "Next, copy the handoff into your agent."
-                  : "Add a screenshot to get started."}
-              </span>
-            </div>
-          </aside>
+          <FeedbackPanel controller={controller} />
         </main>
       )}
       <input

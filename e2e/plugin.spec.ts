@@ -648,6 +648,57 @@ for (const width of [1440, 390])
       await checkTheme();
     });
 
+test("panel collapse preserves image selection, tools, and undo and redo history", async ({
+  page,
+}) => {
+  await page.goto(`${origin}/host`);
+  const ui = page.frameLocator("iframe");
+  await ui.getByRole("button", { name: "Try an example" }).click();
+  await expect(
+    ui.getByRole("button", { name: "Open Example — Fieldnotes.png" }),
+  ).toBeVisible();
+  const buffer = Buffer.from(
+    await page.evaluate(() => {
+      const canvas = document.createElement("canvas");
+      canvas.width = canvas.height = 32;
+      canvas.getContext("2d")!.fillRect(0, 0, 32, 32);
+      return canvas.toDataURL().split(",")[1];
+    }),
+    "base64",
+  );
+  await ui
+    .getByLabel("Upload screenshots")
+    .setInputFiles({ name: "second.png", mimeType: "image/png", buffer });
+  await expect(ui.locator(".image-stage")).toHaveAttribute(
+    "aria-label",
+    /second.png/,
+  );
+  await ui.locator(".image-stage").press("Enter");
+  const comment = ui.getByLabel("Comment for mark 1");
+  await comment.fill("Preserve my editing session");
+  await ui.getByRole("button", { name: "Arrow (A)", exact: true }).click();
+  await ui.getByRole("button", { name: "Blue ink", exact: true }).click();
+  await page.evaluate(() => window.fixtureDisplayMode("inline"));
+  await ui.getByRole("button", { name: "Open canvas", exact: true }).click();
+  await expect(ui.locator(".image-stage")).toHaveAttribute(
+    "aria-label",
+    /second.png/,
+  );
+  await expect(ui.locator(".comment.active")).toHaveCount(1);
+  await expect(
+    ui.getByRole("button", { name: "Arrow (A)", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(
+    ui.getByRole("button", { name: "Blue ink", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await ui.getByRole("button", { name: "Undo", exact: true }).click();
+  await expect(comment).toHaveValue("");
+  await page.evaluate(() => window.fixtureDisplayMode("inline"));
+  await ui.getByRole("button", { name: "Open canvas", exact: true }).click();
+  await ui.getByRole("button", { name: "Redo", exact: true }).click();
+  await expect(comment).toHaveValue("Preserve my editing session");
+});
+
 test("delayed autosave preserves newer edits across repeated panel collapses", async ({
   page,
 }) => {
