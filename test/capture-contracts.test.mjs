@@ -57,6 +57,8 @@ test("capture commands validate and normalize their boundary before dispatch", (
     },
   );
   for (const [action, body] of [
+    ["snapshot", { kind: "web", fullPage: "true" }],
+    ["snapshot", { kind: "simulator", fullPage: true }],
     ["input", { kind: "web", type: "release" }],
     ["input", { kind: "web", generation: 1, type: "home" }],
     ["input", { kind: "simulator", generation: 1, type: "back" }],
@@ -72,6 +74,10 @@ test("capture commands validate and normalize their boundary before dispatch", (
       () => validateCaptureCommand(action, body),
       (error) => error.status === 400,
     );
+  assert.deepEqual(
+    validateCaptureCommand("snapshot", { kind: "web", fullPage: true }),
+    { action: "snapshot", kind: "web", fullPage: true },
+  );
   for (const input of [
     null,
     {},

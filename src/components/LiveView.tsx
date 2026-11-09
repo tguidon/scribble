@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ArrowLeft, Camera, Home, RefreshCw } from "lucide-react";
+import { ArrowLeft, Camera, Home, RefreshCw, ScanLine } from "lucide-react";
 import { captureCommand, liveFrames } from "../api";
 import { createImageSource, releaseImageSource } from "../imageSource";
 import type { CaptureKind } from "../types";
@@ -13,7 +13,7 @@ type Props = {
   inputWarning?: string;
   onReconnect?: () => Promise<void>;
   busy: boolean;
-  onCapture: () => Promise<void>;
+  onCapture: (fullPage?: boolean) => Promise<void>;
   onError: (message: string) => void;
   viewport?: Viewport;
   onViewportChange: (viewport: Viewport) => void;
@@ -265,6 +265,16 @@ export function LiveView({
             Reconnect
           </button>
         </div>
+        {kind === "web" && (
+          <button
+            className="secondary capture-submit"
+            disabled={!available || pending}
+            onClick={() => void onCapture(true)}
+          >
+            <ScanLine size={18} />
+            Capture full page & annotate
+          </button>
+        )}
         <button
           className="primary capture-submit"
           disabled={!available || pending}

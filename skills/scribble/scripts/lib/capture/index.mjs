@@ -107,7 +107,7 @@ export function createCaptures(root, options = {}) {
             await source.close();
             return source.state();
           case "snapshot":
-            return source.capture();
+            return source.capture(input);
         }
       });
     },

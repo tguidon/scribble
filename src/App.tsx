@@ -357,7 +357,7 @@ function Editor({ controller }: { controller: EditorController }) {
           setWebMode={setWebMode}
           share={tabShare}
           onSharedCapture={(file, surface) =>
-            captureImage("shared", file, surface)
+            captureImage({ kind: "shared", file, surface })
           }
           onBack={() => setCaptureOpen(false)}
           onCapture={captureImage}

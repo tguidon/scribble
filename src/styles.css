@@ -1934,8 +1934,16 @@ kbd {
   padding-inline: 12px;
 }
 .live-toolbar .capture-submit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  max-width: 100%;
   min-height: 44px;
   padding-inline: 18px;
+}
+.live-toolbar .capture-submit svg {
+  flex-shrink: 0;
 }
 .live-screen {
   min-height: 240px;

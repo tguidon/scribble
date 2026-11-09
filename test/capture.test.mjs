@@ -177,6 +177,102 @@ test("webpage resize preserves the page and captures the new viewport", async (t
   assert.equal(page.url(), url + "/");
 });
 
+test("full-page capture loads lower content at the selected viewport and restores the live page on success and failure", async (t) => {
+  const root = await temp(t);
+  const url = await server(t, (_req, res) => {
+    res.setHeader("Content-Type", "text/html");
+    res.end(`<title>Full review</title><style>
+      html { scroll-behavior: smooth }
+      body { margin:0; height:2400px; background:#f5f0e8 }
+      @media(max-width:500px) { body { height:3600px } }
+      #lazy { position:absolute; top:2100px; height:200px; width:100%; background:red }
+      </style><input><div id="lazy"></div><script>
+      window.sizes = [];
+      new IntersectionObserver(([entry]) => {
+        if (entry.isIntersecting) {
+          entry.target.textContent = 'Loaded lower content';
+          entry.target.style.background = 'green';
+        }
+      }).observe(document.querySelector('#lazy'));
+      addEventListener('scroll', () => sizes.push([innerWidth, innerHeight]));
+      </script>`);
+  });
+  const web = new WebCapture(root, { headless: true });
+  t.after(() => web.close());
+  await web.open({ url, width: 1280, height: 900 });
+  await web.page.getByRole("textbox").fill("Keep this input");
+  for (const [width, height, fullHeight] of [
+    [1280, 900, 2400],
+    [390, 844, 3600],
+    [1000, 700, 2400],
+  ]) {
+    await web.resize({ width, height });
+    await web.page.evaluate(() => {
+      scrollTo({ top: 400, behavior: "instant" });
+      window.sizes = [];
+    });
+    const captured = await web.capture({ fullPage: true });
+    assert.equal(captured.width, width);
+    assert.equal(captured.height, fullHeight);
+    assert.deepEqual(imageDimensions(captured.bytes), {
+      width,
+      height: fullHeight,
+    });
+    assert.deepEqual(captured.source.viewport, { width, height });
+    assert.equal(captured.source.fullPage, true);
+    assert.deepEqual(captured.source.scroll, { x: 0, y: 0 });
+    assert.equal(await web.page.evaluate(() => scrollY), 400);
+    assert.deepEqual(web.state().viewport, { width, height });
+    assert.equal(
+      await web.page.getByRole("textbox").inputValue(),
+      "Keep this input",
+    );
+    assert.equal(
+      await web.page.locator("#lazy").textContent(),
+      "Loaded lower content",
+    );
+    assert.ok(
+      (await web.page.evaluate(() => sizes)).every(
+        ([w, h]) => w === width && h === height,
+      ),
+    );
+    const visible = await web.capture();
+    assert.equal(visible.height, height);
+    assert.equal(visible.source.scroll.y, 400);
+    assert.equal(visible.source.fullPage, undefined);
+  }
+  const screenshot = web.page.screenshot.bind(web.page);
+  web.page.screenshot = async () => {
+    throw new Error("Screenshot failed");
+  };
+  await assert.rejects(web.capture({ fullPage: true }), /Screenshot failed/);
+  assert.equal(await web.page.evaluate(() => scrollY), 400);
+  web.page.screenshot = screenshot;
+  await web.page.evaluate(() => {
+    document.body.style.height = "100000px";
+  });
+  await assert.rejects(
+    web.capture({ fullPage: true }),
+    /full page exceeds 40 megapixels/,
+  );
+  assert.equal(await web.page.evaluate(() => scrollY), 400);
+  assert.deepEqual(web.state().viewport, { width: 1000, height: 700 });
+  await web.resize({ width: 320, height: 320 });
+  await web.page.evaluate(() => {
+    document.querySelector("#lazy").remove();
+    document.body.style.height = "640px";
+    scrollTo({ top: 100, behavior: "instant" });
+  });
+  await web.page.waitForTimeout(150);
+  await web.page.evaluate(() => {
+    addEventListener("scroll", () => {
+      document.body.style.height = `${parseFloat(document.body.style.height) + 320}px`;
+    });
+  });
+  await assert.rejects(web.capture({ fullPage: true }), /page keeps growing/);
+  assert.equal(await web.page.evaluate(() => scrollY), 100);
+});
+
 test("simulator consumes exactly one bounded frame and detects rotation and disconnection", async (t) => {
   const root = await temp(t);
   let orientation = "portrait",
@@ -299,6 +395,10 @@ test("capture API saves immutable images, retries without duplicates, and submit
   const repeated = await (await call("/capture/snapshot", snapshot)).json();
   assert.equal(repeated.revision, captured.revision);
   assert.equal(repeated.images.length, 1);
+  assert.equal(
+    (await call("/capture/snapshot", { ...snapshot, fullPage: true })).status,
+    409,
+  );
   const beforeResize = (await (await call("/capture/status")).json()).web;
   const resized = await call("/capture/resize", {
     kind: "web",
@@ -336,11 +436,22 @@ test("capture API saves immutable images, retries without duplicates, and submit
       kind: "web",
       captureId: "phone-capture",
       revision: captured.revision,
+      fullPage: true,
     })
   ).json();
   assert.equal(resizedCapture.images[0].width, 800);
   assert.equal(resizedCapture.images[1].width, 390);
   assert.equal(resizedCapture.images[1].height, 844);
+  assert.equal(resizedCapture.images[1].source.fullPage, true);
+  const repeatedFull = await (
+    await call("/capture/snapshot", {
+      kind: "web",
+      captureId: "phone-capture",
+      revision: captured.revision,
+      fullPage: true,
+    })
+  ).json();
+  assert.equal(repeatedFull.images.length, 2);
   assert.equal(
     (await call("/capture/snapshot", { ...snapshot, captureId: "stale" }))
       .status,
@@ -381,6 +492,7 @@ test("capture API saves immutable images, retries without duplicates, and submit
   const bundle = await (await call("/feedback")).json();
   assert.equal(bundle.images[0].annotations[0].comment, "Move this");
   assert.equal(bundle.images[0].source.viewport.width, 800);
+  assert.equal(bundle.images[1].source.fullPage, true);
   assert.match(renderFeedbackBrief(bundle), /Capture context/);
   assert.deepEqual(await readFile(bundle.images[0].path), original);
   assert.equal(

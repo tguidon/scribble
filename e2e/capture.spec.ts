@@ -50,6 +50,12 @@ test.beforeEach(async ({ page }) => {
       return;
     }
     res.setHeader("Content-Type", "text/html");
+    if (req.url === "/long-page") {
+      res.end(
+        `<title>Long webpage</title><style>body{margin:0;height:16000px;background:#f5f1e9;font:20px system-ui}h1{margin:0;padding:24px}footer{position:absolute;top:15800px}</style><h1>Review the whole page</h1><footer>Feedback down here</footer>`,
+      );
+      return;
+    }
     res.end(
       `<title>${req.url === "/details" ? "Project details" : "Local workspace"}</title><body style="font:20px system-ui;padding:60px;background:#f5f1e9;color:#34322e"><h1>Make room for a good idea.</h1><p>A local page for reviewing visual changes.</p><button style="position:absolute;left:80px;top:200px;width:300px;height:60px" onclick="this.textContent='Clicked inside Scribble'">New project</button><input style="position:absolute;left:80px;top:280px;width:300px;height:60px" placeholder="Test input" oninput="document.title=this.value || 'Local workspace'"></body>`,
     );
@@ -295,6 +301,118 @@ test("viewport presets resize the live webpage, preserve input, and survive capt
   ).toHaveAttribute("aria-pressed", "true");
 });
 
+test("full-page capture uses the selected viewport, recovers from failure, and annotates the entire page", async ({
+  page,
+}) => {
+  await page
+    .getByRole("button", { name: "Capture live app", exact: true })
+    .click();
+  await page.getByLabel("Webpage URL").fill(sourceUrl + "/long-page");
+  await page.getByRole("button", { name: "Open webpage", exact: true }).click();
+  const fullPage = page.getByRole("button", {
+    name: "Capture full page & annotate",
+    exact: true,
+  });
+  const visible = page.getByRole("button", {
+    name: "Capture & annotate",
+    exact: true,
+  });
+  await expect(fullPage).toBeEnabled();
+  await page.screenshot({
+    path: ".impeccable/review/full-page-desktop.png",
+    fullPage: true,
+  });
+  const presets = page.getByRole("group", { name: "Webpage viewport" });
+  await presets.getByRole("button", { name: "Phone", exact: true }).click();
+  await expect(fullPage).toBeEnabled();
+  for (const width of [390, 320]) {
+    await page.setViewportSize({ width, height: 844 });
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBe(true);
+    await expect(fullPage).toBeVisible();
+  }
+  await page.screenshot({
+    path: ".impeccable/review/full-page-mobile.png",
+    fullPage: true,
+  });
+  let failedId = "";
+  await page.route("**/api/capture/snapshot", async (route) => {
+    failedId = route.request().postDataJSON().captureId;
+    await route.fulfill({
+      status: 502,
+      json: { error: "Capture failed. Try again." },
+    });
+    await page.unroute("**/api/capture/snapshot");
+  });
+  await fullPage.click();
+  await expect(page.getByRole("alert")).toContainText(
+    "Capture failed. Try again.",
+  );
+  await expect(visible).toBeEnabled();
+  const response = page.waitForResponse(
+    (response) =>
+      response.url().endsWith("/api/capture/snapshot") && response.ok(),
+  );
+  // Switching from a failed full capture must allocate a new operation ID.
+  await visible.click();
+  const first = await response;
+  expect(first.request().postDataJSON().captureId).not.toBe(failedId);
+  await page.getByRole("button", { name: "Resume live capture" }).click();
+  await expect(
+    presets.getByRole("button", { name: "Phone", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(fullPage).toBeEnabled();
+  const captured = page.waitForResponse(
+    (response) =>
+      response.url().endsWith("/api/capture/snapshot") && response.ok(),
+  );
+  await fullPage.click();
+  const session = await (await captured).json();
+  expect(session.images).toHaveLength(2);
+  expect(session.images[0]).toMatchObject({ width: 390, height: 844 });
+  expect(session.images[1]).toMatchObject({
+    width: 390,
+    height: 16000,
+    source: {
+      fullPage: true,
+      viewport: { width: 390, height: 844 },
+      scroll: { x: 0, y: 0 },
+    },
+  });
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  const image = page.locator(".image-stage");
+  await expect(image).toBeVisible();
+  await page.evaluate(async () => {
+    await new Promise(requestAnimationFrame);
+    await new Promise(requestAnimationFrame);
+  });
+  const box = (await image.boundingBox())!;
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height * 0.94);
+  await page.getByLabel("Comment for mark 1").fill("Change the footer");
+  const zoomIn = page.getByRole("button", { name: "Zoom in", exact: true });
+  for (let step = 0; step < 40 && (await zoomIn.isEnabled()); step++)
+    await zoomIn.click();
+  await expect(page.locator(".zoom-controls span")).toHaveText("100%");
+  await page
+    .getByRole("button", { name: "Finish feedback", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Ready for your agent." }),
+  ).toBeVisible();
+  const sessionUrl = new URL(app.url);
+  const token = new URLSearchParams(sessionUrl.hash.slice(1)).get("token");
+  const bundle = await (
+    await page.request.get(sessionUrl.origin + "/api/feedback", {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+  ).json();
+  expect(bundle.images[1].source.fullPage).toBe(true);
+  expect(bundle.images[1].annotations[0].points[0].y).toBeGreaterThan(15000);
+});
+
 test("simulator selection captures into the same editor and supports disconnect", async ({
   page,
 }) => {
@@ -303,6 +421,9 @@ test("simulator selection captures into the same editor and supports disconnect"
     page.getByRole("button", { name: "Simulator", exact: true }),
   ).toBeEnabled();
   await page.getByRole("button", { name: "Simulator", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Capture full page & annotate" }),
+  ).toHaveCount(0);
   await expect(page.getByLabel("Booted simulator")).toHaveValue(device.id);
   await page.route("**/api/capture/status", async (route) => {
     const response = await route.fetch();

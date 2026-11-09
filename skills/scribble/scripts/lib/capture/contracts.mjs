@@ -13,13 +13,14 @@ import { captureError } from "./common.mjs";
 /** @typedef {{kind: "simulator"} & ({connected: false} | {connected: true, generation: number, device: SimulatorDevice, previewUrl: string, inputWarning?: string})} SimulatorConnection */
 /** @typedef {{available: boolean, setupCommand: string}} Availability */
 /** @typedef {{web: WebConnection & Availability, simulator: SimulatorConnection & Availability & {supported: boolean}}} CaptureStatus */
+/** @typedef {{kind: "web", fullPage?: boolean} | {kind: "simulator"}} CaptureSnapshot */
 /** @typedef {({action: "open", kind: "web", url: string} & Viewport)
  * | {action: "open", kind: "simulator", deviceId: string}
  * | ({action: "resize", kind: "web", generation: number} & Viewport)
  * | ({action: "input", kind: CaptureKind, generation: number} & CaptureInput)
  * | {action: "focus", kind: "web"}
  * | {action: "disconnect", kind: CaptureKind}
- * | {action: "snapshot", kind: CaptureKind}} CaptureCommand */
+ * | ({action: "snapshot"} & CaptureSnapshot)} CaptureCommand */
 
 /** @param {Viewport} size @returns {Viewport} */
 export function viewportSize({ width, height }) {
@@ -156,8 +157,18 @@ export function validateCaptureCommand(action, input) {
       if (kind !== "web") throw captureError("Only webpages can be focused.");
       return { action, kind };
     case "disconnect":
-    case "snapshot":
       return { action, kind };
+    case "snapshot":
+      if (input.fullPage !== undefined && typeof input.fullPage !== "boolean")
+        throw captureError("Choose a valid full-page capture option.");
+      if (kind === "simulator") {
+        if (input.fullPage !== undefined)
+          throw captureError(
+            "Full-page capture is only available for webpages.",
+          );
+        return { action, kind };
+      }
+      return { action, kind, fullPage: input.fullPage === true };
     default:
       throw captureError("Unknown capture action.");
   }

@@ -17,6 +17,17 @@ const command: CaptureCommand = {
   generation: 1,
   ...pointer,
 };
+const fullPage: CaptureCommand = {
+  action: "snapshot",
+  kind: "web",
+  fullPage: true,
+};
+const fullSimulator: CaptureCommand = {
+  action: "snapshot",
+  kind: "simulator",
+  // @ts-expect-error Full-page snapshots apply only to webpages.
+  fullPage: true,
+};
 // @ts-expect-error A pointer requires coordinates.
 const missingPoint: CaptureInput = { type: "pointer", phase: "down" };
 // @ts-expect-error The action name is a closed union.
@@ -47,6 +58,8 @@ const disconnected: WebConnection = { kind: "web", connected: false };
 const viewport = disconnected.viewport;
 void [
   command,
+  fullPage,
+  fullSimulator,
   missingPoint,
   unknownInput,
   missingGeneration,

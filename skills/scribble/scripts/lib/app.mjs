@@ -341,6 +341,15 @@ export async function startServer({
             if (previous) {
               if ((previous.source?.kind ?? "upload") !== operation.kind)
                 fail(409, "This image operation ID belongs to another source.");
+              if (
+                operation.kind === "web" &&
+                (previous.source.fullPage === true) !==
+                  (input.fullPage === true)
+              )
+                fail(
+                  409,
+                  "This image operation ID belongs to another capture mode.",
+                );
               return reply(res, 200, publicSession(session));
             }
             checkRevision(operation.revision, session);

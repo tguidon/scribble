@@ -16,6 +16,8 @@ Replace `SKILL_DIRECTORY` with its resolved absolute path. Pass the same `--dir`
 Direct webpage and simulator input is active only in the live view. Click the screen before typing, or expand **Type or paste text**. Escape releases keyboard focus. **Reconnect** retries an interrupted stream. Hidden tabs pause streaming.
 Each capture is a frozen image. The user can annotate it and select **Resume live capture** for another screen. Earlier images and marks remain unchanged. Selecting **Close webpage** clears its temporary login state. Disconnecting a simulator leaves the simulator and shared preview running. A Scribble restart requires reconnecting sources; saved captures remain available.
 
+For direct webpages, **Capture full page & annotate** captures the full scrollable document using the currently selected viewport, loads lower content with bounded scrolling, and restores the previous scroll position. Full-page images record `fullPage: true`, the original viewport dimensions, and a `(0, 0)` image origin. Preparation stops after 10 seconds or 100 steps, and existing image limits still apply. Independently scrolling panels and virtualized lists may not be fully represented. Shared tabs and simulators remain visible-screen captures.
+
 If capture reports an old or mismatched server, run the launcher again and reload the browser tab. For a pre-versioning server that fails its health check, inspect the reported PID and command before stopping it. Preserve the storage directory and restart with the recorded port and session so the user’s draft and browser backup remain available. Verify the current browser session after an upgrade, not only a separate test server.
 
 ### Xcode 27 input recovery
