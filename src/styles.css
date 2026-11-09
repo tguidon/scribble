@@ -171,9 +171,9 @@ kbd {
   align-items: center;
   gap: 9px;
 }
-.brand > svg {
+.brand-icon {
   color: var(--blue);
-  transform: rotate(-9deg);
+  flex-shrink: 0;
 }
 .brand > span {
   font-size: var(--text-brand);
