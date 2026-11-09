@@ -15,11 +15,12 @@ import { ViewportPicker, type Viewport } from "./ViewportPicker";
 import type { CaptureKind } from "../types";
 
 import type { CaptureStatus as Status } from "../../skills/scribble/scripts/lib/capture/contracts.mjs";
+import type { CaptureSnapshot } from "../../skills/scribble/scripts/lib/capture/contracts.mjs";
 type Props = {
   kind: CaptureKind;
   setKind: (kind: CaptureKind) => void;
   onBack: () => void;
-  onCapture: (kind: CaptureKind) => Promise<void>;
+  onCapture: (input: CaptureSnapshot) => Promise<void>;
   webMode: "direct" | "shared";
   setWebMode: (mode: "direct" | "shared") => void;
   share: TabShare;
@@ -477,8 +478,14 @@ export function CapturePanel({
                   }
                   busy={!!busy}
                   onError={setError}
-                  onCapture={() =>
-                    perform("Capturing screen…", () => onCapture(kind))
+                  onCapture={(fullPage = false) =>
+                    perform(
+                      fullPage ? "Capturing full page…" : "Capturing screen…",
+                      () =>
+                        onCapture(
+                          kind === "web" ? { kind, fullPage } : { kind },
+                        ),
+                    )
                   }
                 />
                 <button

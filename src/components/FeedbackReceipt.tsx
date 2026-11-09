@@ -14,6 +14,7 @@ export function FeedbackReceipt({ session }: { session: Session }) {
   const [loadError, setLoadError] = useState("");
   const [attempt, setAttempt] = useState(0);
   const [copied, setCopied] = useState(false);
+  const [delivered, setDelivered] = useState(false);
   const [copying, setCopying] = useState(false);
   const [copyError, setCopyError] = useState("");
   const [starting, setStarting] = useState(false);
@@ -93,10 +94,12 @@ export function FeedbackReceipt({ session }: { session: Session }) {
         Ready for your agent.
       </h1>
       <p>
-        {delivery
-          ? "Send your feedback to this chat, or copy a handoff."
-          : "Copy the handoff, then paste it into your agent’s chat."}
-        <br />
+        {!delivery && (
+          <>
+            Copy the handoff, then paste it into your agent’s chat.
+            <br />
+          </>
+        )}
         Your screenshots and feedback stay saved on this device.
       </p>
       <div className="receipt-images">
@@ -113,23 +116,29 @@ export function FeedbackReceipt({ session }: { session: Session }) {
           {marks} mark{marks !== 1 ? "s" : ""}
         </span>
       </div>
-      {delivery && <PluginDelivery delivery={delivery} />}
+      {delivery && (
+        <PluginDelivery delivery={delivery} onDelivered={setDelivered} />
+      )}
       <div className="handoff-actions">
         <button
-          className={delivery?.canSend ? "secondary" : "primary"}
-          onClick={() => void copy()}
-          disabled={!text || copying}
-        >
-          <Copy size={16} />
-          {copying ? "Copying…" : copied ? "Copy again" : "Copy for agent"}
-        </button>
-        <button
-          className="secondary"
+          className={
+            delivered || (!delivery?.canSend && copied)
+              ? "primary"
+              : "secondary"
+          }
           onClick={() => void newCanvas()}
           disabled={starting}
         >
           <Plus size={16} />
           {starting ? "Opening…" : "New canvas"}
+        </button>
+        <button
+          className={delivery?.canSend || copied ? "text-button" : "primary"}
+          onClick={() => void copy()}
+          disabled={!text || copying}
+        >
+          <Copy size={16} />
+          {copying ? "Copying…" : copied ? "Copy again" : "Copy for agent"}
         </button>
       </div>
       <p className="handoff-status" role="status">
@@ -137,7 +146,7 @@ export function FeedbackReceipt({ session }: { session: Session }) {
           ? "Copied. Paste into your agent to start the next step."
           : !text && !loadError
             ? "Preparing your handoff…"
-            : "The handoff contains file paths. Use an agent with access to this device."}
+            : ""}
       </p>
       {loadError && (
         <div className="handoff-error" role="alert">
@@ -163,6 +172,10 @@ export function FeedbackReceipt({ session }: { session: Session }) {
           open={copyError ? true : undefined}
         >
           <summary>View handoff message</summary>
+          <p className="handoff-help">
+            The handoff contains file paths. Use an agent with access to this
+            device.
+          </p>
           <textarea
             ref={preview}
             aria-label="Handoff message"
@@ -172,10 +185,6 @@ export function FeedbackReceipt({ session }: { session: Session }) {
           />
         </details>
       )}
-      <p className="receipt-note">
-        Keep going with a new canvas. This feedback and its image paths will
-        stay available.
-      </p>
     </main>
   );
 }

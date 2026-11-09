@@ -4,8 +4,10 @@ import type { DeliveryReceipt, FeedbackDelivery } from "../editorHost";
 
 export function PluginDelivery({
   delivery: host,
+  onDelivered,
 }: {
   delivery: FeedbackDelivery;
+  onDelivered: (delivered: boolean) => void;
 }) {
   const [state, setState] = useState<
     | "checking"
@@ -33,6 +35,10 @@ export function PluginDelivery({
     setError(receipt.error || "");
     setConnected(receipt.connected !== false);
   };
+  const delivered = state === "accepted" || state === "read";
+  useEffect(() => {
+    onDelivered(delivered);
+  }, [delivered, onDelivered]);
   useEffect(() => {
     if (
       !host.canSend ||
@@ -75,53 +81,58 @@ export function PluginDelivery({
       </p>
     );
   return (
-    <section
-      className="plugin-delivery"
-      aria-label="Send feedback to this chat"
-    >
-      <button
-        className="primary"
-        disabled={state !== "ready" && state !== "blocked"}
-        onClick={() => {
-          setState("sending");
-          setError("");
-          void host
-            .sendFeedback()
-            .then(() => host.deliveryStatus())
-            .then(applyReceipt, (error) => {
-              setState("ready");
-              setError(
-                `${error.message || "Could not confirm delivery."} If no message appeared in the chat, copy the handoff below.`,
-              );
-            });
-        }}
-      >
-        {state === "read" ? <Check size={18} /> : <Send size={18} />}
-        {state === "checking"
-          ? "Checking delivery…"
-          : state === "sending"
-            ? "Sending…"
-            : state === "queued"
-              ? "Feedback queued"
-              : state === "blocked"
-                ? "Retry sending"
-                : state === "accepted"
-                  ? "Message accepted"
-                  : state === "read"
-                    ? "Feedback read"
+    <section className="plugin-delivery" aria-label="Feedback delivery">
+      {delivered ? (
+        <div className="delivery-status" role="status">
+          <span className="delivery-status-label">
+            <Check size={18} aria-hidden="true" />
+            {state === "read" ? "Feedback read" : "Message accepted"}
+          </span>
+          <p>
+            {state === "read"
+              ? "Follow your agent’s progress in the chat."
+              : "Waiting for your agent to read the feedback."}
+          </p>
+        </div>
+      ) : (
+        <>
+          <button
+            className="primary"
+            disabled={state !== "ready" && state !== "blocked"}
+            onClick={() => {
+              setState("sending");
+              setError("");
+              void host
+                .sendFeedback()
+                .then(() => host.deliveryStatus())
+                .then(applyReceipt, (error) => {
+                  setState("ready");
+                  setError(
+                    `${error.message || "Could not confirm delivery."} If no message appeared in the chat, copy the handoff below.`,
+                  );
+                });
+            }}
+          >
+            <Send size={18} aria-hidden="true" />
+            {state === "checking"
+              ? "Checking delivery…"
+              : state === "sending"
+                ? "Sending…"
+                : state === "queued"
+                  ? "Feedback queued"
+                  : state === "blocked"
+                    ? "Retry sending"
                     : "Send to this chat"}
-      </button>
-      <p className="handoff-status" role="status">
-        {state === "queued"
-          ? connected
-            ? "Your feedback is saved and queued for this chat. It will be delivered when the agent is ready."
-            : "Your feedback is saved. Reopen the originating Claude Code chat with Scribble enabled to deliver it."
-          : state === "accepted"
-            ? "The host accepted your message. Waiting for the agent to read the feedback."
-            : state === "read"
-              ? "The agent retrieved this feedback. Follow its progress in the chat."
+          </button>
+          <p className="handoff-status" role="status">
+            {state === "queued"
+              ? connected
+                ? "Your feedback is saved and queued for this chat. It will be delivered when the agent is ready."
+                : "Your feedback is saved. Reopen the originating Claude Code chat with Scribble enabled to deliver it."
               : "Send your finished feedback to the conversation that opened this canvas."}
-      </p>
+          </p>
+        </>
+      )}
       {error && (
         <p className="handoff-error" role="alert">
           {error}

@@ -4,7 +4,7 @@ import {
   INKS,
   type Annotation,
   type CaptureKind,
-  type CaptureMode,
+  type CaptureRequest,
   type Draft,
   type Tool,
 } from "./types";
@@ -92,12 +92,8 @@ export function useEditorController() {
     },
     [disabled, upload, acceptImages],
   );
-  const captureImage = async (
-    kind: CaptureMode,
-    file?: File,
-    surface?: string,
-  ) => {
-    const result = await capture(kind, file, surface);
+  const captureImage = async (input: CaptureRequest) => {
+    const result = await capture(input);
     acceptImages(result);
     setCaptureOpen(false);
   };

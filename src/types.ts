@@ -21,6 +21,9 @@ export type Screenshot = {
 import type { CaptureKind } from "../skills/scribble/scripts/lib/capture/contracts.mjs";
 export type { CaptureKind } from "../skills/scribble/scripts/lib/capture/contracts.mjs";
 export type CaptureMode = CaptureKind | "shared";
+export type CaptureRequest =
+  | import("../skills/scribble/scripts/lib/capture/contracts.mjs").CaptureSnapshot
+  | { kind: "shared"; file: File; surface: string };
 export type CaptureSource = {
   capturedAt: string;
 } & (
@@ -31,6 +34,7 @@ export type CaptureSource = {
       viewport: { width: number; height: number };
       scroll: { x: number; y: number };
       deviceScaleFactor: number;
+      fullPage?: boolean;
     }
   | { kind: "shared"; displaySurface: "browser" | "window" | "monitor" }
   | {

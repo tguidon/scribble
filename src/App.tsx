@@ -10,6 +10,7 @@ import {
   Maximize2,
 } from "lucide-react";
 import { FeedbackReceipt } from "./components/FeedbackReceipt";
+import { BrandIcon } from "./components/BrandIcon";
 import { Canvas } from "./components/Canvas";
 import { CapturePanel } from "./components/CapturePanel";
 import { Toolbar } from "./components/Toolbar";
@@ -172,7 +173,7 @@ function Editor({ controller }: { controller: EditorController }) {
           rel="noreferrer"
           aria-label="Scribble"
         >
-          <PencilLine size={24} strokeWidth={2.3} />
+          <BrandIcon />
           <span>
             scribble<span className="brand-dot">.</span>
           </span>
@@ -356,7 +357,7 @@ function Editor({ controller }: { controller: EditorController }) {
           setWebMode={setWebMode}
           share={tabShare}
           onSharedCapture={(file, surface) =>
-            captureImage("shared", file, surface)
+            captureImage({ kind: "shared", file, surface })
           }
           onBack={() => setCaptureOpen(false)}
           onCapture={captureImage}

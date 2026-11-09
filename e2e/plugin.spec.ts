@@ -177,60 +177,73 @@ test.afterEach(async ({ page }, info) => {
 });
 
 for (const width of [1440, 390])
-  test(`sandboxed editor sends feedback and starts another round at ${width}px`, async ({
-    page,
-  }) => {
-    const errors: string[] = [];
-    page.on("pageerror", (error) => {
-      errors.push(error.message);
-      console.error("Plugin browser error:", error.message);
-    });
-    await page.setViewportSize({ width, height: 1000 });
-    await page.goto(`${origin}/host`);
-    const ui = page.frameLocator("iframe");
-    await expect(ui.getByRole("heading", { name: /A picture/ })).toBeVisible();
-    await ui.getByRole("button", { name: "Try an example" }).click();
-    await expectDecodedScreenshot(ui.locator(".image-stage image"));
-    await ui
-      .getByRole("textbox", { name: "The bigger picture" })
-      .fill("Improve this example's spacing.");
-    await ui.getByRole("button", { name: "Finish feedback" }).click();
-    await expect(
-      ui.getByRole("heading", { name: "Ready for your agent." }),
-    ).toBeVisible();
-    await ui.getByRole("button", { name: "Send to this chat" }).click();
-    await expect(
-      ui.getByRole("button", { name: "Message accepted" }),
-    ).toBeVisible();
-    expect(messages).toHaveLength(1);
-    expect(messages[0].content[0].text).toContain(
-      result.structuredContent.sessionId,
-    );
-    expect(messages[0].content[0].text).not.toContain(
-      result._meta.scribble.token,
-    );
-    const feedback = await client.callTool({
-      name: "read_feedback",
-      arguments: { sessionId: result.structuredContent.sessionId },
-    });
-    expect(feedback.isError).not.toBe(true);
-    await expect(
-      ui.getByRole("button", { name: "Feedback read" }),
-    ).toBeVisible();
-    if (process.env.SCRIBBLE_VISUAL_TEST)
-      await page.screenshot({
-        path: `.impeccable/review/plugin-${width}.png`,
-        fullPage: true,
+  for (const theme of ["light", "dark"])
+    test(`sandboxed editor sends feedback and starts another round at ${width}px in ${theme}`, async ({
+      page,
+    }) => {
+      const errors: string[] = [];
+      page.on("pageerror", (error) => {
+        errors.push(error.message);
+        console.error("Plugin browser error:", error.message);
       });
-    await ui.getByRole("button", { name: "New canvas" }).click();
-    await expect(ui.getByRole("heading", { name: /A picture/ }))
-      .toBeVisible()
-      .catch(async (error) => {
-        console.error("Plugin calls:", calls);
-        throw error;
+      await page.setViewportSize({ width, height: 1000 });
+      await page.goto(`${origin}/host?theme=${theme}`);
+      const ui = page.frameLocator("iframe");
+      await expect(
+        ui.getByRole("heading", { name: /A picture/ }),
+      ).toBeVisible();
+      await ui.getByRole("button", { name: "Try an example" }).click();
+      await expectDecodedScreenshot(ui.locator(".image-stage image"));
+      await ui
+        .getByRole("textbox", { name: "The bigger picture" })
+        .fill("Improve this example's spacing.");
+      await ui.getByRole("button", { name: "Finish feedback" }).click();
+      await expect(
+        ui.getByRole("heading", { name: "Ready for your agent." }),
+      ).toBeVisible();
+      await ui.getByRole("button", { name: "Send to this chat" }).click();
+      await expect(
+        ui.getByRole("status").filter({ hasText: "Message accepted" }),
+      ).toBeVisible();
+      expect(messages).toHaveLength(1);
+      expect(messages[0].content[0].text).toContain(
+        result.structuredContent.sessionId,
+      );
+      expect(messages[0].content[0].text).not.toContain(
+        result._meta.scribble.token,
+      );
+      const feedback = await client.callTool({
+        name: "read_feedback",
+        arguments: { sessionId: result.structuredContent.sessionId },
       });
-    expect(errors).toEqual([]);
-  });
+      expect(feedback.isError).not.toBe(true);
+      await expect(
+        ui.getByRole("status").filter({ hasText: "Feedback read" }),
+      ).toBeVisible();
+      await expect(
+        ui.getByRole("button", { name: "Feedback read" }),
+      ).toHaveCount(0);
+      await expect(ui.getByRole("button", { name: "New canvas" })).toHaveClass(
+        "primary",
+      );
+      await expect(
+        ui.getByRole("button", { name: "Copy for agent" }),
+      ).toHaveClass("text-button");
+      await expect(ui.locator(".receipt-note")).toHaveCount(0);
+      if (process.env.SCRIBBLE_VISUAL_TEST)
+        await page.screenshot({
+          path: `.impeccable/review/receipt-${theme}-${width}.png`,
+          fullPage: true,
+        });
+      await ui.getByRole("button", { name: "New canvas" }).click();
+      await expect(ui.getByRole("heading", { name: /A picture/ }))
+        .toBeVisible()
+        .catch(async (error) => {
+          console.error("Plugin calls:", calls);
+          throw error;
+        });
+      expect(errors).toEqual([]);
+    });
 
 test("image failures do not reject saved uploads or edits and retry independently", async ({
   page,
@@ -297,7 +310,7 @@ test("uploaded screenshot decodes with desktop CSP and survives reopening the pl
   await ui.getByRole("button", { name: "Finish feedback" }).click();
   await ui.getByRole("button", { name: "Send to this chat" }).click();
   await expect(
-    ui.getByRole("button", { name: "Message accepted" }),
+    ui.getByRole("status").filter({ hasText: "Message accepted" }),
   ).toBeVisible();
   const feedback: any = await client.callTool({
     name: "read_feedback",
@@ -480,7 +493,7 @@ test("host rejection leaves feedback saved and offers manual delivery", async ({
   await ui.getByRole("button", { name: "Send to this chat" }).click();
   await expect(ui.getByRole("alert")).toContainText("declined");
   await expect(
-    ui.getByRole("button", { name: "Message accepted" }),
+    ui.getByRole("status").filter({ hasText: "Message accepted" }),
   ).toHaveCount(0);
   expect(messages).toEqual([]);
 });
@@ -638,7 +651,7 @@ for (const width of [1440, 390])
       await capture("receipt");
       await ui.getByRole("button", { name: "Send to this chat" }).click();
       await expect(
-        ui.getByRole("button", { name: "Message accepted" }),
+        ui.getByRole("status").filter({ hasText: "Message accepted" }),
       ).toBeVisible();
       await checkTheme();
       await ui.getByRole("button", { name: "New canvas" }).click();
@@ -762,29 +775,29 @@ test("delivery acceptance and read receipts survive panel collapse and reload", 
   await ui.getByRole("button", { name: "Finish feedback" }).click();
   await ui.getByRole("button", { name: "Send to this chat" }).click();
   await expect(
-    ui.getByRole("button", { name: "Message accepted" }),
-  ).toBeDisabled();
+    ui.getByRole("status").filter({ hasText: "Message accepted" }),
+  ).toBeVisible();
   await page.evaluate(() => (window as any).fixtureDisplayMode("inline"));
   await ui.getByRole("button", { name: "Open canvas", exact: true }).click();
   await expect(
-    ui.getByRole("button", { name: "Message accepted" }),
-  ).toBeDisabled();
+    ui.getByRole("status").filter({ hasText: "Message accepted" }),
+  ).toBeVisible();
   await page.reload();
   await expect(
-    ui.getByRole("button", { name: "Message accepted" }),
-  ).toBeDisabled();
+    ui.getByRole("status").filter({ hasText: "Message accepted" }),
+  ).toBeVisible();
   expect(messages).toHaveLength(1);
   await client.callTool({
     name: "read_feedback",
     arguments: { sessionId: result.structuredContent.sessionId },
   });
   await expect(
-    ui.getByRole("button", { name: "Feedback read" }),
-  ).toBeDisabled();
+    ui.getByRole("status").filter({ hasText: "Feedback read" }),
+  ).toBeVisible();
   await page.reload();
   await expect(
-    ui.getByRole("button", { name: "Feedback read" }),
-  ).toBeDisabled();
+    ui.getByRole("status").filter({ hasText: "Feedback read" }),
+  ).toBeVisible();
   expect(messages).toHaveLength(1);
   await ui.getByRole("button", { name: "New canvas" }).click();
   await ui.getByRole("button", { name: "Try an example" }).click();
@@ -826,8 +839,8 @@ test("closing the panel while sending never enables a duplicate send", async ({
   ).toHaveCount(0);
   release();
   await expect(
-    ui.getByRole("button", { name: "Message accepted" }),
-  ).toBeDisabled();
+    ui.getByRole("status").filter({ hasText: "Message accepted" }),
+  ).toBeVisible();
   expect(messages).toHaveLength(1);
 });
 
@@ -854,8 +867,8 @@ test("accepted delivery retries receipt storage without sending again", async ({
   });
   await ui.getByRole("button", { name: "Send to this chat" }).click();
   await expect(
-    ui.getByRole("button", { name: "Message accepted" }),
-  ).toBeDisabled();
+    ui.getByRole("status").filter({ hasText: "Message accepted" }),
+  ).toBeVisible();
   await expect.poll(() => records).toBeGreaterThan(1);
   await expect
     .poll(
@@ -870,7 +883,7 @@ test("accepted delivery retries receipt storage without sending again", async ({
     .toBeTruthy();
   await page.reload();
   await expect(
-    ui.getByRole("button", { name: "Message accepted" }),
-  ).toBeDisabled();
+    ui.getByRole("status").filter({ hasText: "Message accepted" }),
+  ).toBeVisible();
   expect(messages).toHaveLength(1);
 });

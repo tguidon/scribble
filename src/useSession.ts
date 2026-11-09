@@ -6,7 +6,7 @@ import {
   currentSessionId,
   uploadImage,
 } from "./api";
-import type { CaptureMode, Draft, Session } from "./types";
+import type { CaptureMode, CaptureRequest, Draft, Session } from "./types";
 import { draftStorage } from "./draftStorage";
 import {
   draftBytes,
@@ -31,7 +31,7 @@ export function useSession() {
   const [recovery, setRecovery] = useState<Backup>();
   const pending = useRef<PendingSave | undefined>(undefined);
   const pendingCapture = useRef<
-    { kind: CaptureMode; captureId: string } | undefined
+    { kind: CaptureMode; fullPage?: boolean; captureId: string } | undefined
   >(undefined);
   const current = useRef<Session | undefined>(undefined);
   const generation = useRef(0);
@@ -249,16 +249,22 @@ export function useSession() {
     [enqueue, flush, accept],
   );
   const capture = useCallback(
-    async (kind: CaptureMode, file?: File, surface?: string) => {
+    async (input: CaptureRequest) => {
+      const { kind } = input;
+      const fullPage = kind === "web" ? input.fullPage === true : undefined;
       if (recovery)
         throw new Error(
           "Resolve the saved draft conflict before capturing a screen.",
         );
       setBusy(true);
       setError("");
-      if (pendingCapture.current?.kind !== kind)
+      if (
+        pendingCapture.current?.kind !== kind ||
+        pendingCapture.current?.fullPage !== fullPage
+      )
         pendingCapture.current = {
           kind,
+          ...(kind === "web" ? { fullPage } : {}),
           captureId: crypto.randomUUID(),
         };
       const operation = pendingCapture.current;
@@ -267,18 +273,17 @@ export function useSession() {
         return await enqueue(async () => {
           let result: Session;
           try {
-            if (operation.kind === "shared") {
-              if (!file) throw new Error("Capture a shared frame first.");
+            if (input.kind === "shared") {
               const params = new URLSearchParams({
                 captureId: operation.captureId,
                 revision: String(revision.current),
-                surface: surface || "browser",
+                surface: input.surface || "browser",
               });
               result = await request<Session>(`/capture/shared?${params}`, {
                 method: "POST",
                 // Keep the ID for lost acknowledgements, but use the current
                 // frame when the previous attempt did not save an image.
-                body: file,
+                body: input.file,
               });
             } else
               result = await request<Session>("/capture/snapshot", {

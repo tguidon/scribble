@@ -59,11 +59,11 @@ test("browser delivery queues, pauses, retries, records retrieval, and inherits 
     const retry = await pollAgentDelivery(directory, "chat-one", "consumer");
     await settleAgentDelivery(directory, "chat-one", "consumer", retry);
     await expect(
-      page.getByRole("button", { name: "Message accepted" }),
+      page.locator(".delivery-status-label", { hasText: "Message accepted" }),
     ).toBeVisible();
     await backend.feedback(canvas.sessionId);
     await expect(
-      page.getByRole("button", { name: "Feedback read" }),
+      page.locator(".delivery-status-label", { hasText: "Feedback read" }),
     ).toBeVisible();
     await page.getByRole("button", { name: "New canvas" }).click();
     await page.getByRole("button", { name: "Try an example" }).click();

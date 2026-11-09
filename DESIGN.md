@@ -278,9 +278,9 @@ Not canonized: the directional handwritten wordmark did not ship; the implemente
 
 ## Feedback receipt
 
-Finish feedback saves the brief, full annotation data, and original image references. The receipt offers Copy for agent and New canvas. Copy status reports clipboard success only; the user pastes into their chosen agent chat. A collapsed handoff preview opens and selects its text when clipboard access is blocked. New canvas preserves the earlier feedback and closes its capture connections. At 440px and below, the two actions stack at full width.
+Finish feedback saves the brief, full annotation data, and original image references. The receipt offers New canvas and Copy for agent. Copy status reports clipboard success only; the user pastes into their chosen agent chat. A collapsed handoff preview contains the file-path explanation, and opens and selects its text when clipboard access is blocked. New canvas preserves the earlier feedback and closes its capture connections. At 440px and below, the two actions stack at full width.
 
-In the desktop plugin, Send to this chat is the primary receipt action when the host supports messages. Message accepted confirms host acceptance; Feedback read confirms retrieval of the saved feedback. Neither state claims that changes were applied. Copy for agent remains available below, alongside New canvas. Hosts without messaging show the clipboard action and an explanation. The narrow header uses an icon button to expand the embedded editor, preserving room for save status.
+In the desktop plugin, Send to this chat is the primary receipt action when the host supports messages. After delivery, a quiet check and text status replaces the send button: Message accepted confirms host acceptance; Feedback read confirms retrieval of the saved feedback. Neither state claims that changes were applied. New canvas becomes the primary action, with Copy for agent as a secondary text action. The redundant new-canvas footer is omitted. Hosts without messaging keep Copy for agent primary until copying succeeds, then promote New canvas. The narrow header uses an icon button to expand the embedded editor, preserving room for save status.
 
 ## Light and dark themes
 

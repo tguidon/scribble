@@ -3,6 +3,7 @@ import { playwright } from "./runtime.mjs";
 import { webpageUrl, imageDimensions, captureError } from "./common.mjs";
 
 import { streamHeaders, writeFrame } from "./live.mjs";
+import { prepareFullPage } from "./full-page.mjs";
 
 export class WebCapture {
   constructor(root, options = {}) {
@@ -152,7 +153,7 @@ export class WebCapture {
     await page.bringToFront();
     return this.state();
   }
-  async capture() {
+  async capture({ fullPage = false } = {}) {
     const page = this.currentPage();
     if (!page) throw captureError("Open a webpage before capturing it.", 409);
     const url = webpageUrl(page.url()).href;
@@ -164,35 +165,57 @@ export class WebCapture {
       viewport: { width: innerWidth, height: innerHeight },
       deviceScaleFactor: devicePixelRatio,
     }));
-    const bytes = await page.screenshot({
-      type: "png",
-      animations: "disabled",
-      caret: "hide",
-      timeout: 15000,
-    });
-    const after = await page.evaluate(() => ({
-      url: location.href,
-      scroll: { x: scrollX, y: scrollY },
-      width: innerWidth,
-      height: innerHeight,
-    }));
-    if (
-      url !== after.url ||
-      before.scroll.x !== after.scroll.x ||
-      before.scroll.y !== after.scroll.y ||
-      before.viewport.width !== after.width ||
-      before.viewport.height !== after.height
-    )
-      throw captureError(
-        "The page moved during capture. Let it settle and capture again.",
-        409,
-      );
-    return {
-      bytes,
-      ...imageDimensions(bytes),
-      name: `${before.title || new URL(url).host}.png`.slice(0, 200),
-      source: { kind: "web", ...before, capturedAt: new Date().toISOString() },
-    };
+    try {
+      if (fullPage) await prepareFullPage(page);
+      const bytes = await page.screenshot({
+        type: "png",
+        fullPage,
+        animations: "disabled",
+        caret: "hide",
+        timeout: 15000,
+      });
+      const after = await page.evaluate(() => ({
+        url: location.href,
+        scroll: { x: scrollX, y: scrollY },
+        width: innerWidth,
+        height: innerHeight,
+      }));
+      if (
+        url !== after.url ||
+        (fullPage ? 0 : before.scroll.x) !== after.scroll.x ||
+        (fullPage ? 0 : before.scroll.y) !== after.scroll.y ||
+        before.viewport.width !== after.width ||
+        before.viewport.height !== after.height
+      )
+        throw captureError(
+          "The page moved during capture. Let it settle and capture again.",
+          409,
+        );
+      return {
+        bytes,
+        ...imageDimensions(bytes),
+        name: `${before.title || new URL(url).host}.png`.slice(0, 200),
+        source: {
+          kind: "web",
+          ...before,
+          ...(fullPage ? { fullPage: true, scroll: { x: 0, y: 0 } } : {}),
+          capturedAt: new Date().toISOString(),
+        },
+      };
+    } finally {
+      if (fullPage && !page.isClosed() && page.url() === url)
+        await page
+          .evaluate(
+            (scroll) =>
+              window.scrollTo({
+                left: scroll.x,
+                top: scroll.y,
+                behavior: "instant",
+              }),
+            before.scroll,
+          )
+          .catch(() => {});
+    }
   }
   async stream(res) {
     const page = this.currentPage();

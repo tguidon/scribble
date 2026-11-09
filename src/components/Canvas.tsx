@@ -67,7 +67,9 @@ export function Canvas({
         1,
       )
     : 1;
-  const scale = Math.max(0.02, fit) * zoom;
+  const baseScale = Math.max(0.001, fit);
+  const maxZoom = Math.max(5, 1 / baseScale);
+  const scale = baseScale * zoom;
   useEffect(() => {
     if (!viewport.current) return;
     const observer = new ResizeObserver(([entry]) => {
@@ -145,13 +147,16 @@ export function Canvas({
       event.preventDefault();
       if (zooming)
         setZoom((z) =>
-          Math.max(0.25, Math.min(5, z * (event.deltaY > 0 ? 0.92 : 1.08))),
+          Math.max(
+            0.25,
+            Math.min(maxZoom, z * (event.deltaY > 0 ? 0.92 : 1.08)),
+          ),
         );
       else setPan((p) => ({ x: p.x - event.deltaX, y: p.y - event.deltaY }));
     };
     element?.addEventListener("wheel", wheel, { passive: false });
     return () => element?.removeEventListener("wheel", wheel);
-  }, [image, tool, space]);
+  }, [image, tool, space, maxZoom]);
   const point = (event: React.PointerEvent): Point => {
     const bounds = svg.current!.getBoundingClientRect();
     return {
@@ -259,7 +264,9 @@ export function Canvas({
               {" "}
               ·{" "}
               {image.source.kind === "web"
-                ? "Web capture"
+                ? image.source.fullPage
+                  ? "Full-page web capture"
+                  : "Web capture"
                 : image.source.kind === "shared"
                   ? "Shared screen capture"
                   : "Simulator capture"}
@@ -412,8 +419,8 @@ export function Canvas({
             <span>{Math.round(scale * 100)}%</span>
             <button
               aria-label="Zoom in"
-              disabled={zoom >= 5}
-              onClick={() => setZoom((z) => Math.min(5, z * 1.2))}
+              disabled={zoom >= maxZoom}
+              onClick={() => setZoom((z) => Math.min(maxZoom, z * 1.2))}
             >
               <Plus size={14} />
             </button>
