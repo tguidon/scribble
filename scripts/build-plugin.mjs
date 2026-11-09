@@ -3,8 +3,8 @@ import { mkdir, writeFile, readFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
 
 await mkdir("plugin/dist", { recursive: true });
-// Older desktop/CLI builds discover the Codex layout. Generate it from the
-// portable manifests so both installation paths have one source of truth.
+// Generate harness packaging from one manifest and one MCP server definition.
+// Both distributions include exactly the same runtime, editor and skill.
 const manifest = JSON.parse(await readFile("plugin.json", "utf8"));
 const mcp = JSON.parse(await readFile("mcp.json", "utf8"));
 await mkdir(".codex-plugin", { recursive: true });
@@ -17,7 +17,7 @@ await writeFile(
       description: manifest.description,
       author: manifest.author,
       skills: "./skills/",
-      mcpServers: "./.mcp.json",
+      mcpServers: "./.codex-plugin/mcp.json",
       ...manifest.extensions["com.openai"],
     },
     null,
@@ -25,7 +25,7 @@ await writeFile(
   ) + "\n",
 );
 await writeFile(
-  ".mcp.json",
+  ".codex-plugin/mcp.json",
   JSON.stringify(
     {
       mcpServers: Object.fromEntries(
@@ -34,6 +34,55 @@ await writeFile(
           server,
         ]),
       ),
+    },
+    null,
+    2,
+  ) + "\n",
+);
+await mkdir(".claude-plugin", { recursive: true });
+await writeFile(
+  ".claude-plugin/plugin.json",
+  JSON.stringify(
+    {
+      name: manifest.name,
+      version: manifest.version,
+      description: manifest.description,
+      author: manifest.author,
+      homepage: manifest.homepage,
+      repository: manifest.repository,
+      hooks: "./plugin/claude/hooks.json",
+      mcpServers: Object.fromEntries(
+        Object.entries(mcp.mcpServers).map(([name, { cwd, ...server }]) => [
+          name,
+          {
+            ...server,
+            args: server.args.map((arg) =>
+              arg.startsWith("./")
+                ? `\${CLAUDE_PLUGIN_ROOT}/${arg.slice(2)}`
+                : arg,
+            ),
+            env: { ...server.env, SCRIBBLE_HARNESS: "claude-code" },
+          },
+        ]),
+      ),
+    },
+    null,
+    2,
+  ) + "\n",
+);
+await writeFile(
+  ".claude-plugin/marketplace.json",
+  JSON.stringify(
+    {
+      name: manifest.name,
+      owner: manifest.author,
+      plugins: [
+        {
+          name: manifest.name,
+          source: "./",
+          description: manifest.description,
+        },
+      ],
     },
     null,
     2,

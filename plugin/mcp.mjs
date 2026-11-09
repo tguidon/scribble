@@ -72,6 +72,11 @@ export function createPlugin(options = {}) {
       inputSchema: {
         projectPath: z.string().min(1),
         title: z.string().max(120).default("A little visual direction"),
+        deliveryChatId: id
+          .optional()
+          .describe(
+            "Set by the Claude Code mod to bind delivery to this chat.",
+          ),
       },
       annotations: {
         readOnlyHint: false,
@@ -80,8 +85,14 @@ export function createPlugin(options = {}) {
       },
       _meta: { ui: { resourceUri: RESOURCE } },
     },
-    guarded(async ({ projectPath, title }) => {
-      const connection = await backend.open(projectPath, title);
+    guarded(async ({ projectPath, title, deliveryChatId }) => {
+      const connection = await backend.open(
+        projectPath,
+        title,
+        (options.harness || process.env.SCRIBBLE_HARNESS) === "claude-code"
+          ? deliveryChatId
+          : undefined,
+      );
       return {
         ...result({
           sessionId: connection.sessionId,

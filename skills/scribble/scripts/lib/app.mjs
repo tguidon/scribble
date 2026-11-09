@@ -20,6 +20,12 @@ import { createCaptures } from "./capture/index.mjs";
 import { imageDimensions } from "./capture/common.mjs";
 import { discoverWebApps } from "./capture/discovery.mjs";
 import { prepareHandoff } from "./handoff.mjs";
+import {
+  agentDeliveryStatus,
+  requestAgentDelivery,
+  inheritAgentDelivery,
+} from "./agent-delivery.mjs";
+import { excludeStorage } from "./git-exclude.mjs";
 const appRoot = fileURLToPath(new URL("../../", import.meta.url));
 const mime = {
   ".html": "text/html",
@@ -264,6 +270,12 @@ export async function startServer({
           const receipt = await loadSubmission(root, id);
           if (req.method === "GET" && url.pathname === "/api/session")
             return reply(res, 200, publicSession(session));
+          if (url.pathname === "/api/delivery") {
+            if (req.method === "GET")
+              return reply(res, 200, await agentDeliveryStatus(root, id));
+            if (req.method === "POST")
+              return reply(res, 200, await requestAgentDelivery(root, id));
+          }
           if (req.method === "GET" && url.pathname.startsWith("/api/images/")) {
             const id = url.pathname.split("/").pop();
             const image = session.images.find((i) => i.id === id);
@@ -277,6 +289,7 @@ export async function startServer({
           if (req.method === "POST" && url.pathname === "/api/sessions") {
             if (!receipt)
               fail(409, "Finish this feedback before opening a new canvas.");
+            await excludeStorage(root);
             await captures.release(id);
             // Reuse the next draft after a lost response or repeated click.
             let next = session.nextSessionId
@@ -284,6 +297,7 @@ export async function startServer({
               : null;
             if (!next || next.status !== "draft") {
               next = await createSession(root);
+              await inheritAgentDelivery(root, id, next.id);
               session.nextSessionId = next.id;
               await persist();
             }

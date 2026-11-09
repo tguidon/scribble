@@ -1,12 +1,12 @@
 {
   "name": "scribble",
-  "version": "0.0.9",
+  "version": "0.0.10",
   "description": "Capture app screens, annotate them, and hand precise visual feedback to your coding agent.",
   "author": {
     "name": "Taylor Guidon"
   },
   "skills": "./skills/",
-  "mcpServers": "./.mcp.json",
+  "mcpServers": "./.codex-plugin/mcp.json",
   "interface": {
     "displayName": "Scribble",
     "shortDescription": "Visual feedback for your coding agent",

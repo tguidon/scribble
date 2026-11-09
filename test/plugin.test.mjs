@@ -210,11 +210,18 @@ test("bundled plugin starts over stdio without node_modules or source checkout",
   t.after(() => rm(destination, { recursive: true, force: true }));
   await cp(resolve("plugin"), join(destination, "plugin"), { recursive: true });
   await cp(resolve("skills"), join(destination, "skills"), { recursive: true });
+  const claude = JSON.parse(
+    await readFile(".claude-plugin/plugin.json", "utf8"),
+  );
+  const launch = claude.mcpServers.scribble;
   const transport = new StdioClientTransport({
     command: process.execPath,
-    args: [join(destination, "plugin/mcp.mjs")],
+    args: launch.args.map((arg) =>
+      arg.replace("${CLAUDE_PLUGIN_ROOT}", destination),
+    ),
+    cwd: tmpdir(),
     stderr: "pipe",
-    env: { SCRIBBLE_PLUGIN_DATA: join(destination, "data") },
+    env: { ...launch.env, SCRIBBLE_PLUGIN_DATA: join(destination, "data") },
   });
   const client = new Client({ name: "distribution-test", version: "1" });
   let stderr = "";
@@ -241,6 +248,7 @@ test("bundled plugin starts over stdio without node_modules or source checkout",
   for (const path of [
     "plugin.json",
     ".codex-plugin/plugin.json",
+    ".claude-plugin/plugin.json",
     "package.json",
   ])
     assert.equal(JSON.parse(await readFile(path, "utf8")).version, VERSION);

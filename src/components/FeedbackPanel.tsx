@@ -125,7 +125,7 @@ export function FeedbackPanel({
         </button>
         <span className="send-hint">
           {session.images.length
-            ? host
+            ? host || session.deliveryHost
               ? "Next, send the feedback to this chat."
               : "Next, copy the handoff into your agent."
             : "Add a screenshot to get started."}
