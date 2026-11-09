@@ -1064,10 +1064,6 @@ kbd {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
-.receipt .receipt-note {
-  font-size: var(--text-label);
-  margin-top: 24px;
-}
 .help-panel {
   position: absolute;
   right: 22px;
@@ -2191,22 +2187,23 @@ kbd {
   }
 }
 
-/* The saved receipt hands off through the clipboard; it never implies delivery. */
+/* Delivery is a status; cobalt highlights the next available action. */
 .handoff-actions {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
   gap: 12px;
 }
-.handoff-actions .secondary {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
+.handoff-actions > button {
+  min-height: 46px;
+  padding-inline: 18px;
 }
 .receipt .handoff-status {
   margin-top: 16px;
   max-width: 55ch;
+}
+.receipt > .handoff-status:empty {
+  margin: 0;
 }
 .handoff-preview {
   width: min(100%, 640px);
@@ -2216,6 +2213,11 @@ kbd {
 .handoff-preview summary {
   cursor: pointer;
   color: var(--blue);
+}
+.handoff-help {
+  margin: 12px 0 0;
+  color: var(--muted);
+  font-size: var(--text-label);
 }
 .handoff-preview textarea {
   width: 100%;
@@ -2251,4 +2253,18 @@ kbd {
 .plugin-delivery > button:disabled {
   opacity: 1;
   background: var(--action);
+}
+.delivery-status-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--success);
+  font-size: var(--text-label);
+  font-weight: 600;
+}
+.delivery-status p {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: var(--text-body);
+  line-height: 1.6;
 }

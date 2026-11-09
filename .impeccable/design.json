@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-10-10T22:03:17.325575+00:00",
+  "generatedAt": "2026-11-09T02:33:43.992132+00:00",
   "title": "Design System: Scribble",
   "extensions": {
     "colorMeta": {
@@ -470,8 +470,8 @@
       "name": "Primary action",
       "kind": "button",
       "refersTo": "button-primary",
-      "description": "Save a feedback batch before the receipt offers direct delivery or a clipboard handoff.",
-      "html": "<button class=\"ds-primary\">Finish feedback</button>",
+      "description": "The main next action: finish feedback, send it to the chat, or start a new canvas after delivery.",
+      "html": "<button class=\"ds-primary\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" aria-hidden=\"true\"><path d=\"M12 5v14M5 12h14\"/></svg>New canvas</button>",
       "css": ".ds-primary{font-family:-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;cursor:pointer;transition:background-color 160ms ease,color 160ms ease,border-color 160ms ease;display:inline-flex;align-items:center;justify-content:center;gap:9px;border:0;background:var(--action,light-dark(#3456c4, #395bcc));color:#fff;font-size:1rem;font-weight:600;border-radius:9px;min-height:46px;padding:0 18px}.ds-primary:hover:not(:disabled){background:var(--action-hover,light-dark(#2747ae, #4264d6))}.ds-primary:active:not(:disabled){background:var(--action-active,light-dark(#203c99, #3454bc))}.ds-primary:focus-visible{outline:3px solid var(--blue,light-dark(#3456c4, #a4b8ff));outline-offset:3px;}.ds-primary:disabled{opacity:.4;cursor:not-allowed}@media(prefers-reduced-motion:reduce){button,a,textarea{transition:none!important;animation:none!important}}"
     },
     {
@@ -486,8 +486,8 @@
       "name": "Text action",
       "kind": "button",
       "refersTo": "button-text",
-      "description": "A quiet example entry.",
-      "html": "<button class=\"ds-text\">Try an example <svg width=\"19\" height=\"19\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M7 17 17 7M7 7h10v10\"/></svg></button>",
+      "description": "A quiet supporting action. Copy for agent remains secondary after plugin delivery.",
+      "html": "<button class=\"ds-text\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><rect x=\"9\" y=\"9\" width=\"13\" height=\"13\" rx=\"2\"/><path d=\"M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1\"/></svg>Copy for agent</button>",
       "css": ".ds-text{font-family:-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;cursor:pointer;transition:background-color 160ms ease,color 160ms ease,border-color 160ms ease;display:inline-flex;align-items:center;gap:8px;border:0;background:none;padding:5px;font-size:0.875rem;color:var(--secondary-ink,light-dark(#635d53, #cbc5b9))}.ds-text:hover{color:var(--blue,light-dark(#3456c4, #a4b8ff))}.ds-text:focus-visible{outline:3px solid var(--blue,light-dark(#3456c4, #a4b8ff));outline-offset:3px;}.ds-text svg{width:14px;height:14px}@media(prefers-reduced-motion:reduce){button,a,textarea{transition:none!important;animation:none!important}}"
     },
     {
@@ -504,7 +504,7 @@
       "refersTo": "input-overall",
       "description": "A larger instruction shared across screenshots.",
       "html": "<textarea class=\"ds-overall\" aria-label=\"The bigger picture\" placeholder=\"What are we working toward? Add any overall direction...\"></textarea>",
-      "css": ".ds-overall{font-family:-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;cursor:pointer;transition:background-color 160ms ease,color 160ms ease,border-color 160ms ease;cursor:text;width:100%;min-height:104px;max-height:180px;resize:vertical;border:1px solid #ded8cd;border-radius:8px;padding:11px;background:var(--panel,light-dark(#fdfcf8, #292925));color:var(--ink,light-dark(#34322e, #eeeae1));font-size:1rem;line-height:1.6;caret-color:var(--blue,light-dark(#3456c4, #a4b8ff))}.ds-overall::placeholder{color:var(--muted,light-dark(#70685c, #bcb7ab))}.ds-overall:focus-visible{outline:3px solid var(--blue,light-dark(#3456c4, #a4b8ff));outline-offset:3px;}@media(prefers-reduced-motion:reduce){button,a,textarea{transition:none!important;animation:none!important}}"
+      "css": ".ds-overall{font-family:-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;cursor:pointer;transition:background-color 160ms ease,color 160ms ease,border-color 160ms ease;cursor:text;width:100%;min-height:104px;max-height:180px;resize:vertical;border:1px solid var(--field-line,light-dark(#ded8cd, #66665c));border-radius:8px;padding:11px;background:var(--panel,light-dark(#fdfcf8, #292925));color:var(--ink,light-dark(#34322e, #eeeae1));font-size:1rem;line-height:1.6;caret-color:var(--blue,light-dark(#3456c4, #a4b8ff))}.ds-overall::placeholder{color:var(--muted,light-dark(#70685c, #bcb7ab))}.ds-overall:focus-visible{outline:3px solid var(--blue,light-dark(#3456c4, #a4b8ff));outline-offset:3px;}@media(prefers-reduced-motion:reduce){button,a,textarea{transition:none!important;animation:none!important}}"
     },
     {
       "name": "Count badge",
@@ -537,6 +537,13 @@
       "description": "A focused selectable mark at its nominal screen size.",
       "html": "<svg class=\"ds-mark\" width=\"60\" height=\"60\" viewBox=\"0 0 60 60\"><g role=\"button\" tabindex=\"0\" aria-label=\"Mark 1: Pin\"><circle cx=\"30\" cy=\"30\" r=\"20\" fill=\"white\" opacity=\".85\"/><circle class=\"ds-badge\" cx=\"30\" cy=\"30\" r=\"14\" fill=\"#c94b35\" stroke=\"white\" stroke-width=\"2\"/><text x=\"30\" y=\"30\" fill=\"white\" text-anchor=\"middle\" dominant-baseline=\"central\" font-size=\"14\" font-weight=\"700\">1</text></g></svg>",
       "css": ".ds-mark{font-family:-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;overflow:visible}.ds-mark g{cursor:pointer}.ds-mark g:focus-visible{outline:none;filter:drop-shadow(0 2px 4px #242d7440)}.ds-mark g:focus-visible .ds-badge{stroke:#34322e;stroke-width:3px}.ds-mark text{pointer-events:none}@media(prefers-reduced-motion:reduce){button,a,textarea{transition:none!important;animation:none!important}} .ds-badge{transform-box:fill-box;transform-origin:center;animation:ds-pin-pop 180ms cubic-bezier(0.16,1,0.3,1)}@keyframes ds-pin-pop{from{opacity:.6;transform:scale(.72)}to{opacity:1;transform:scale(1)}}@media(prefers-reduced-motion:reduce){.ds-badge{animation:none!important}}"
+    },
+    {
+      "name": "Feedback delivery status",
+      "kind": "custom",
+      "description": "A noninteractive check and text status replaces the send button after host acceptance or feedback retrieval. New canvas becomes primary; the copy action stays secondary.",
+      "html": "<div class=\"ds-delivery\" role=\"status\"><span class=\"ds-delivery-label\"><svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"m20 6-11 11-5-5\"/></svg>Feedback read</span><p>Follow your agent’s progress in the chat.</p></div>",
+      "css": ".ds-delivery{font-family:-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;text-align:center}.ds-delivery-label{display:inline-flex;align-items:center;gap:8px;color:var(--success,light-dark(#48743b, #b2d79e));font-size:.875rem;font-weight:600}.ds-delivery p{margin:8px 0 0;color:var(--muted,light-dark(#70685c, #bcb7ab));font-size:1rem;line-height:1.6}"
     }
   ],
   "narrative": {
