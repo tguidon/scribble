@@ -8,35 +8,17 @@ No account, hosted backend, or model API key is required.
 
 ![Scribble showing a screenshot marked with a pin, an arrow, and a rectangle, with comments alongside it.](docs/images/scribble.png)
 
-## Install the skill
-
-Scribble requires **Node.js 22 or newer**. The skill includes the browser app and server. Screenshot uploads need no separate build or dependency installation. Live capture uses optional tools, described below.
-
-From your project directory, run:
-
-```sh
-npx skills add tguidon/scribble
-```
-
-The installer offers a choice of agents and installation scope. The repository contains one skill, so `--skill scribble` is optional.
-
-To select Codex and Claude Code directly, run:
-
-```sh
-npx skills add tguidon/scribble --agent codex claude-code
-```
-
-Add `--global` to install across projects. The [skills CLI documentation](https://github.com/vercel-labs/skills) lists all installation flags.
-
 ## Install the plugin
 
-Scribble supports Codex and Claude Code from one shared editor, server, skill, and MCP runtime. Both plugins can send finished feedback back to the chat that opened the canvas.
+Install the plugin for your coding agent below. Both plugins let you send finished feedback directly to the chat that opened the canvas.
 
-### Codex (preview)
+Scribble requires Node.js 22 or newer. The plugin includes the browser app and server. No repository clone, npm install, or local build is required.
 
-The Codex plugin requires Node.js 22+ and a desktop host with local MCP support. Ordinary ChatGPT web is not supported by this local package.
+### Install for Codex
 
-Add the GitHub marketplace and install Scribble:
+The Codex plugin requires a desktop host with local MCP support. Ordinary ChatGPT web is not supported by this local package.
+
+Run these commands in your terminal:
 
 ```sh
 codex plugin marketplace add tguidon/scribble
@@ -60,16 +42,25 @@ codex plugin add scribble@scribble
 
 Wait for **Draft saved** before updating, then reopen the editor. Installed plugins are cached copies; edits to a source checkout do not update them automatically. See [plugin development and verification](docs/plugin.md).
 
-### Claude Code
+### Install for Claude Code
 
-Requires **Node.js 22+**, **Claude Code 2.1.304+**, and mods enabled. Add the marketplace and install the plugin from your shell:
+Requires Claude Code 2.1.304+ with mods enabled. Mods let the plugin deliver feedback into your session.
+
+Run this command in your terminal to add the marketplace and install Scribble:
 
 ```sh
-claude plugin marketplace add tguidon/scribble
-claude plugin install scribble@scribble
+claude plugin install scribble --marketplace tguidon/scribble
 ```
 
-Start or restart Claude Code in your project, then run **`/scribble:scribble start`**. Open the browser link Claude returns, annotate your screenshots, choose **Finish feedback**, then **Send to this chat**. The plugin's mod submits your feedback into the originating Claude Code conversation and starts the next turn. No channel flags, separate model API key, or clipboard handoff are needed.
+Start or restart Claude Code in your project. The plugin command is:
+
+```text
+/scribble:editor [COMMAND]
+```
+
+Commands are `start`, `start --new`, `status`, and `stop`. Without a command, Scribble opens the editor.
+
+Run **`/scribble:editor start`**. Open the browser link Claude returns, annotate your screenshots, choose **Finish feedback**, then **Send to this chat**. The plugin's mod submits your feedback into the originating Claude Code conversation and starts the next turn. No channel flags, separate model API key, or clipboard handoff are needed.
 
 **Feedback queued** means your request is saved and waiting for the chat. **Message accepted** means Claude Code accepted the prompt; **Feedback read** means Claude retrieved the canvas. If Claude is busy, delivery waits until it is idle. Keep the originating session open, or reopen that same session with the plugin enabled. After Esc or Stop, provide input in Claude Code to resume the session, then choose **Retry sending**. **Copy for agent** remains available.
 
@@ -82,7 +73,27 @@ claude plugin marketplace update scribble
 claude plugin update scribble@scribble
 ```
 
-Restart Claude Code after updating to reload both the mod and MCP runtime. The Claude adapter is implemented; verification in the actual Claude Code host is a manual step. See [local development and host verification](docs/plugin.md).
+Restart Claude Code after updating to reload the plugin. See [plugin development and verification](docs/plugin.md) for development instructions.
+
+## Install the standalone skill
+
+The standalone skill supports Codex and Claude Code with a copy-and-paste handoff. It includes the browser app and server and requires Node.js 22 or newer. Live capture uses optional tools, described below.
+
+From your project directory, run:
+
+```sh
+npx skills add tguidon/scribble
+```
+
+The installer offers a choice of agents and installation scope. The repository contains one skill, so `--skill scribble` is optional.
+
+To select Codex and Claude Code directly, run:
+
+```sh
+npx skills add tguidon/scribble --agent codex claude-code
+```
+
+Add `--global` to install across projects. The [skills CLI documentation](https://github.com/vercel-labs/skills) lists all installation flags.
 
 ### Test a fixed release
 
@@ -276,7 +287,7 @@ After UI changes, run `npm run build`. Commit `skills/scribble/app/` and `plugin
 
 ### Publish a version
 
-Keep `package.json`, the root entries in `package-lock.json`, `plugin.json`, and `skills/scribble/version.json` on the same version. Build to refresh the generated Codex and Claude Code manifests. The installed server reads the bundled version file without needing the development package. Plugin updates are distributed from `main` after merge; the existing `v0.0.4` tag remains the standalone clipboard release.
+Keep `package.json`, the root entries in `package-lock.json`, `plugin.json`, and `skills/scribble/version.json` on the same version. Build to refresh the generated Codex and Claude Code manifests. The installed server reads the bundled version file without needing the development package. Plugin updates are distributed from `main`; the existing `v0.0.4` tag remains the standalone clipboard release.
 
 Build and test, commit the changes, then tag that commit as `vVERSION` and publish its GitHub release. Keep published tags fixed so a tagged installation remains reproducible.
 

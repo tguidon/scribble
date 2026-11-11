@@ -50,6 +50,9 @@ await writeFile(
       author: manifest.author,
       homepage: manifest.homepage,
       repository: manifest.repository,
+      commands: {
+        editor: { source: "./plugin/claude/editor.md" },
+      },
       hooks: "./plugin/claude/hooks.json",
       mcpServers: Object.fromEntries(
         Object.entries(mcp.mcpServers).map(([name, { cwd, ...server }]) => [

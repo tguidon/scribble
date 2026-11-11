@@ -58,7 +58,7 @@ The current return path uses the documented [mods prompt API](https://code.claud
 
 ## Keeping features shared
 
-Implement editor features in `src/`, server/capture behavior in `skills/scribble/scripts/lib/`, and model-facing tools in `plugin/mcp.mjs`. `npm run build` rebuilds both the browser app and embedded editor and regenerates both harness manifests from the same metadata. `feedback-message.mjs` is the single source of the submitted feedback instruction. Do not fork the editor, capture implementation, skill, or MCP tools for Claude.
+Implement editor features in `src/`, server/capture behavior in `skills/scribble/scripts/lib/`, and model-facing tools in `plugin/mcp.mjs`. `npm run build` rebuilds both the browser app and embedded editor and regenerates both harness manifests from the same metadata. `feedback-message.mjs` is the single source of the submitted feedback instruction. Claude exposes `/scribble:editor [COMMAND]` through `plugin/claude/editor.md`. That command reads the shared skill at invocation time. Codex keeps `$scribble`, and the standalone Claude skill keeps `/scribble`. The shared skill remains named `scribble`; the Claude command adds no separate workflow. Do not fork the editor, capture implementation, skill, or MCP tools for Claude.
 
 The mod only supplies chat routing and prompt submission; new shared editor features and MCP tools require no parallel Claude implementation. An embedded transport change may still need its Codex adapter updated. Installed plugin caches do not update merely because a source checkout changed: rebuild, update/reinstall the installed package, and restart the harness. During Claude adapter development, load this checkout directly:
 
@@ -66,7 +66,7 @@ The mod only supplies chat routing and prompt submission; new shared editor feat
 claude --plugin-dir /absolute/path/to/scribble
 ```
 
-Then invoke `/scribble:scribble start`. Rebuild after editor/server changes and restart the session to load changed mod and MCP code. A GitHub install will not include this branch until it is published or merged.
+Then invoke `/scribble:editor start`. Rebuild after editor/server changes and restart the session to load changed mod and MCP code. A GitHub install will not include this branch until it is published or merged.
 
 ## Local development
 
@@ -107,4 +107,4 @@ For manual Codex host verification:
 
 If the Codex host does not expose an MCP Apps bridge for local servers, its browser fallback keeps clipboard delivery.
 
-For manual Claude Code host verification, load the checkout, invoke `/scribble:scribble start`, finish a browser canvas, and confirm Send starts a turn in the same chat. Repeat while Claude is busy, after Stop followed by user input and Retry, with two chats in the same project, after reopening the original session, and after choosing New canvas. This host verification is intentionally left to the maintainer; the repository tests do not launch Claude Code.
+For manual Claude Code host verification, load the checkout, invoke `/scribble:editor start`, finish a browser canvas, and confirm Send starts a turn in the same chat. Repeat while Claude is busy, after Stop followed by user input and Retry, with two chats in the same project, after reopening the original session, and after choosing New canvas. This host verification is intentionally left to the maintainer; the repository tests do not launch Claude Code.

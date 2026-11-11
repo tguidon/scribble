@@ -9,7 +9,7 @@ description: Launch the Scribble editor web app and collect annotated screenshot
 
 ## Launch first
 
-A bare `$scribble` / `/scribble` invocation, the Claude plugin's `/scribble:scribble`, or `scribble start` means **open the editor and collect feedback now**. The optional word `start` makes this intent explicit. Follow a request to explain or modify Scribble as that task instead.
+A bare `$scribble` / `/scribble` invocation, the Claude plugin's `/scribble:editor`, or `scribble start` means **open the editor and collect feedback now**. The optional word `start` makes this intent explicit. Follow a request to explain or modify Scribble as that task instead.
 
 For a launch request, open the editor immediately using the plugin tools or the bundled launcher below.
 

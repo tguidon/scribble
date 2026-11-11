@@ -1,7 +1,7 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "scribble",
-  "version": "0.0.13",
+  "version": "0.0.14",
   "description": "Capture app screens, annotate them, and hand precise visual feedback to your coding agent.",
   "author": { "name": "Taylor Guidon" },
   "repository": "https://github.com/tguidon/scribble",
