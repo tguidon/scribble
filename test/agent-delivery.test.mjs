@@ -1,6 +1,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, rm, readFile } from "node:fs/promises";
+import fs, {
+  mkdtemp,
+  rm,
+  readFile,
+  writeFile,
+  readdir,
+} from "node:fs/promises";
+import { syncBuiltinESMExports } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { execFile } from "node:child_process";
@@ -18,11 +25,91 @@ import {
   agentDeliveryStatus,
 } from "../skills/scribble/scripts/lib/agent-delivery.mjs";
 import { PluginBackend } from "../plugin/backend.mjs";
+import { createPlugin } from "../plugin/mcp.mjs";
+import { register } from "../plugin/claude/register.mjs";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 
 const png = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=",
   "base64",
 );
+
+test("the Claude mod delivers and records feedback through the existing MCP connection", async (t) => {
+  const { project, root, backend, call, finish } = await setup(t);
+  const plugin = createPlugin({ backend, harness: "claude-code" });
+  const client = new Client({ name: "claude-mod-test", version: "1" });
+  const [front, back] = InMemoryTransport.createLinkedPair();
+  await plugin.server.connect(back);
+  await client.connect(front);
+  t.after(async () => {
+    await client.close();
+    await plugin.close();
+  });
+  const tools = await client.listTools();
+  for (const name of ["poll_delivery", "settle_delivery"])
+    assert.deepEqual(
+      tools.tools.find((tool) => tool.name === name)._meta.ui.visibility,
+      ["app"],
+    );
+  const handlers = new Map();
+  let timer;
+  const messages = [];
+  const $ = {
+    session: { id: async () => "chat-one", messages: async () => messages },
+    clock: {
+      every: (_ms, fn) => {
+        timer = fn;
+        return { cancel() {} };
+      },
+    },
+    mcp: {
+      call: (_server, tool, args) =>
+        client.callTool({ name: tool, arguments: args }),
+    },
+    prompt: {
+      submit: async ({ text }) => {
+        messages.push({ role: "user", text });
+        return {};
+      },
+    },
+    ui: { toast: (text) => assert.fail(text) },
+  };
+  register((event, handler) => handlers.set(event, handler));
+  const next = (event) => event;
+  await handlers.get("session.start")($, {}, next);
+  const input = await handlers.get("tool.call")(
+    $,
+    {
+      tool: "mcp__plugin_scribble_scribble__open_canvas",
+      projectPath: project,
+    },
+    next,
+  );
+  const { tool, ...args } = input;
+  const opened = await client.callTool({
+    name: "open_canvas",
+    arguments: args,
+  });
+  assert.ok(!opened.isError, JSON.stringify(opened));
+  const canvas = opened._meta.scribble;
+  await finish(canvas);
+  await call(canvas, "/delivery", "POST", {});
+  await timer();
+  // Deliver runs independently of polling while prompt.submit waits for idle.
+  for (
+    let i = 0;
+    i < 100 && !(await agentDeliveryStatus(root, canvas.sessionId)).acceptedAt;
+    i++
+  )
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  assert.equal(messages.length, 1);
+  assert.match(messages[0].text, new RegExp(canvas.sessionId));
+  assert.ok((await agentDeliveryStatus(root, canvas.sessionId)).acceptedAt);
+  await timer();
+  assert.equal(messages.length, 1);
+  await handlers.get("session.end")($, {}, next);
+});
 async function setup(t) {
   const project = await mkdtemp(join(tmpdir(), "scribble-delivery-"));
   const root = join(project, ".scribble");
@@ -117,6 +204,12 @@ test("browser Send queues only explicit finished feedback, isolates chats, and s
     null,
   );
   await settleAgentDelivery(directory, "chat-one", "consumer-one", item);
+  assert.deepEqual(
+    (await readdir(join(directory, "claude-chats/chat-one/pending"))).filter(
+      (name) => name.endsWith(".json"),
+    ),
+    [],
+  );
   const reconnected = new PluginBackend({ directory });
   assert.ok((await reconnected.delivery(one.sessionId, one.token)).acceptedAt);
   assert.equal(
@@ -125,6 +218,118 @@ test("browser Send queues only explicit finished feedback, isolates chats, and s
   );
   await reconnected.feedback(one.sessionId);
   assert.ok((await agentDeliveryStatus(root, one.sessionId)).readAt);
+});
+
+test("idle polling never reads completed history or feedback payloads", async (t) => {
+  const { project, root, directory, backend, call, finish } = await setup(t);
+  const canvas = await backend.open(project, "Completed", "chat-one");
+  await finish(canvas);
+  await call(canvas, "/delivery", "POST", {});
+  const item = await pollAgentDelivery(directory, "chat-one", "consumer");
+  await settleAgentDelivery(directory, "chat-one", "consumer", item);
+  const index = join(directory, "claude-chats/chat-one");
+  // Simulate a large pre-upgrade history, including a malformed old record.
+  for (let i = 0; i < 20; i++)
+    await atomicJson(join(index, `old-${i}.json`), { root });
+  await writeFile(join(index, "000-broken.json"), "{broken");
+  const original = fs.readFile;
+  const reads = [];
+  fs.readFile = async (path, ...args) => {
+    reads.push(String(path));
+    return original(path, ...args);
+  };
+  syncBuiltinESMExports();
+  try {
+    assert.equal(
+      await pollAgentDelivery(directory, "chat-one", "consumer"),
+      null,
+    );
+    assert.ok(reads.length < 10, `${reads.length} reads for an idle poll`);
+    assert.ok(reads.every((path) => !path.includes(root)));
+    assert.ok(reads.every((path) => !/old-|000-broken/.test(path)));
+  } finally {
+    fs.readFile = original;
+    syncBuiltinESMExports();
+  }
+});
+
+test("a malformed pending entry cannot block healthy feedback", async (t) => {
+  const { project, directory, backend, call, finish } = await setup(t);
+  const canvas = await backend.open(project, "Healthy", "chat-one");
+  await finish(canvas);
+  await call(canvas, "/delivery", "POST", {});
+  await writeFile(
+    join(directory, "claude-chats/chat-one/pending/000-broken.json"),
+    "{broken",
+  );
+  const item = await pollAgentDelivery(directory, "chat-one", "consumer");
+  assert.equal(item.sessionId, canvas.sessionId);
+});
+
+test("failed index or request writes never leave undiscoverable queued feedback", async (t) => {
+  const { project, root, directory, backend, call, finish } = await setup(t);
+  for (const phase of ["index", "request"]) {
+    const canvas = await backend.open(project, phase, "chat-one");
+    await finish(canvas);
+    const target =
+      phase === "index"
+        ? join(
+            directory,
+            "claude-chats/chat-one/pending",
+            `${canvas.sessionId}.json`,
+          )
+        : join(sessionDir(root, canvas.sessionId), "agent-delivery.json");
+    const rename = fs.rename;
+    fs.rename = async (from, to) => {
+      if (to === target)
+        throw Object.assign(new Error("simulated disk failure"), {
+          code: "EIO",
+        });
+      return rename(from, to);
+    };
+    syncBuiltinESMExports();
+    try {
+      assert.equal((await call(canvas, "/delivery", "POST", {})).status, 500);
+      assert.equal(
+        (await agentDeliveryStatus(root, canvas.sessionId)).queuedAt,
+        null,
+      );
+    } finally {
+      fs.rename = rename;
+      syncBuiltinESMExports();
+    }
+    assert.equal(
+      await pollAgentDelivery(directory, "chat-one", "consumer"),
+      null,
+    );
+    assert.equal((await call(canvas, "/delivery", "POST", {})).status, 200);
+    const item = await pollAgentDelivery(directory, "chat-one", "consumer");
+    assert.equal(item.sessionId, canvas.sessionId);
+    await settleAgentDelivery(directory, "chat-one", "consumer", item);
+  }
+});
+
+test("the first poll upgrades legacy pending requests without reading feedback", async (t) => {
+  const { project, root, directory, backend, call, finish } = await setup(t);
+  const canvas = await backend.open(project, "Legacy", "chat-one");
+  await finish(canvas);
+  await call(canvas, "/delivery", "POST", {});
+  const index = join(directory, "claude-chats/chat-one");
+  await rm(join(index, "pending"), { recursive: true });
+  await atomicJson(join(index, `${canvas.sessionId}.json`), { root });
+  await writeFile(join(index, "000-broken.json"), "{broken");
+  // The immutable submission was validated by Send. Claiming needs metadata.
+  await writeFile(
+    join(sessionDir(root, canvas.sessionId), "feedback.json"),
+    "{broken",
+  );
+  const item = await pollAgentDelivery(directory, "chat-one", "consumer");
+  assert.equal(item.sessionId, canvas.sessionId);
+  await settleAgentDelivery(directory, "chat-one", "consumer", item);
+  assert.equal(
+    await pollAgentDelivery(directory, "chat-one", "consumer"),
+    null,
+  );
 });
 
 test("paused deliveries retry explicitly, reject stale acknowledgements, and recover expired leases", async (t) => {

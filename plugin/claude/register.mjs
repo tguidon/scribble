@@ -1,123 +1,148 @@
-let timer;
-let generation = 0;
-let polling = false;
-let inFlight;
-let completed;
-let paused = false;
-const consumer = `mod-${Math.random().toString(36).slice(2)}`;
-
-async function helper($, payload) {
-  const result = await $.process.run(
-    ["node", `${$.plugin.root}/plugin/claude/delivery.mjs`],
-    {
-      stdin: JSON.stringify(payload),
-      timeoutMs: 10000,
-    },
-  );
-  if (result.exitCode !== 0)
-    throw new Error(result.stderr || "Scribble delivery is unavailable.");
-  return JSON.parse(result.stdout);
+// Every callback holds its own controller. Disposing it cannot clear a later
+// session's prompt result, even when an old MCP call completes out of order.
+function start($) {
+  const controller = {
+    consumer: `mod-${Math.random().toString(36).slice(2)}`,
+    server: "plugin_scribble_scribble",
+    chatId: undefined,
+    disposed: false,
+    polling: false,
+    work: null,
+    lastError: undefined,
+  };
+  controller.timer = $.clock.every(1000, () => tick($, controller));
+  return controller;
 }
 
-async function deliver($, chatId, item, epoch) {
-  inFlight = item;
+function dispose(controller) {
+  if (!controller) return;
+  controller.disposed = true;
+  controller.timer.cancel();
+}
+
+function report($, controller, error) {
+  if (controller.disposed || controller.lastError === error.message) return;
+  controller.lastError = error.message;
   try {
-    // Reconcile a crash after prompt acceptance but before its disk receipt.
+    $.ui.toast(`Scribble: ${error.message || "delivery unavailable"}`);
+  } catch {
+    // A missing UI surface cannot discard the stored prompt outcome.
+  }
+}
+
+async function active($, controller) {
+  const chatId = await $.session.id();
+  return !controller.disposed && chatId === controller.chatId;
+}
+
+async function call($, controller, tool, args = {}) {
+  const result = await $.mcp.call(controller.server, tool, {
+    chatId: controller.chatId,
+    consumer: controller.consumer,
+    ...args,
+  });
+  const text = result.content.find((block) => block.type === "text")?.text;
+  if (result.isError) throw new Error(text || "Delivery unavailable.");
+  return JSON.parse(text);
+}
+
+async function settle($, controller) {
+  const work = controller.work;
+  if (work?.phase !== "settling" || work.saving) return;
+  work.saving = true;
+  try {
+    await call($, controller, "settle_delivery", {
+      item: { sessionId: work.item.sessionId, requestId: work.item.requestId },
+      error: work.error,
+    });
+    if (!controller.disposed && controller.work === work)
+      controller.work = null;
+  } catch (error) {
+    // Preserve the known prompt outcome until its receipt is saved. A failed
+    // acknowledgement must never turn acceptance into a pause or resubmission.
+    report($, controller, error);
+  } finally {
+    work.saving = false;
+  }
+}
+
+async function deliver($, controller, item) {
+  controller.work = { phase: "submitting", item };
+  let error = false;
+  try {
+    // Reconcile a restart between prompt acceptance and its durable receipt.
     const messages = await $.session.messages();
     const alreadySent = messages.some(
       (message) =>
         message.role === "user" && message.text?.includes(item.marker),
     );
-    if (epoch !== generation || (await $.session.id()) !== chatId) return;
+    if (!(await active($, controller))) return;
     const result = alreadySent
       ? {}
       : await $.prompt.submit({ text: item.text });
-    const error = result?.drop;
-    if (epoch !== generation || (await $.session.id()) !== chatId) return;
-    // Keep a successful result in memory while receipt writes retry. Never
-    // resubmit a prompt merely because the acknowledgement couldn't be saved.
-    completed = { chatId, item, error };
-    if (error) paused = item.requestId;
-    await helper($, { action: "settle", chatId, consumer, item, error });
-    completed = undefined;
-  } catch (error) {
-    if (epoch === generation) {
-      if (!completed) {
-        paused = item.requestId;
-        completed = { chatId, item, error: true };
-      }
-      try {
-        $.ui.toast(`Scribble: ${error.message || "delivery paused"}`);
-      } catch {
-        // A missing UI surface must not discard a saved delivery request.
-      }
-    }
-  } finally {
-    if (epoch === generation) inFlight = undefined;
+    error = !!result?.drop;
+  } catch (cause) {
+    error = true;
+    report($, controller, cause);
   }
+  // Acceptance is already known. Do not put another fallible host call between
+  // that outcome and retaining it for receipt retries.
+  if (controller.disposed) return;
+  controller.work = { phase: "settling", item, error, saving: false };
+  await settle($, controller);
 }
 
-async function tick($) {
-  if (polling) return;
-  polling = true;
-  const epoch = generation;
+async function tick($, controller) {
+  if (controller.disposed || controller.polling) return;
+  controller.polling = true;
   try {
     const chatId = await $.session.id();
-    if (completed) {
-      await helper($, { action: "settle", consumer, ...completed });
-      completed = undefined;
-    }
-    // Keep the consumer lease alive even while a submitted prompt waits for
-    // Claude to become idle. No model requests are made by this timer.
-    const item = await helper($, { action: "poll", chatId, consumer });
-    if (epoch !== generation || !item || inFlight || paused === item.requestId)
+    if (controller.disposed) return;
+    controller.chatId ??= chatId;
+    if (chatId !== controller.chatId) return;
+    await settle($, controller);
+    if (controller.disposed) return;
+    // Renew the lease even while prompt.submit is waiting for an idle session.
+    const { item } = await call($, controller, "poll_delivery");
+    if (controller.disposed || !item || controller.work) return;
+    if ((await $.session.id()) !== controller.chatId || controller.disposed)
       return;
-    if ((await $.session.id()) !== chatId) return;
-    void deliver($, chatId, item, epoch);
-  } catch {
-    // A missing Node runtime or a transient lock/IO failure must not prevent
-    // the host session from starting. Saved requests remain on disk.
+    controller.lastError = undefined;
+    void deliver($, controller, item);
+  } catch (error) {
+    report($, controller, error);
   } finally {
-    polling = false;
+    controller.polling = false;
   }
-}
-
-function start($) {
-  timer?.cancel();
-  timer = $.clock.every(1000, () => tick($));
 }
 
 export function register(on) {
+  let controller;
   on("session.start", ($, e, next) => {
-    start($);
+    dispose(controller);
+    controller = start($);
     return next(e);
   });
   on("session.end", ($, e, next) => {
-    generation++;
-    timer?.cancel();
-    timer = undefined;
-    inFlight = undefined;
-    completed = undefined;
-    paused = false;
+    dispose(controller);
+    controller = undefined;
     return next(e);
   });
   on("tool.call", async ($, e, next) => {
-    // Match only Scribble's own MCP tool. All tool behavior stays in the
-    // shared MCP server; the mod supplies its private chat routing context.
     if (
       e.tool !== "mcp__plugin_scribble_scribble__open_canvas" &&
       e.tool !== "mcp__scribble__open_canvas"
     )
       return next(e);
-    if (!timer) start($);
-    paused = false;
+    if (!controller) controller = start($);
+    controller.server =
+      e.tool === "mcp__scribble__open_canvas"
+        ? "scribble"
+        : "plugin_scribble_scribble";
     return next({ ...e, deliveryChatId: await $.session.id() });
   });
   on("turn.complete", ($, e, next) => {
-    if (!e.agentId && !e.isAborted) {
-      paused = false;
-      if (!timer) start($);
-    }
+    if (!e.agentId && !e.isAborted && !controller) controller = start($);
     return next(e);
   });
 }

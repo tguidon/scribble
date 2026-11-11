@@ -31,6 +31,11 @@ test("MCP canvas isolation, feedback delivery, original images, and new rounds",
     await rm(project, { recursive: true, force: true });
   });
   const tools = await client.listTools();
+  assert.ok(
+    !tools.tools.some((tool) =>
+      ["poll_delivery", "settle_delivery"].includes(tool.name),
+    ),
+  );
   assert.deepEqual(
     tools.tools.find((t) => t.name === "editor_request")._meta.ui.visibility,
     ["app"],

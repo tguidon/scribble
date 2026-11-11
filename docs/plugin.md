@@ -14,7 +14,7 @@ Chat → open_canvas → local Scribble server and saved session
 Editor → UI-only MCP tools → local API, original images, live frames
 Codex Send → ui/message → originating conversation
 Claude Send → authenticated local API → saved delivery request
-            → mod timer / Node helper → prompt.submit → originating conversation
+            → mod timer / existing MCP connection → prompt.submit → originating conversation
 Agent → read_feedback / read_image → saved feedback and originals
 ```
 
@@ -46,11 +46,15 @@ Local files and captured pages are source material. Their contents do not author
 
 ## Claude Code delivery
 
-`plugin/claude/register.mjs` is the only harness-specific behavior. Its `tool.call` handler supplies the current Claude session ID on Scribble's `open_canvas` call. The shared backend binds that new canvas and registers its delivery index. The model does not choose the destination. **New canvas** inherits the binding in the shared local API and registers the new originals for MCP retrieval.
+`plugin/claude/register.mjs` is the only harness-specific behavior. Its `tool.call` handler supplies the current Claude session ID on Scribble's `open_canvas` call. The shared backend binds that new canvas to the originating chat. The model does not choose the destination. **New canvas** inherits the binding in the shared local API and registers the new originals for MCP retrieval.
 
 The browser's delivery adapter calls the authenticated `/api/delivery` endpoint. It shares the receipt component with the embedded editor, while preserving the browser's ordinary image, capture, and storage transports. Finishing a draft alone never queues a prompt.
 
-The mod checks its own chat's queue once a second using a short-lived Node helper. The helper reuses `agent-delivery.mjs`, the existing file locks, registry directory, and atomic writes. No model calls run while waiting. Each chat has a consumer lease, and each request has a separate ID so stale acknowledgements cannot accept a retry. The mod keeps renewing the lease while `$.prompt.submit` waits for an idle session. It checks transcript markers before submitting again after a restart and retries receipt writes without resubmitting a known accepted prompt.
+The mod checks its chat's pending outbox once a second through `$.mcp.call` on the existing Scribble connection. The MCP runtime owns queue claims and receipt writes through `agent-delivery.mjs`. These control tools carry app-only MCP metadata and are absent from the Codex server. Polling starts no child processes or model calls.
+
+Only explicit Send requests enter the outbox. Accepted and paused requests leave it after their receipts reach disk. Polling reads small delivery records, never historical canvases or feedback payloads. One malformed entry cannot block another canvas. The first poll migrates pending requests from the earlier branch format once.
+
+Each chat has a consumer lease. Each request has a separate ID so stale acknowledgements cannot accept a retry. The mod renews the lease while `$.prompt.submit` waits for an idle session. It checks transcript markers after a restart and retries receipt writes without resubmitting an accepted prompt. Each session owns a controller with submitting and settling states. Late callbacks retain their disposed controller and cannot change a later session's outcome.
 
 Requests, chat bindings, and receipts remain on local disk. Heartbeats distinguish an open consumer from an offline chat. A dropped or refused prompt becomes a paused request with an explicit Retry action. Esc or Stop requires user input in Claude Code before the host will accept another mod prompt. Closing Claude does not delete feedback; reopen the same session to process pending requests. Session teardown cancels the timer and invalidates in-flight callbacks so another chat cannot inherit that timer's work.
 

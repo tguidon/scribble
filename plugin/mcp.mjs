@@ -6,6 +6,10 @@ import { McpServer, StdioServerTransport, z } from "./dist/sdk.mjs";
 import { PluginBackend } from "./backend.mjs";
 import { FrameRelay } from "./frame-relay.mjs";
 import { VERSION } from "../skills/scribble/scripts/lib/version.mjs";
+import {
+  pollAgentDelivery,
+  settleAgentDelivery,
+} from "../skills/scribble/scripts/lib/agent-delivery.mjs";
 
 const RESOURCE = "ui://scribble/editor.html";
 export function createPlugin(options = {}) {
@@ -20,6 +24,8 @@ export function createPlugin(options = {}) {
   );
   const id = z.string().regex(/^[a-zA-Z0-9-]{1,80}$/);
   const auth = { sessionId: id, token: z.string().length(64) };
+  const claude =
+    (options.harness || process.env.SCRIBBLE_HARNESS) === "claude-code";
   const result = (structuredContent) => ({
     content: [{ type: "text", text: JSON.stringify(structuredContent) }],
     structuredContent,
@@ -89,9 +95,7 @@ export function createPlugin(options = {}) {
       const connection = await backend.open(
         projectPath,
         title,
-        (options.harness || process.env.SCRIBBLE_HARNESS) === "claude-code"
-          ? deliveryChatId
-          : undefined,
+        claude ? deliveryChatId : undefined,
       );
       return {
         ...result({
@@ -219,6 +223,57 @@ export function createPlugin(options = {}) {
       privateResult(await backend.delivery(sessionId, token)),
     ),
   );
+  // The mod uses the host's existing MCP connection. These control operations
+  // are absent in Codex and marked app-only in the MCP Apps metadata.
+  if (claude) {
+    const owner = { chatId: id, consumer: id };
+    server.registerTool(
+      "poll_delivery",
+      {
+        description:
+          "Renew the Claude mod's lease and claim pending feedback. Mod only.",
+        inputSchema: owner,
+        outputSchema: {
+          item: z
+            .object({
+              sessionId: id,
+              requestId: id,
+              text: z.string(),
+              marker: z.string(),
+            })
+            .nullable(),
+        },
+        _meta: { ui: { visibility: ["app"] } },
+      },
+      guarded(async ({ chatId, consumer }) =>
+        result({
+          item: await pollAgentDelivery(backend.directory, chatId, consumer),
+        }),
+      ),
+    );
+    server.registerTool(
+      "settle_delivery",
+      {
+        description: "Save the Claude mod's prompt outcome. Mod only.",
+        inputSchema: {
+          ...owner,
+          item: z.object({ sessionId: id, requestId: id }),
+          error: z.boolean(),
+        },
+        _meta: { ui: { visibility: ["app"] } },
+      },
+      guarded(async ({ chatId, consumer, item, error }) => {
+        await settleAgentDelivery(
+          backend.directory,
+          chatId,
+          consumer,
+          item,
+          error,
+        );
+        return result({});
+      }),
+    );
+  }
   return {
     server,
     backend,
