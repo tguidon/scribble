@@ -56,6 +56,7 @@ export type Session = {
   updatedAt: string;
   submittedAt?: string;
   bundlePath?: string;
+  deliveryHost?: "claude-code";
 };
 export type Draft = Pick<Session, "message" | "images">;
 export const INKS = [

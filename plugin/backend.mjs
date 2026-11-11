@@ -2,7 +2,6 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { readFile, mkdir, stat, realpath } from "node:fs/promises";
 import { join, isAbsolute } from "node:path";
-import { homedir } from "node:os";
 import { fileURLToPath } from "node:url";
 import {
   createSession,
@@ -20,6 +19,8 @@ import {
 } from "../skills/scribble/scripts/lib/version.mjs";
 import { prepareHandoff } from "../skills/scribble/scripts/lib/handoff.mjs";
 import { excludeStorage } from "../skills/scribble/scripts/lib/git-exclude.mjs";
+import { bindAgentDelivery } from "../skills/scribble/scripts/lib/agent-delivery.mjs";
+import { pluginDataDirectory } from "./data-directory.mjs";
 
 const exec = promisify(execFile);
 const launcher = fileURLToPath(
@@ -28,11 +29,7 @@ const launcher = fileURLToPath(
 // A registry permits old canvases to survive MCP reconnections without accepting
 // arbitrary filesystem paths from the UI or exposing a global "latest" session.
 export class PluginBackend {
-  constructor({
-    directory = process.env.SCRIBBLE_PLUGIN_DATA ||
-      process.env.PLUGIN_DATA ||
-      join(homedir(), ".local", "share", "scribble-plugin"),
-  } = {}) {
+  constructor({ directory = pluginDataDirectory() } = {}) {
     this.directory = directory;
     this.starts = new Map();
   }
@@ -51,7 +48,7 @@ export class PluginBackend {
       );
     return { root: record.root, session: await loadSession(record.root, id) };
   }
-  async open(projectPath, title) {
+  async open(projectPath, title, deliveryChatId) {
     if (!isAbsolute(projectPath))
       throw new Error("Use the absolute path of the user's project.");
     const project = await realpath(projectPath);
@@ -61,6 +58,11 @@ export class PluginBackend {
     await excludeStorage(root);
     const session = await createSession(root, title);
     await this.register(root, session.id);
+    if (deliveryChatId)
+      await bindAgentDelivery(root, session.id, {
+        chatId: deliveryChatId,
+        directory: this.directory,
+      });
     return this.connection(session.id);
   }
   async connection(id) {

@@ -78,13 +78,15 @@ async function acquire(root, name, wait) {
     "Another Scribble process is starting. Try again in a few seconds.",
   );
 }
-export async function withStartLock(root, task) {
-  const release = await acquire(root, "server-start.lock", true);
+export async function withLock(root, name, task) {
+  const release = await acquire(root, name, true);
   try {
     return await task();
   } finally {
     await release();
   }
 }
+export const withStartLock = (root, task) =>
+  withLock(root, "server-start.lock", task);
 export const acquireServerLease = (root) =>
   acquire(root, "server-owner.lock", false);

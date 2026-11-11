@@ -1,0 +1,13 @@
+{
+  "name": "scribble",
+  "owner": {
+    "name": "Taylor Guidon"
+  },
+  "plugins": [
+    {
+      "name": "scribble",
+      "source": "./",
+      "description": "Capture app screens, annotate them, and hand precise visual feedback to your coding agent."
+    }
+  ]
+}

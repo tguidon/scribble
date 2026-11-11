@@ -9,11 +9,11 @@ description: Launch the Scribble editor web app and collect annotated screenshot
 
 ## Launch first
 
-A bare `$scribble` / `/scribble` invocation or `scribble start` means **open the editor and collect feedback now**. The optional word `start` makes this intent explicit. Follow a request to explain or modify Scribble as that task instead.
+A bare `$scribble` / `/scribble` invocation, the Claude plugin's `/scribble:editor`, or `scribble start` means **open the editor and collect feedback now**. The optional word `start` makes this intent explicit. Follow a request to explain or modify Scribble as that task instead.
 
 For a launch request, open the editor immediately using the plugin tools or the bundled launcher below.
 
-**When the Scribble plugin tools are available:** call `open_canvas` with the absolute path of the user's current project instead of running the launcher below. Use its embedded editor when the host renders it, or share the returned `browserUrl` if it does not. Tell the user to finish feedback and choose **Send to this chat** in the plugin, or copy and paste from the browser. End your turn; do not poll. Each call creates a fresh canvas. See [plugin feedback](references/plugin.md) when the user sends a canvas ID or needs help with plugin delivery. The CLI commands below remain available for explicit `status` and `stop` requests.
+**When the Scribble plugin tools are available:** call `open_canvas` with the absolute path of the user's current project instead of running the launcher below. The Claude Code mod supplies the chat binding; leave `deliveryChatId` to the mod. Use the embedded editor in Codex or open and share the returned `browserUrl` in Claude Code. Tell the user to finish feedback and choose **Send to this chat**. End your turn; do not poll. Each call creates a fresh canvas. See [plugin feedback](references/plugin.md) when the user sends a canvas ID or needs help with queued, paused, or unavailable delivery. The CLI commands below remain available for explicit `status` and `stop` requests.
 
 **Without plugin tools**, resolve `SKILL_DIRECTORY` from the absolute path of this SKILL.md and run this command from the user's project directory:
 

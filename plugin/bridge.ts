@@ -3,6 +3,7 @@ import type { EditorHost } from "../src/editorHost";
 import { version } from "../skills/scribble/version.json";
 import { createImageCache } from "../src/imageCache";
 import { createImageSource, releaseImageSource } from "../src/imageSource";
+import { feedbackMessage } from "../skills/scribble/scripts/lib/feedback-message.mjs";
 
 export type Connection = { sessionId: string; token: string; url: string };
 export const app = new App(
@@ -130,7 +131,7 @@ export function createEditorHost(
             content: [
               {
                 type: "text",
-                text: `Apply my Scribble feedback from canvas ${connection.sessionId}. Use Scribble's read_feedback tool with sessionId "${connection.sessionId}", then inspect every original image with read_image before making changes. Follow my feedback within this task's scope and verify the result.`,
+                text: feedbackMessage(connection.sessionId),
               },
             ],
           },

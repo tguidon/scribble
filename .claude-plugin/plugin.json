@@ -1,0 +1,28 @@
+{
+  "name": "scribble",
+  "version": "0.0.15",
+  "description": "Capture app screens, annotate them, and hand precise visual feedback to your coding agent.",
+  "author": {
+    "name": "Taylor Guidon"
+  },
+  "homepage": "https://github.com/tguidon/scribble",
+  "repository": "https://github.com/tguidon/scribble",
+  "commands": {
+    "editor": {
+      "source": "./plugin/claude/editor.md"
+    }
+  },
+  "hooks": "./plugin/claude/hooks.json",
+  "mcpServers": {
+    "scribble": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        "${CLAUDE_PLUGIN_ROOT}/plugin/mcp.mjs"
+      ],
+      "env": {
+        "SCRIBBLE_HARNESS": "claude-code"
+      }
+    }
+  }
+}

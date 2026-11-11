@@ -5,9 +5,11 @@ import type { Session } from "../types";
 import { getEditorHost } from "../editorHost";
 import { ScreenshotImage } from "./ScreenshotImage";
 import { PluginDelivery } from "./PluginDelivery";
+import { browserDelivery } from "../browserDelivery";
 
 export function FeedbackReceipt({ session }: { session: Session }) {
   const host = getEditorHost();
+  const delivery = host || (session.deliveryHost ? browserDelivery : undefined);
   const [text, setText] = useState("");
   const [loadError, setLoadError] = useState("");
   const [attempt, setAttempt] = useState(0);
@@ -92,7 +94,7 @@ export function FeedbackReceipt({ session }: { session: Session }) {
         Ready for your agent.
       </h1>
       <p>
-        {!host && (
+        {!delivery && (
           <>
             Copy the handoff, then paste it into your agent’s chat.
             <br />
@@ -114,11 +116,15 @@ export function FeedbackReceipt({ session }: { session: Session }) {
           {marks} mark{marks !== 1 ? "s" : ""}
         </span>
       </div>
-      {host && <PluginDelivery onDelivered={setDelivered} />}
+      {delivery && (
+        <PluginDelivery delivery={delivery} onDelivered={setDelivered} />
+      )}
       <div className="handoff-actions">
         <button
           className={
-            delivered || (!host?.canSend && copied) ? "primary" : "secondary"
+            delivered || (!delivery?.canSend && copied)
+              ? "primary"
+              : "secondary"
           }
           onClick={() => void newCanvas()}
           disabled={starting}
@@ -127,7 +133,7 @@ export function FeedbackReceipt({ session }: { session: Session }) {
           {starting ? "Opening…" : "New canvas"}
         </button>
         <button
-          className={host?.canSend || copied ? "text-button" : "primary"}
+          className={delivery?.canSend || copied ? "text-button" : "primary"}
           onClick={() => void copy()}
           disabled={!text || copying}
         >
