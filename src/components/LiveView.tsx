@@ -40,6 +40,11 @@ export function LiveView({
     return () => document.removeEventListener("visibilitychange", visibility);
   }, []);
   useEffect(() => {
+    // The embedded host can return the same data URL after reconnect. Clear
+    // the previous source so the first frame triggers onLoad again.
+    setFrameUrl(undefined);
+    setReady(false);
+    setFailed(false);
     if (!visible) return;
     const abort = new AbortController();
     let currentUrl = "",
@@ -53,10 +58,9 @@ export function LiveView({
         ),
       15000,
     );
-    setReady(false);
-    setFailed(false);
     void (async () => {
       for await (const bytes of liveFrames(kind, generation, abort.signal)) {
+        if (!active) return;
         clearTimeout(watchdog);
         watchdog = window.setTimeout(
           () =>

@@ -541,6 +541,11 @@ for (const kind of ["web", "simulator"])
         width: 2560,
         pixels: [255, 0, 0, 255, 0, 0, 255, 255],
       });
+      // A static page sends identical image data when the preview reconnects.
+      await ui.getByRole("button", { name: "Reconnect view" }).click();
+      await expect(
+        ui.getByRole("button", { name: "Capture & annotate" }),
+      ).toBeEnabled();
       await image.click();
       await expect.poll(readDetail).toEqual({
         width: 2560,
