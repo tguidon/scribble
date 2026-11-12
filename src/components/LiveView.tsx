@@ -65,11 +65,15 @@ export function LiveView({
             ),
           20000,
         );
-        if (performance.now() - lastFrame < 65) continue;
+        if (kind === "simulator" && performance.now() - lastFrame < 65)
+          continue;
         lastFrame = performance.now();
         releaseImageSource(previousUrl);
         previousUrl = currentUrl;
-        currentUrl = createImageSource(bytes, "image/jpeg");
+        currentUrl = createImageSource(
+          bytes,
+          bytes[0] === 0x89 ? "image/png" : "image/jpeg",
+        );
         setFrameUrl(currentUrl);
       }
     })().catch((error) => {
@@ -355,6 +359,11 @@ export function LiveView({
         )}
         <img
           ref={image}
+          style={
+            kind === "web" && viewport
+              ? { maxWidth: `min(100%, ${viewport.width}px)` }
+              : undefined
+          }
           src={frameUrl}
           alt={`Live ${kind === "web" ? "webpage" : "simulator"} screen`}
           draggable={false}

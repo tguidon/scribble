@@ -7,50 +7,54 @@ const MAX_HEADER_BYTES = 8192;
 export async function* readMultipartFrames(body) {
   const reader = body.getReader();
   const decoder = new TextDecoder();
-  let buffer = new Uint8Array(0);
+  const header = new Uint8Array(MAX_HEADER_BYTES);
+  let headerSize = 0;
+  let frame;
+  let filled = 0;
   try {
     while (true) {
       const { value, done } = await reader.read();
       if (done)
         throw new Error("The live view disconnected. Reconnect to try again.");
-      const joined = new Uint8Array(buffer.length + value.length);
-      joined.set(buffer);
-      joined.set(value, buffer.length);
-      buffer = joined;
-      if (buffer.length > MAX_FRAME_BYTES + MAX_HEADER_BYTES)
-        throw new Error("The live frame is too large. Reconnect to try again.");
-      while (buffer.length) {
-        let end = -1;
-        for (
-          let i = 0;
-          i < Math.min(buffer.length - 3, MAX_HEADER_BYTES);
-          i++
-        ) {
+      let offset = 0;
+      while (offset < value.length) {
+        if (!frame) {
+          header[headerSize++] = value[offset++];
           if (
-            buffer[i] === 13 &&
-            buffer[i + 1] === 10 &&
-            buffer[i + 2] === 13 &&
-            buffer[i + 3] === 10
+            headerSize < 4 ||
+            header[headerSize - 4] !== 13 ||
+            header[headerSize - 3] !== 10 ||
+            header[headerSize - 2] !== 13 ||
+            header[headerSize - 1] !== 10
           ) {
-            end = i;
-            break;
+            if (headerSize === header.length)
+              throw new Error("Invalid live frame header.");
+            continue;
           }
+          const length = Number(
+            /content-length:\s*(\d+)/i.exec(
+              decoder.decode(header.subarray(0, headerSize)),
+            )?.[1],
+          );
+          if (
+            !Number.isInteger(length) ||
+            length < 1 ||
+            length > MAX_FRAME_BYTES
+          )
+            throw new Error("Invalid or oversized live frame length.");
+          frame = new Uint8Array(length);
+          filled = 0;
+          headerSize = 0;
         }
-        if (end < 0) {
-          if (buffer.length > MAX_HEADER_BYTES)
-            throw new Error("Invalid live frame header.");
-          break;
+        // Copy each chunk once, even for multi-megabyte lossless frames.
+        const count = Math.min(value.length - offset, frame.length - filled);
+        frame.set(value.subarray(offset, offset + count), filled);
+        offset += count;
+        filled += count;
+        if (filled === frame.length) {
+          yield frame;
+          frame = undefined;
         }
-        const length = Number(
-          /content-length:\s*(\d+)/i.exec(
-            decoder.decode(buffer.subarray(0, end)),
-          )?.[1],
-        );
-        if (!Number.isInteger(length) || length < 1 || length > MAX_FRAME_BYTES)
-          throw new Error("Invalid or oversized live frame length.");
-        if (buffer.length < end + 4 + length) break;
-        yield buffer.slice(end + 4, end + 4 + length);
-        buffer = buffer.slice(end + 4 + length);
       }
     }
   } finally {

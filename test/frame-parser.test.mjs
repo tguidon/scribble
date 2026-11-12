@@ -46,6 +46,23 @@ test("multipart frames survive fragmented headers, bodies, and multiple frames p
   await reader.return();
 });
 
+test("a maximum-size frame can share its last chunk with the next frame", async () => {
+  const large = frame(Buffer.alloc(MAX_FRAME_BYTES, 91));
+  const next = Buffer.alloc(16384, 17);
+  const split = large.length - 65536;
+  const reader = readMultipartFrames(
+    stream([
+      large.subarray(0, split),
+      Buffer.concat([large.subarray(split), frame(next)]),
+    ]),
+  );
+  const first = (await reader.next()).value;
+  assert.equal(first.length, MAX_FRAME_BYTES);
+  assert.equal(first.at(-1), 91);
+  assert.deepEqual(Buffer.from((await reader.next()).value), next);
+  await reader.return();
+});
+
 for (const [name, bytes, error] of [
   ["missing length", Buffer.from("--frame\r\n\r\n"), /length/],
   [
@@ -54,7 +71,7 @@ for (const [name, bytes, error] of [
     /length/,
   ],
   ["oversized header", Buffer.alloc(8193, 65), /header/],
-  ["oversized body", Buffer.alloc(MAX_FRAME_BYTES + 8193), /too large/],
+  ["chunk without a header", Buffer.alloc(MAX_FRAME_BYTES + 8193), /header/],
   [
     "truncated body",
     frame(Buffer.from("hello")).subarray(0, -4),

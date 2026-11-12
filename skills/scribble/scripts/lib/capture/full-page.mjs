@@ -39,10 +39,9 @@ export async function prepareFullPage(page) {
         ),
         viewportHeight: innerHeight,
         y: scrollY,
-        ratio: devicePixelRatio,
       };
     }, top);
-    if (bounds.width * bounds.height * bounds.ratio ** 2 > 40000000)
+    if (bounds.width * bounds.height > 40000000)
       throw captureError(
         "The full page exceeds 40 megapixels. Choose a narrower viewport or use Capture & annotate for a visible section.",
       );

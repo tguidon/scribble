@@ -5,6 +5,11 @@ import { webpageUrl, imageDimensions, captureError } from "./common.mjs";
 import { streamHeaders, writeFrame } from "./live.mjs";
 import { prepareFullPage } from "./full-page.mjs";
 
+const DEVICE_SCALE = 2;
+// An opaque PNG of 2560² RGB pixels fits the 20 MiB frame transport, even
+// for incompressible content. Every supported CSS viewport fits this budget.
+const MAX_LIVE_PIXELS = 2560 ** 2;
+
 export class WebCapture {
   constructor(root, options = {}) {
     this.root = root;
@@ -78,8 +83,13 @@ export class WebCapture {
       const options = {
         headless: true,
         ...this.options,
+        // The screencast uses the compositor scale, while screenshots use the context scale.
+        args: [
+          ...(this.options.args || []),
+          `--force-device-scale-factor=${DEVICE_SCALE}`,
+        ],
         viewport: { width, height },
-        deviceScaleFactor: 1,
+        deviceScaleFactor: DEVICE_SCALE,
         acceptDownloads: false,
       };
       let browser;
@@ -169,6 +179,7 @@ export class WebCapture {
       if (fullPage) await prepareFullPage(page);
       const bytes = await page.screenshot({
         type: "png",
+        scale: "css",
         fullPage,
         animations: "disabled",
         caret: "hide",
@@ -224,11 +235,24 @@ export class WebCapture {
     const client = await this.context.newCDPSession(page);
     let stopped = false,
       latestFrame,
-      heartbeat;
+      lastSentFrame,
+      lastSentAt = 0,
+      timer;
+    const flush = () => {
+      if (
+        !latestFrame ||
+        (latestFrame === lastSentFrame && Date.now() - lastSentAt < 5000)
+      )
+        return;
+      if (writeFrame(res, latestFrame)) {
+        lastSentFrame = latestFrame;
+        lastSentAt = Date.now();
+      }
+    };
     const stop = async () => {
       if (stopped) return;
       stopped = true;
-      clearInterval(heartbeat);
+      clearInterval(timer);
       page.off("close", stop);
       res.end();
       await client.detach().catch(() => {});
@@ -239,30 +263,35 @@ export class WebCapture {
     page.once("close", stop);
     client.on("Page.screencastFrame", ({ data, sessionId }) => {
       latestFrame = Buffer.from(data, "base64");
-      if (!stopped) writeFrame(res, latestFrame);
       void client
         .send("Page.screencastFrameAck", { sessionId })
         .catch(() => {});
     });
     try {
       streamHeaders(res);
+      const { width, height } = page.viewportSize();
+      const scale = Math.min(
+        DEVICE_SCALE,
+        Math.sqrt(MAX_LIVE_PIXELS / (width * height)),
+      );
       await client.send("Page.startScreencast", {
-        format: "jpeg",
-        quality: 75,
-        maxWidth: 1600,
-        maxHeight: 1600,
-        everyNthFrame: 2,
+        format: "png",
+        maxWidth: Math.floor(width * scale),
+        maxHeight: Math.floor(height * scale),
       });
-      // Static pages also need an initial frame.
-      latestFrame = await page.screenshot({
-        type: "jpeg",
-        quality: 75,
-        timeout: 10000,
-      });
-      writeFrame(res, latestFrame);
-      heartbeat = setInterval(() => {
-        if (latestFrame && !stopped) writeFrame(res, latestFrame);
-      }, 5000);
+      // Seed static pages without replacing a newer compositor frame.
+      if (!latestFrame) {
+        const initial = await page.screenshot({
+          type: "png",
+          scale: scale === DEVICE_SCALE ? "device" : "css",
+          timeout: 10000,
+        });
+        latestFrame ??= initial;
+      }
+      if (stopped) return;
+      flush();
+      // Coalesce repaints before transport, including the final frame after input stops.
+      timer = setInterval(flush, 1000 / 15);
     } catch (error) {
       await stop();
       throw error;

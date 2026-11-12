@@ -227,6 +227,20 @@ test("viewport presets resize the live webpage, preserve input, and survive capt
     await expect(page.locator(".viewport-size")).toHaveText(
       `${width} × ${height} px`,
     );
+    await expect
+      .poll(() =>
+        screen.evaluate(
+          (img: HTMLImageElement, size) =>
+            img.naturalWidth >= size.width &&
+            img.naturalHeight >= size.height &&
+            Math.abs(
+              img.naturalHeight - (img.naturalWidth * size.height) / size.width,
+            ) <= 2 &&
+            img.getBoundingClientRect().width <= size.width,
+          { width, height },
+        ),
+      )
+      .toBe(true);
     const response = await page.request.get(
       sessionUrl.origin + "/api/capture/status",
       { headers },

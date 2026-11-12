@@ -73,7 +73,9 @@ test.beforeEach(async () => {
       if (req.url === "/fixture") {
         res.setHeader("Content-Type", "text/html");
         res.end(
-          '<title>Plugin capture fixture</title><h1>A live page</h1><input placeholder="Feedback target">',
+          `<title>Plugin capture fixture</title><h1>A live page</h1><input placeholder="Feedback target">
+           <div id="stripes" style="position:fixed;top:0;left:0;width:8px;height:8px;background:repeating-linear-gradient(to right,#f00 0 .5px,#00f .5px 1px)"></div>
+           <script>document.addEventListener("click", () => document.querySelector("#stripes").style.transform = "scaleX(-1)")</script>`,
         );
       } else if (req.url === "/config" || req.url === "/foreground") {
         res.setHeader("Content-Type", "application/json");
@@ -521,6 +523,30 @@ for (const kind of ["web", "simulator"])
     ).toBeEnabled({ timeout: 20000 });
     const image = ui.locator(".live-screen img");
     await expect(image).toBeVisible();
+    if (kind === "web") {
+      // Half-CSS-pixel stripes should survive the entire live preview path.
+      const readDetail = () =>
+        image.evaluate((element: HTMLImageElement) => {
+          const canvas = document.createElement("canvas");
+          canvas.width = 2;
+          canvas.height = 1;
+          const ctx = canvas.getContext("2d")!;
+          ctx.drawImage(element, 0, 0);
+          return {
+            width: element.naturalWidth,
+            pixels: Array.from(ctx.getImageData(0, 0, 2, 1).data),
+          };
+        });
+      await expect.poll(readDetail).toEqual({
+        width: 2560,
+        pixels: [255, 0, 0, 255, 0, 0, 255, 255],
+      });
+      await image.click();
+      await expect.poll(readDetail).toEqual({
+        width: 2560,
+        pixels: [0, 0, 255, 255, 255, 0, 0, 255],
+      });
+    }
     expect(
       await image.evaluate((element: HTMLImageElement) => element.naturalWidth),
     ).toBeGreaterThan(0);

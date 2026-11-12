@@ -6,10 +6,11 @@ export function streamHeaders(res) {
   });
 }
 export function writeFrame(res, bytes) {
-  if (res.destroyed || res.writableLength > 1024 * 1024) return;
+  if (res.destroyed || res.writableLength > 1024 * 1024) return false;
   res.write(
-    `--frame\r\nContent-Type: image/jpeg\r\nContent-Length: ${bytes.length}\r\n\r\n`,
+    `--frame\r\nContent-Type: image/png\r\nContent-Length: ${bytes.length}\r\n\r\n`,
   );
   res.write(bytes);
   res.write("\r\n");
+  return true;
 }
