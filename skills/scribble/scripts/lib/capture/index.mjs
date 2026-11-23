@@ -1,6 +1,7 @@
 import { validateCaptureCommand } from "./contracts.mjs";
 import { WebCapture } from "./web.mjs";
 import { SimulatorCapture } from "./simulator.mjs";
+import { SimulatorHelpers } from "./simulator-helper.mjs";
 import {
   playwright,
   simCommand,
@@ -12,6 +13,7 @@ import { captureError } from "./common.mjs";
 export function createCaptures(root, options = {}) {
   const sessions = new Map(),
     queues = new Map();
+  const helpers = new SimulatorHelpers(root);
   let closed = false;
   const sources = (id) => {
     if (closed)
@@ -22,7 +24,10 @@ export function createCaptures(root, options = {}) {
     if (!sessions.has(id))
       sessions.set(id, {
         web: new WebCapture(root, options.web),
-        simulator: new SimulatorCapture(root, options.simulator),
+        simulator: new SimulatorCapture(root, {
+          helpers,
+          ...options.simulator,
+        }),
       });
     return sessions.get(id);
   };
@@ -164,6 +169,7 @@ export function createCaptures(root, options = {}) {
         ]),
       );
       sessions.clear();
+      await helpers.close();
     },
   };
 }

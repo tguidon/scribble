@@ -1,12 +1,10 @@
 import { createRequire } from "node:module";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { execFile, spawn } from "node:child_process";
-import { promisify } from "node:util";
+import { spawn } from "node:child_process";
 import { mkdir } from "node:fs/promises";
 import { captureError } from "./common.mjs";
 import { withStartLock } from "../lock.mjs";
-const exec = promisify(execFile);
 export const CAPTURE_PACKAGES = {
   web: "playwright@1.63.0",
   simulator: "serve-sim@0.1.47",
@@ -35,25 +33,20 @@ export function setupCommand(root, kind) {
   // Display only: callers pass arguments directly, never through a shell.
   return `node ${JSON.stringify(cli)} setup ${kind} --dir ${JSON.stringify(root)}`;
 }
-export async function simCommand(root) {
+export function simMiddlewareEntry(root) {
   try {
-    const entry = runtimeRequire(root).resolve("serve-sim/middleware");
-    return {
-      file: process.execPath,
-      args: [join(dirname(entry), "serve-sim.js")],
-    };
-  } catch {}
-  try {
-    await exec("serve-sim", ["--help"], {
-      timeout: 5000,
-      maxBuffer: 1024 * 1024,
-    });
-    return { file: "serve-sim", args: [] };
+    return runtimeRequire(root).resolve("serve-sim/middleware");
   } catch {}
   throw captureError(
     "Simulator capture needs serve-sim. Ask your agent to run Scribble setup simulator.",
     503,
   );
+}
+export function simCommand(root) {
+  return {
+    file: process.execPath,
+    args: [join(dirname(simMiddlewareEntry(root)), "serve-sim.js")],
+  };
 }
 function run(file, args, env = process.env) {
   return new Promise((resolve, reject) => {

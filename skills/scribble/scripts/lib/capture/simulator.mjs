@@ -5,6 +5,7 @@ import { simCommand } from "./runtime.mjs";
 import { localUrl, imageDimensions, captureError } from "./common.mjs";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
+import { setTimeout as delay } from "node:timers/promises";
 import { SimulatorInput } from "./sim-input.mjs";
 import { validateInput } from "./contracts.mjs";
 const exec = promisify(execFile);
@@ -17,6 +18,49 @@ async function deviceHubShadowsInput(deviceId) {
     { timeout: 4000 },
   ).catch(() => null);
   return result?.stdout.trim() === `${flag} 1`;
+}
+
+async function runningGuestJob(device, job, signal) {
+  const result = await exec(
+    "xcrun",
+    [
+      "simctl",
+      "spawn",
+      device,
+      "launchctl",
+      "print",
+      `user/foreground/com.apple.${job}`,
+    ],
+    { signal, timeout: 3000 },
+  ).catch(() => null);
+  if (/^\s*state = running$/m.test(result?.stdout ?? ""))
+    return result.stdout.match(/^\s*pid = (\d+)$/m)?.[1];
+}
+
+async function waitForSimulatorReady(device, previousPid) {
+  const signal = AbortSignal.timeout(15000);
+  while (!signal.aborted) {
+    const [backboard, springBoard, display] = await Promise.all([
+      runningGuestJob(device, "backboardd", signal),
+      runningGuestJob(device, "SpringBoard", signal),
+      exec("xcrun", ["simctl", "io", device, "enumerate"], {
+        signal,
+        timeout: 3000,
+      }).catch(() => null),
+    ]);
+    if (
+      backboard &&
+      backboard !== previousPid &&
+      springBoard &&
+      display?.stdout.includes("com.apple.framebuffer.display")
+    )
+      return;
+    await delay(300, undefined, { signal }).catch(() => {});
+  }
+  throw captureError(
+    "The simulator is still starting after input repair. Choose Reconnect to try again.",
+    503,
+  );
 }
 
 export async function bootedDevices() {
@@ -87,7 +131,7 @@ export class SimulatorCapture {
     return (this.options.devices || bootedDevices)();
   }
   async run(args, { json = true, failure } = {}) {
-    const command = this.options.command || (await simCommand(this.root));
+    const command = this.options.command || simCommand(this.root);
     try {
       const { stdout } = await exec(command.file, [...command.args, ...args], {
         timeout: 25000,
@@ -103,6 +147,14 @@ export class SimulatorCapture {
       );
     }
   }
+  async refreshInputWarning(deviceId) {
+    const checkInput =
+      this.options.inputShadowed ||
+      (this.options.command ? () => false : deviceHubShadowsInput);
+    this.inputWarning = (await checkInput(deviceId))
+      ? "Device Hub is blocking touch and keyboard input in Scribble. You can still capture the simulator screen."
+      : undefined;
+  }
   async open(input) {
     if (
       typeof input.deviceId !== "string" ||
@@ -115,9 +167,18 @@ export class SimulatorCapture {
         "That simulator is no longer booted. Refresh the device list.",
         409,
       );
+    if (this.pendingRepair?.deviceId === device.id) {
+      const waitForReady = this.options.waitForReady || waitForSimulatorReady;
+      await waitForReady(device.id, this.pendingRepair.previousPid);
+      if (this.options.command) await this.run(["--kill", device.id]);
+      else await this.options.helpers.stop(device.id);
+      this.pendingRepair = undefined;
+    }
     await this.close();
     this.generation = this.generation + 1;
-    const result = await this.run(["--detach", "-q", device.id]);
+    const result = this.options.command
+      ? await this.run(["--detach", "-q", device.id])
+      : await this.options.helpers.start(device.id);
     if (result.device !== device.id || !result.streamUrl || !result.url)
       throw captureError(
         "serve-sim returned a different device or no stream. Update serve-sim and try again.",
@@ -134,12 +195,7 @@ export class SimulatorCapture {
       streamUrl: stream.href,
       previewUrl: preview.href,
     };
-    const checkInput =
-      this.options.inputShadowed ||
-      (this.options.command ? () => false : deviceHubShadowsInput);
-    this.inputWarning = (await checkInput(device.id))
-      ? "Device Hub is blocking touch and keyboard input in Scribble. You can still capture the simulator screen."
-      : undefined;
+    await this.refreshInputWarning(device.id);
     return this.state();
   }
   async repairInput() {
@@ -149,15 +205,30 @@ export class SimulatorCapture {
         409,
       );
     const deviceId = this.connection.device.id;
-    await this.run(["repair-input", "-d", deviceId], {
+    if (this.pendingRepair?.deviceId === deviceId)
+      return this.open({ deviceId });
+    const previousPid = await (this.options.backboardPid
+      ? this.options.backboardPid(deviceId)
+      : runningGuestJob(deviceId, "backboardd"));
+    const result = await this.run(["repair-input", "-d", deviceId], {
       json: false,
       failure:
         "Scribble could not repair simulator input. Check that the simulator is still booted and try again.",
     });
-    await this.run(["--kill", deviceId], {
-      failure:
-        "Scribble could not restart the simulator helper. Try repairing input again.",
-    });
+    if (
+      result.startsWith(
+        "Input is not shadowed by Device Hub; no restart needed.",
+      )
+    ) {
+      await this.refreshInputWarning(deviceId);
+      return this.state();
+    }
+    if (!result.startsWith("Input repaired."))
+      throw captureError(
+        "serve-sim did not report whether input was repaired. Try reconnecting.",
+        502,
+      );
+    this.pendingRepair = { deviceId, previousPid };
     return this.open({ deviceId });
   }
   async capture() {

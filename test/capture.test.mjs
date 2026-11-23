@@ -1,6 +1,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, rm, writeFile, readFile } from "node:fs/promises";
+import {
+  appendFile,
+  mkdir,
+  mkdtemp,
+  rm,
+  writeFile,
+  readFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createServer } from "node:http";
@@ -282,15 +289,18 @@ test("Device Hub input repair is explicit, scoped to the connected device, and r
   const command = join(root, "serve-sim.mjs");
   const log = join(root, "commands.jsonl");
   const repaired = join(root, "repaired");
+  const skipRepair = join(root, "skip-repair");
   await writeFile(
     command,
     `
-    import { appendFileSync, writeFileSync } from "node:fs";
+    import { appendFileSync, existsSync, writeFileSync } from "node:fs";
     const args = process.argv.slice(2);
     appendFileSync(${JSON.stringify(log)}, JSON.stringify(args) + "\\n");
     if (args[0] === "repair-input") {
       writeFileSync(${JSON.stringify(repaired)}, "yes");
-      console.log("Input repaired.");
+      console.log(existsSync(${JSON.stringify(skipRepair)})
+        ? "Input is not shadowed by Device Hub; no restart needed."
+        : "Input repaired.");
     } else {
       console.log(JSON.stringify(${JSON.stringify({
         device: device.id,
@@ -310,6 +320,9 @@ test("Device Hub input repair is explicit, scoped to the connected device, and r
         command: { file: process.execPath, args: [command] },
         inputShadowed: async () =>
           !(await readFile(repaired).catch(() => null)),
+        backboardPid: async () => 123,
+        waitForReady: (id, previousPid) =>
+          appendFile(log, JSON.stringify(["ready", id, previousPid]) + "\n"),
       },
     },
   });
@@ -342,10 +355,84 @@ test("Device Hub input repair is explicit, scoped to the connected device, and r
     [
       ["--detach", "-q", device.id],
       ["repair-input", "-d", device.id],
+      ["ready", device.id, 123],
       ["--kill", device.id],
       ["--detach", "-q", device.id],
     ],
   );
+  await rm(repaired);
+  await writeFile(skipRepair, "");
+  const beforeNoop = await (await call("open", { deviceId: device.id })).json();
+  assert.match(beforeNoop.inputWarning, /Device Hub/);
+  const noOp = await repair(beforeNoop.generation);
+  assert.equal(noOp.status, 200);
+  const unchanged = await noOp.json();
+  assert.equal(unchanged.generation, beforeNoop.generation);
+  assert.equal(unchanged.inputWarning, undefined);
+  assert.deepEqual(
+    (await readFile(log, "utf8")).trim().split("\n").map(JSON.parse).slice(5),
+    [
+      ["--detach", "-q", device.id],
+      ["repair-input", "-d", device.id],
+    ],
+  );
+});
+
+test("simulator attach uses the embedding API and reuses its helper on reconnect", async (t) => {
+  const root = await temp(t);
+  const device = {
+    id: "00000000-0000-0000-0000-000000000001",
+    name: "Test iPhone",
+  };
+  const packageDir = join(root, "capture-runtime", "node_modules", "serve-sim");
+  await mkdir(packageDir, { recursive: true });
+  await writeFile(
+    join(packageDir, "package.json"),
+    JSON.stringify({
+      exports: { "./middleware": "./middleware.cjs" },
+    }),
+  );
+  await writeFile(
+    join(packageDir, "middleware.cjs"),
+    `
+    exports.simMiddleware = ({ device }) => (req, res) => {
+      res.end(JSON.stringify({ device, pid: process.pid }));
+      return Promise.resolve();
+    };
+  `,
+  );
+  const session = await createSession(root);
+  const instance = await startServer({
+    root,
+    session,
+    captureOptions: {
+      simulator: {
+        devices: async () => [device],
+        inputShadowed: async () => false,
+      },
+    },
+  });
+  t.after(() => instance.close());
+  const connect = async () => {
+    const response = await fetch(new URL("/api/capture/open", instance.url), {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${session.token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ kind: "simulator", deviceId: device.id }),
+    });
+    assert.equal(response.status, 200);
+    const state = await response.json();
+    const config = await fetch(
+      new URL(`/helper/${device.id}/config`, state.previewUrl),
+    );
+    return config.json();
+  };
+  const first = await connect();
+  assert.equal(first.device, device.id);
+  assert.notEqual(first.pid, process.pid);
+  assert.deepEqual(await connect(), first);
 });
 
 test("simulator consumes exactly one bounded frame and detects rotation and disconnection", async (t) => {
