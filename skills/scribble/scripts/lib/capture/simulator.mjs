@@ -9,6 +9,16 @@ import { SimulatorInput } from "./sim-input.mjs";
 import { validateInput } from "./contracts.mjs";
 const exec = promisify(execFile);
 
+async function deviceHubShadowsInput(deviceId) {
+  const flag = "com.apple.coredevice.dtuhidd.active";
+  const result = await exec(
+    "xcrun",
+    ["simctl", "spawn", deviceId, "notifyutil", "-g", flag],
+    { timeout: 4000 },
+  ).catch(() => null);
+  return result?.stdout.trim() === `${flag} 1`;
+}
+
 export async function bootedDevices() {
   if (process.platform !== "darwin")
     throw captureError("Simulator capture requires a Mac with Xcode.", 503);
@@ -21,7 +31,7 @@ export async function bootedDevices() {
     );
   } catch {
     throw captureError(
-      "Xcode could not list simulators. Open Simulator and boot a device, then refresh.",
+      "Xcode could not list simulators. Boot a device in Xcode, then refresh.",
       503,
     );
   }
@@ -76,18 +86,19 @@ export class SimulatorCapture {
   async devices() {
     return (this.options.devices || bootedDevices)();
   }
-  async run(args) {
+  async run(args, { json = true, failure } = {}) {
     const command = this.options.command || (await simCommand(this.root));
     try {
       const { stdout } = await exec(command.file, [...command.args, ...args], {
         timeout: 25000,
         maxBuffer: 2 * 1024 * 1024,
       });
-      return JSON.parse(stdout);
+      return json ? JSON.parse(stdout) : stdout;
     } catch (error) {
       if (error.status) throw error;
       throw captureError(
-        "serve-sim could not connect. Check that the simulator is booted, then try again.",
+        failure ||
+          "serve-sim could not connect. Check that the simulator is booted, then try again.",
         502,
       );
     }
@@ -123,25 +134,31 @@ export class SimulatorCapture {
       streamUrl: stream.href,
       previewUrl: preview.href,
     };
-    this.inputWarning = "";
-    if (!this.options.command) {
-      const flag = await exec(
-        "xcrun",
-        [
-          "simctl",
-          "spawn",
-          device.id,
-          "notifyutil",
-          "-g",
-          "com.apple.coredevice.dtuhidd.active",
-        ],
-        { timeout: 4000 },
-      ).catch(() => null);
-      if (flag?.stdout.trim() === "com.apple.coredevice.dtuhidd.active 1")
-        this.inputWarning =
-          "Xcode Device Hub has disabled touch and keyboard input for this simulator. You can still capture its screen. Ask your agent to repair simulator input; the repair closes running apps. Then reconnect here.";
-    }
+    const checkInput =
+      this.options.inputShadowed ||
+      (this.options.command ? () => false : deviceHubShadowsInput);
+    this.inputWarning = (await checkInput(device.id))
+      ? "Device Hub is blocking touch and keyboard input in Scribble. You can still capture the simulator screen."
+      : undefined;
     return this.state();
+  }
+  async repairInput() {
+    if (!this.connection || !this.inputWarning)
+      throw captureError(
+        "The connected simulator does not need input repair.",
+        409,
+      );
+    const deviceId = this.connection.device.id;
+    await this.run(["repair-input", "-d", deviceId], {
+      json: false,
+      failure:
+        "Scribble could not repair simulator input. Check that the simulator is still booted and try again.",
+    });
+    await this.run(["--kill", deviceId], {
+      failure:
+        "Scribble could not restart the simulator helper. Try repairing input again.",
+    });
+    return this.open({ deviceId });
   }
   async capture() {
     if (!this.connection)

@@ -18,6 +18,7 @@ import { captureError } from "./common.mjs";
  * | {action: "open", kind: "simulator", deviceId: string}
  * | ({action: "resize", kind: "web", generation: number} & Viewport)
  * | ({action: "input", kind: CaptureKind, generation: number} & CaptureInput)
+ * | {action: "repair-input", kind: "simulator", generation: number}
  * | {action: "focus", kind: "web"}
  * | {action: "disconnect", kind: CaptureKind}
  * | ({action: "snapshot"} & CaptureSnapshot)} CaptureCommand */
@@ -153,6 +154,10 @@ export function validateCaptureCommand(action, input) {
         ...event,
       };
     }
+    case "repair-input":
+      if (kind !== "simulator")
+        throw captureError("Input repair is only available for simulators.");
+      return { action, kind, generation: generation(input.generation) };
     case "focus":
       if (kind !== "web") throw captureError("Only webpages can be focused.");
       return { action, kind };

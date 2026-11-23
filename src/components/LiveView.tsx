@@ -11,6 +11,7 @@ type Props = {
   title: string;
   generation: number;
   inputWarning?: string;
+  onRepairInput?: () => Promise<void>;
   onReconnect?: () => Promise<void>;
   busy: boolean;
   onCapture: (fullPage?: boolean) => Promise<void>;
@@ -27,11 +28,13 @@ export function LiveView({
   onError,
   generation,
   inputWarning,
+  onRepairInput,
   onReconnect,
   viewport,
   onViewportChange,
 }: Props) {
   const [attempt, setAttempt] = useState(0);
+  const [confirmRepair, setConfirmRepair] = useState(false);
   const [frameUrl, setFrameUrl] = useState<string>();
   const [visible, setVisible] = useState(!document.hidden);
   useEffect(() => {
@@ -294,9 +297,37 @@ export function LiveView({
       </div>
 
       {inputWarning && (
-        <p className="capture-error" role="status">
-          {inputWarning}
-        </p>
+        <div className="capture-error simulator-input-warning">
+          <span role="status">
+            {confirmRepair
+              ? "Repair restarts the simulator’s system UI and closes apps on this device. You’ll need to reopen your app."
+              : inputWarning}
+          </span>
+          {onRepairInput && (
+            <div className="simulator-input-actions">
+              {confirmRepair && (
+                <button
+                  className="text-button"
+                  disabled={busy}
+                  onClick={() => setConfirmRepair(false)}
+                >
+                  Cancel
+                </button>
+              )}
+              <button
+                className="secondary"
+                disabled={busy}
+                onClick={() =>
+                  confirmRepair ? void onRepairInput() : setConfirmRepair(true)
+                }
+              >
+                {confirmRepair
+                  ? "Repair and reconnect"
+                  : "Repair simulator input"}
+              </button>
+            </div>
+          )}
+        </div>
       )}
       {kind === "web" && viewport && (
         <ViewportPicker

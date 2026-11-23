@@ -118,7 +118,7 @@ export class PluginBackend {
     const routes = {
       GET: /^\/(session|health|handoff|feedback|images\/[a-zA-Z0-9-]+|capture\/(status|apps|devices))$/,
       PUT: /^\/draft$/,
-      POST: /^\/(sessions|submit|images|capture\/(shared|snapshot|input|open|resize|focus|disconnect))$/,
+      POST: /^\/(sessions|submit|images|capture\/(shared|snapshot|input|open|repair-input|resize|focus|disconnect))$/,
     };
     if (
       !path.startsWith("/") ||

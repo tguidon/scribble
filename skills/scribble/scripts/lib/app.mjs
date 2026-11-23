@@ -251,6 +251,7 @@ export async function startServer({
               "/api/capture/input",
               "/api/capture/resize",
               "/api/capture/open",
+              "/api/capture/repair-input",
               "/api/capture/focus",
               "/api/capture/disconnect",
             ].includes(url.pathname)

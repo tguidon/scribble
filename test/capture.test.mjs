@@ -273,6 +273,81 @@ test("full-page capture loads lower content at the selected viewport and restore
   assert.equal(await web.page.evaluate(() => scrollY), 100);
 });
 
+test("Device Hub input repair is explicit, scoped to the connected device, and reconnects the helper", async (t) => {
+  const root = await temp(t);
+  const device = {
+    id: "00000000-0000-0000-0000-000000000001",
+    name: "Test iPhone",
+  };
+  const command = join(root, "serve-sim.mjs");
+  const log = join(root, "commands.jsonl");
+  const repaired = join(root, "repaired");
+  await writeFile(
+    command,
+    `
+    import { appendFileSync, writeFileSync } from "node:fs";
+    const args = process.argv.slice(2);
+    appendFileSync(${JSON.stringify(log)}, JSON.stringify(args) + "\\n");
+    if (args[0] === "repair-input") {
+      writeFileSync(${JSON.stringify(repaired)}, "yes");
+      console.log("Input repaired.");
+    } else {
+      console.log(JSON.stringify(${JSON.stringify({
+        device: device.id,
+        url: "http://127.0.0.1:3100",
+        streamUrl: "http://127.0.0.1:3100/helper/stream.mjpeg",
+      })}));
+    }
+  `,
+  );
+  const session = await createSession(root);
+  const instance = await startServer({
+    root,
+    session,
+    captureOptions: {
+      simulator: {
+        devices: async () => [device],
+        command: { file: process.execPath, args: [command] },
+        inputShadowed: async () =>
+          !(await readFile(repaired).catch(() => null)),
+      },
+    },
+  });
+  t.after(() => instance.close());
+  const origin = new URL(instance.url).origin;
+  const call = (action, data) =>
+    fetch(`${origin}/api/capture/${action}`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${session.token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ kind: "simulator", ...data }),
+    });
+  const open = await call("open", { deviceId: device.id });
+  assert.equal(open.status, 200);
+  const { generation, inputWarning } = await open.json();
+  assert.match(inputWarning, /Device Hub/);
+  const repair = (currentGeneration) =>
+    call("repair-input", { generation: currentGeneration });
+  assert.equal((await repair(generation - 1)).status, 409);
+  const recovered = await repair(generation);
+  assert.equal(recovered.status, 200);
+  const state = await recovered.json();
+  assert.equal(state.generation, generation + 1);
+  assert.equal(state.inputWarning, undefined);
+  assert.equal((await repair(state.generation)).status, 409);
+  assert.deepEqual(
+    (await readFile(log, "utf8")).trim().split("\n").map(JSON.parse),
+    [
+      ["--detach", "-q", device.id],
+      ["repair-input", "-d", device.id],
+      ["--kill", device.id],
+      ["--detach", "-q", device.id],
+    ],
+  );
+});
+
 test("simulator consumes exactly one bounded frame and detects rotation and disconnection", async (t) => {
   const root = await temp(t);
   let orientation = "portrait",
