@@ -21,6 +21,10 @@ export type Screenshot = {
 import type { CaptureKind } from "../skills/scribble/scripts/lib/capture/contracts.mjs";
 export type { CaptureKind } from "../skills/scribble/scripts/lib/capture/contracts.mjs";
 export type CaptureMode = CaptureKind | "shared";
+export type CaptureEntry =
+  | { kind: "web"; url: string; viewport: { width: number; height: number } }
+  | { kind: "simulator"; deviceId: string }
+  | { kind: "shared" };
 export type CaptureRequest =
   | import("../skills/scribble/scripts/lib/capture/contracts.mjs").CaptureSnapshot
   | { kind: "shared"; file: File; surface: string };
@@ -55,6 +59,9 @@ export type Session = {
   lastSaveId?: string;
   updatedAt: string;
   submittedAt?: string;
+  submittedImageId?: string;
+  resumeCapture?: CaptureEntry;
+  captureEntry?: CaptureEntry;
   bundlePath?: string;
   deliveryHost?: "claude-code";
 };

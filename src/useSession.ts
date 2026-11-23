@@ -314,31 +314,34 @@ export function useSession() {
     },
     [enqueue, flush, accept, recovery],
   );
-  const submit = useCallback(async () => {
-    setBusy(true);
-    setError("");
-    try {
-      await flush();
-      await enqueue(async () => {
-        const result = await request<Session>("/submit", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ revision: revision.current }),
+  const submit = useCallback(
+    async (imageId?: string) => {
+      setBusy(true);
+      setError("");
+      try {
+        await flush();
+        await enqueue(async () => {
+          const result = await request<Session>("/submit", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ revision: revision.current, imageId }),
+          });
+          accept(result);
+          draftStorage.removeItem(key);
         });
-        accept(result);
-        draftStorage.removeItem(key);
-      });
-    } catch (e) {
-      // A dropped response may follow a successful durable submission.
-      const recovered = await loadSession().catch(() => undefined);
-      if (recovered?.status === "submitted") {
-        accept(recovered);
-        draftStorage.removeItem(key);
-      } else setError((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  }, [enqueue, flush, accept]);
+      } catch (e) {
+        // A dropped response may follow a successful durable submission.
+        const recovered = await loadSession().catch(() => undefined);
+        if (recovered?.status === "submitted") {
+          accept(recovered);
+          draftStorage.removeItem(key);
+        } else setError((e as Error).message);
+      } finally {
+        setBusy(false);
+      }
+    },
+    [enqueue, flush, accept],
+  );
   return {
     session,
     error,

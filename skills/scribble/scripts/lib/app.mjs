@@ -290,18 +290,64 @@ export async function startServer({
           if (req.method === "POST" && url.pathname === "/api/sessions") {
             if (!receipt)
               fail(409, "Finish this feedback before opening a new canvas.");
+            const mode = input?.mode ?? "blank";
+            if (!["blank", "screenshot", "live"].includes(mode))
+              fail(400, "Choose how to start the next canvas.");
+            const image =
+              session.images.find(
+                (item) => item.id === session.submittedImageId,
+              ) ?? session.images[0];
+            const captureEntry =
+              mode === "live"
+                ? session.resumeCapture ||
+                  captures.resumeSource(id, image?.source)
+                : undefined;
+            if (mode === "live" && !captureEntry)
+              fail(409, "There’s no live source to return to.");
+            if (mode === "screenshot" && !image)
+              fail(409, "There’s no screenshot to reuse.");
             await excludeStorage(root);
-            await captures.release(id);
             // Reuse the next draft after a lost response or repeated click.
-            let next = session.nextSessionId
-              ? await loadSession(root, session.nextSessionId)
-              : null;
+            const nextId =
+              mode === "blank"
+                ? session.nextSessionId
+                : session.followUpSessions?.[mode];
+            let next = nextId ? await loadSession(root, nextId) : null;
             if (!next || next.status !== "draft") {
-              next = await createSession(root);
+              next = await createSession(root, undefined, {
+                original:
+                  mode === "screenshot"
+                    ? { image, path: join(dir, "images", image.file) }
+                    : undefined,
+                captureEntry,
+              });
               await inheritAgentDelivery(root, id, next.id);
-              session.nextSessionId = next.id;
+              if (mode === "blank") session.nextSessionId = next.id;
+              else
+                session.followUpSessions = {
+                  ...session.followUpSessions,
+                  [mode]: next.id,
+                };
               await persist();
+              if (captureEntry && captureEntry.kind !== "shared") {
+                const { kind } = captureEntry;
+                if (!(await captures.transfer(id, next.id, kind))) {
+                  const input =
+                    kind === "web"
+                      ? {
+                          kind,
+                          url: captureEntry.url,
+                          ...captureEntry.viewport,
+                        }
+                      : { kind, deviceId: captureEntry.deviceId };
+                  // If the source went away, leave its settings selected for retry.
+                  await captures
+                    .command(next.id, "open", input)
+                    .catch(() => {});
+                }
+              }
             }
+            await captures.release(id);
             return reply(res, 200, {
               url: `/?session=${next.id}#token=${next.token}&session=${next.id}`,
             });
@@ -419,6 +465,7 @@ export async function startServer({
             session = {
               ...session,
               images: [...session.images, image],
+              captureEntry: undefined,
               revision: session.revision + 1,
               updatedAt: new Date().toISOString(),
             };
@@ -466,6 +513,12 @@ export async function startServer({
             checkRevision(input.revision, session);
             if (!session.images.length)
               fail(400, "Add at least one screenshot before finishing.");
+            const image =
+              session.images.find((item) => item.id === input.imageId) ??
+              session.images[0];
+            const previousSource =
+              image.source ??
+              session.images.findLast((item) => item.source)?.source;
             const submittedAt = new Date().toISOString();
             const bundle = {
               version: 1,
@@ -490,6 +543,8 @@ export async function startServer({
             session = {
               ...session,
               status: "submitted",
+              submittedImageId: image.id,
+              resumeCapture: captures.resumeSource(id, previousSource),
               submittedAt,
               updatedAt: submittedAt,
             };

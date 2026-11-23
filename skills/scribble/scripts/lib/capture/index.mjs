@@ -39,6 +39,39 @@ export function createCaptures(root, options = {}) {
     return operation;
   }
   return {
+    resumeSource(id, imageSource) {
+      if (imageSource?.kind === "shared") return { kind: "shared" };
+      const current = sessions.get(id);
+      const web = current?.web.state();
+      const simulator = current?.simulator.state();
+      if (
+        web?.connected &&
+        (imageSource?.kind === "web" || !simulator?.connected)
+      )
+        return { kind: "web", url: web.url, viewport: web.viewport };
+      if (simulator?.connected)
+        return { kind: "simulator", deviceId: simulator.device.id };
+      if (imageSource?.kind === "web")
+        return {
+          kind: "web",
+          url: imageSource.url,
+          viewport: imageSource.viewport,
+        };
+      if (imageSource?.kind === "simulator")
+        return { kind: "simulator", deviceId: imageSource.device.id };
+    },
+    async transfer(id, nextId, kind) {
+      return run(id, async (current) => {
+        const source = current[kind];
+        if (!source.state().connected) return false;
+        await source.stopStream?.();
+        await source.release();
+        await current[kind === "web" ? "simulator" : "web"].close();
+        sources(nextId)[kind] = source;
+        sessions.delete(id);
+        return true;
+      });
+    },
     /** @returns {Promise<import("./contracts.mjs").CaptureStatus>} */
     async status(id) {
       const current = sources(id);

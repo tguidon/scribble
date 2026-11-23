@@ -566,6 +566,14 @@ for (const kind of ["web", "simulator"])
       arguments: { sessionId: result.structuredContent.sessionId },
     });
     expect(feedback.structuredContent.images[0].source.kind).toBe(kind);
+    await ui.getByRole("button", { name: "Back to live preview" }).click();
+    await expect(
+      ui.getByRole("button", { name: "Capture & annotate" }),
+    ).toBeEnabled();
+    await ui.getByRole("button", { name: "Back to annotations" }).click();
+    await expect(
+      ui.getByRole("button", { name: "Capture a webpage or simulator" }),
+    ).toBeVisible();
   });
 
 test("upload drop overlay stays inside the viewport after scrolling the expanded editor", async ({

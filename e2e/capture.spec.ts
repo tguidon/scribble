@@ -97,6 +97,10 @@ test.afterEach(async () => {
 test("local capture opens, annotates, resumes, captures again, and submits both images", async ({
   page,
 }) => {
+  let detailLoads = 0;
+  source.on("request", (req) => {
+    if (req.url === "/details") detailLoads++;
+  });
   await page
     .getByRole("button", { name: "Capture a webpage or simulator" })
     .click();
@@ -169,6 +173,9 @@ test("local capture opens, annotates, resumes, captures again, and submits both 
   await expect(
     page.getByRole("button", { name: "Open Project details.png" }),
   ).toBeVisible();
+  await page.getByRole("button", { name: "Open Project details.png" }).click();
+  await page.locator(".image-stage").focus();
+  await page.keyboard.press("Enter");
   await page.getByRole("button", { name: "Finish feedback" }).click();
   await expect(
     page.getByRole("heading", { name: "Ready for your agent." }),
@@ -182,6 +189,60 @@ test("local capture opens, annotates, resumes, captures again, and submits both 
   expect(bundle.images).toHaveLength(2);
   expect(bundle.images[0].source.url).toBe(sourceUrl + "/");
   expect(bundle.images[1].source.url).toBe(sourceUrl + "/details");
+  expect(bundle.images[1].annotations).toHaveLength(1);
+
+  // Reopen the saved receipt before choosing a follow-up.
+  expect(detailLoads).toBe(1);
+  await page.reload();
+  await page.getByRole("button", { name: "Back to live preview" }).click();
+  await expect(
+    page.getByRole("button", { name: "Capture & annotate" }),
+  ).toBeEnabled();
+  await page.getByRole("button", { name: "Capture & annotate" }).click();
+  await expect(
+    page.getByRole("button", { name: "Open Project details.png" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Open Local workspace.png" }),
+  ).toHaveCount(0);
+  expect(detailLoads).toBe(1);
+  await page.reload();
+  await expect(
+    page.getByRole("button", { name: "Open Project details.png" }),
+  ).toBeVisible();
+
+  await page.goto(app.url);
+  await page.getByRole("button", { name: "Back to screenshot" }).click();
+  await expect(
+    page.getByRole("button", { name: "Open Project details.png" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Open Local workspace.png" }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("textbox", { name: "Comment for mark 1" }),
+  ).toHaveCount(0);
+  const followUp = new URL(page.url());
+  const nextParams = new URLSearchParams(followUp.hash.slice(1));
+  const draft = await (
+    await page.request.get(followUp.origin + "/api/session", {
+      headers: {
+        Authorization: `Bearer ${nextParams.get("token")}`,
+        "X-Scribble-Session": nextParams.get("session")!,
+      },
+    })
+  ).json();
+  expect(draft).toMatchObject({
+    message: "",
+    images: [
+      {
+        id: bundle.images[1].id,
+        annotations: [],
+        source: bundle.images[1].source,
+      },
+    ],
+  });
+  expect(draft.images).toHaveLength(1);
 });
 
 test("viewport presets resize the live webpage, preserve input, and survive capture", async ({
@@ -810,6 +871,10 @@ test("shared tab captures survive lost responses, resume sharing, and stop on su
     height: 800,
     source: { kind: "shared", displaySurface: "browser" },
   });
+  await page.getByRole("button", { name: "Share browser tab again" }).click();
+  await expect(
+    page.getByRole("button", { name: "Share browser tab", exact: true }),
+  ).toBeVisible();
 });
 
 test("a rejected shared capture saves the new source on the next attempt", async ({

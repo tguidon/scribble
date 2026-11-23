@@ -29,6 +29,13 @@ export function useEditorController() {
   const [captureOpen, setCaptureOpen] = useState(false);
   const [captureKind, setCaptureKind] = useState<CaptureKind>("web");
   const [webMode, setWebMode] = useState<"direct" | "shared">("direct");
+  const captureEntryKind = session?.captureEntry?.kind;
+  useEffect(() => {
+    if (!captureEntryKind) return;
+    setCaptureKind(captureEntryKind === "simulator" ? "simulator" : "web");
+    setWebMode(captureEntryKind === "shared" ? "shared" : "direct");
+    setCaptureOpen(true);
+  }, [captureEntryKind]);
   const [activeId, setActiveId] = useState<string>();
   const [selected, setSelected] = useState<string | null>(null);
   const [tool, setTool] = useState<Tool>("pin");
@@ -99,6 +106,7 @@ export function useEditorController() {
   };
   return {
     ...persistence,
+    submit: () => persistence.submit(image?.id),
     session,
     recovery,
     setError,

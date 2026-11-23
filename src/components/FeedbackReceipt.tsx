@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from "react";
-import { Check, Copy, Plus } from "lucide-react";
+import { Check, Copy, Image, Plus, ScanLine } from "lucide-react";
 import { request } from "../api";
 import type { Session } from "../types";
 import { getEditorHost } from "../editorHost";
 import { ScreenshotImage } from "./ScreenshotImage";
 import { PluginDelivery } from "./PluginDelivery";
 import { browserDelivery } from "../browserDelivery";
+
+type NextCanvas = "blank" | "screenshot" | "live";
 
 export function FeedbackReceipt({ session }: { session: Session }) {
   const host = getEditorHost();
@@ -17,7 +19,7 @@ export function FeedbackReceipt({ session }: { session: Session }) {
   const [delivered, setDelivered] = useState(false);
   const [copying, setCopying] = useState(false);
   const [copyError, setCopyError] = useState("");
-  const [starting, setStarting] = useState(false);
+  const [starting, setStarting] = useState<NextCanvas>();
   const [startError, setStartError] = useState("");
   const preview = useRef<HTMLTextAreaElement>(null);
   const heading = useRef<HTMLHeadingElement>(null);
@@ -63,19 +65,19 @@ export function FeedbackReceipt({ session }: { session: Session }) {
       setCopying(false);
     }
   }
-  async function newCanvas() {
-    setStarting(true);
+  async function newCanvas(mode: NextCanvas) {
+    setStarting(mode);
     setStartError("");
     try {
       const next = await request<{ url: string }>("/sessions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: "{}",
+        body: JSON.stringify({ mode }),
       });
       if (host) host.newCanvas(next.url);
       else window.location.assign(next.url);
     } catch {
-      setStarting(false);
+      setStarting(undefined);
       setStartError(
         "Could not open a new canvas. Your feedback is saved. Try again.",
       );
@@ -85,6 +87,11 @@ export function FeedbackReceipt({ session }: { session: Session }) {
     (count, image) => count + image.annotations.length,
     0,
   );
+  const screenshot =
+    session.images.find((image) => image.id === session.submittedImageId) ??
+    session.images[0];
+  const liveSource = session.resumeCapture?.kind ?? screenshot?.source?.kind;
+  const followUpStyle = delivered || copied ? "primary" : "secondary";
   return (
     <main className="receipt">
       <div className="receipt-check">
@@ -119,18 +126,44 @@ export function FeedbackReceipt({ session }: { session: Session }) {
       {delivery && (
         <PluginDelivery delivery={delivery} onDelivered={setDelivered} />
       )}
+      {screenshot && (
+        <div className="handoff-actions receipt-follow-up">
+          <button
+            className={followUpStyle}
+            onClick={() => void newCanvas("screenshot")}
+            disabled={!!starting}
+          >
+            <Image size={16} />
+            {starting === "screenshot" ? "Opening…" : "Back to screenshot"}
+          </button>
+          {liveSource && (
+            <button
+              className={followUpStyle}
+              onClick={() => void newCanvas("live")}
+              disabled={!!starting}
+            >
+              <ScanLine size={16} />
+              {starting === "live"
+                ? "Opening…"
+                : liveSource === "shared"
+                  ? "Share browser tab again"
+                  : "Back to live preview"}
+            </button>
+          )}
+        </div>
+      )}
       <div className="handoff-actions">
         <button
           className={
-            delivered || (!delivery?.canSend && copied)
+            !liveSource && (delivered || (!delivery?.canSend && copied))
               ? "primary"
               : "secondary"
           }
-          onClick={() => void newCanvas()}
-          disabled={starting}
+          onClick={() => void newCanvas("blank")}
+          disabled={!!starting}
         >
           <Plus size={16} />
-          {starting ? "Opening…" : "New canvas"}
+          {starting === "blank" ? "Opening…" : "New canvas"}
         </button>
         <button
           className={delivery?.canSend || copied ? "text-button" : "primary"}

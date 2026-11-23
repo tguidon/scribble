@@ -1,4 +1,11 @@
-import { mkdir, readFile, writeFile, rename, readdir } from "node:fs/promises";
+import {
+  copyFile,
+  mkdir,
+  readFile,
+  writeFile,
+  rename,
+  readdir,
+} from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { randomUUID, randomBytes } from "node:crypto";
 
@@ -19,10 +26,16 @@ export function sessionDir(root, id) {
   if (!safeId(id)) throw new Error("Invalid session ID.");
   return join(resolve(root), "sessions", id);
 }
-export async function createSession(root, title = "A little visual direction") {
+export async function createSession(
+  root,
+  title = "A little visual direction",
+  { original, captureEntry } = {},
+) {
   const id = randomUUID();
   const dir = sessionDir(root, id);
   await mkdir(join(dir, "images"), { recursive: true, mode: 0o700 });
+  if (original)
+    await copyFile(original.path, join(dir, "images", original.image.file));
   const session = {
     version: 1,
     id,
@@ -33,7 +46,8 @@ export async function createSession(root, title = "A little visual direction") {
     revision: 0,
     status: "draft",
     message: "",
-    images: [],
+    images: original ? [{ ...original.image, annotations: [] }] : [],
+    captureEntry,
   };
   await atomicJson(join(dir, "session.json"), session);
   return session;

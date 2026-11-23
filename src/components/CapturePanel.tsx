@@ -12,12 +12,13 @@ import { SharedTabView } from "./SharedTabView";
 import type { TabShare, SharedSurface } from "../useTabShare";
 import { LiveView } from "./LiveView";
 import { ViewportPicker, type Viewport } from "./ViewportPicker";
-import type { CaptureKind } from "../types";
+import type { CaptureEntry, CaptureKind } from "../types";
 
 import type { CaptureStatus as Status } from "../../skills/scribble/scripts/lib/capture/contracts.mjs";
 import type { CaptureSnapshot } from "../../skills/scribble/scripts/lib/capture/contracts.mjs";
 type Props = {
   kind: CaptureKind;
+  initialSource?: CaptureEntry;
   setKind: (kind: CaptureKind) => void;
   onBack: () => void;
   onCapture: (input: CaptureSnapshot) => Promise<void>;
@@ -28,6 +29,7 @@ type Props = {
 };
 export function CapturePanel({
   kind,
+  initialSource,
   setKind,
   onBack,
   onCapture,
@@ -38,12 +40,20 @@ export function CapturePanel({
 }: Props) {
   const [status, setStatus] = useState<Status>();
   const [devices, setDevices] = useState<{ id: string; name: string }[]>([]);
-  const [deviceId, setDeviceId] = useState("");
-  const [url, setUrl] = useState("");
+  const [deviceId, setDeviceId] = useState(
+    initialSource?.kind === "simulator" ? initialSource.deviceId : "",
+  );
+  const [url, setUrl] = useState(
+    initialSource?.kind === "web" ? initialSource.url : "",
+  );
   const [apps, setApps] = useState<{ url: string; title: string }[]>([]);
   const [discoveryMessage, setDiscoveryMessage] = useState("");
-  const [width, setWidth] = useState(1280);
-  const [height, setHeight] = useState(900);
+  const [width, setWidth] = useState(
+    initialSource?.kind === "web" ? initialSource.viewport.width : 1280,
+  );
+  const [height, setHeight] = useState(
+    initialSource?.kind === "web" ? initialSource.viewport.height : 900,
+  );
   const [busy, setBusy] = useState("Checking sources…");
   const [error, setError] = useState("");
   const heading = useRef<HTMLHeadingElement>(null);

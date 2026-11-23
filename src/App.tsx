@@ -351,6 +351,7 @@ function Editor({ controller }: { controller: EditorController }) {
         <FeedbackReceipt session={session} />
       ) : captureOpen ? (
         <CapturePanel
+          initialSource={session.captureEntry}
           kind={captureKind}
           setKind={setCaptureKind}
           webMode={webMode}
