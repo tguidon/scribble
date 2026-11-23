@@ -12,6 +12,7 @@ import { startServer } from "../skills/scribble/scripts/lib/app.mjs";
 
 let project: string, origin: string, result: any, messages: any[];
 let calls: string[];
+let simulatorFrame: Buffer;
 // Visibility alone does not prove that an SVG image decoded; broken images
 // still occupy their full canvas rectangle.
 async function expectDecodedScreenshot(image: Locator) {
@@ -31,6 +32,10 @@ let http: Awaited<ReturnType<typeof startServer>>,
   host: ReturnType<typeof createServer>,
   client: Client;
 test.beforeEach(async () => {
+  simulatorFrame = Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGNgYPgPAAEDAQAIicLsAAAAAElFTkSuQmCC",
+    "base64",
+  );
   project = await mkdtemp(join(tmpdir(), "scribble-plugin-browser-"));
   const root = join(project, ".scribble");
   const simCommand = join(project, "simulator.mjs");
@@ -86,18 +91,20 @@ test.beforeEach(async () => {
           }),
         );
       } else if (req.url === "/stream.mjpeg") {
-        const bytes = Buffer.from(
-          "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=",
-          "base64",
-        );
         res.writeHead(200, {
           "Content-Type": "multipart/x-mixed-replace; boundary=frame",
         });
-        res.write(
-          `--frame\r\nContent-Type: image/png\r\nContent-Length: ${bytes.length}\r\n\r\n`,
-        );
-        res.write(bytes);
-        res.write("\r\n");
+        const sendFrame = () => {
+          const bytes = simulatorFrame;
+          res.write(
+            `--frame\r\nContent-Type: image/png\r\nContent-Length: ${bytes.length}\r\n\r\n`,
+          );
+          res.write(bytes);
+          res.write("\r\n");
+        };
+        sendFrame();
+        const repeat = setInterval(sendFrame, 50);
+        res.once("close", () => clearInterval(repeat));
       } else if (req.url === "/host" || req.url?.startsWith("/host?")) {
         const params = new URL(req.url, "http://fixture").searchParams;
         res.setHeader("Content-Type", "text/html");
@@ -521,9 +528,9 @@ for (const kind of ["web", "simulator"])
     await expect(
       ui.getByRole("button", { name: "Capture & annotate" }),
     ).toBeEnabled({ timeout: 20000 });
-    const image = ui.locator(".live-screen img");
-    await expect(image).toBeVisible();
     if (kind === "web") {
+      const image = ui.locator(".live-screen img");
+      await expect(image).toBeVisible();
       // Half-CSS-pixel stripes should survive the entire live preview path.
       const readDetail = () =>
         image.evaluate((element: HTMLImageElement) => {
@@ -551,10 +558,23 @@ for (const kind of ["web", "simulator"])
         width: 2560,
         pixels: [0, 0, 255, 255, 255, 0, 0, 255],
       });
+    } else {
+      const canvas = ui.getByRole("img", { name: "Live simulator screen" });
+      await expect(canvas).toHaveAttribute("width", "1");
+      await expect(ui.locator(".live-screen img")).toHaveCount(0);
+      simulatorFrame = Buffer.from(
+        "iVBORw0KGgoAAAANSUhEUgAAAAIAAAABCAIAAAB7QOjdAAAADUlEQVR4nGP4z8AARAAI/gH/xp559wAAAABJRU5ErkJggg==",
+        "base64",
+      );
+      await expect(canvas).toHaveAttribute("width", "2");
+      await expect
+        .poll(() =>
+          canvas.evaluate((element: HTMLCanvasElement) => [
+            ...element.getContext("2d")!.getImageData(0, 0, 1, 1).data,
+          ]),
+        )
+        .toEqual([255, 0, 0, 255]);
     }
-    expect(
-      await image.evaluate((element: HTMLImageElement) => element.naturalWidth),
-    ).toBeGreaterThan(0);
     await ui.getByRole("button", { name: "Capture & annotate" }).click();
     await expectDecodedScreenshot(ui.locator(".image-stage image"));
     await ui.getByRole("button", { name: "Finish feedback" }).click();

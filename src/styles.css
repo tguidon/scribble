@@ -1969,7 +1969,7 @@ kbd {
   outline: 3px solid var(--blue);
   outline-offset: 3px;
 }
-.live-screen img,
+.live-screen :is(img, canvas),
 .live-screen video {
   display: block;
   max-width: 100%;
@@ -1978,7 +1978,7 @@ kbd {
   height: auto;
   object-fit: contain;
 }
-.live-screen img {
+.live-screen :is(img, canvas) {
   touch-action: none;
   user-select: none;
   cursor: crosshair;
@@ -2178,7 +2178,7 @@ kbd {
   .capture-sheet-live .capture-tabs {
     margin-block: 0 12px;
   }
-  .live-screen img,
+  .live-screen :is(img, canvas),
   .live-screen video {
     max-height: 58dvh;
   }

@@ -6,7 +6,9 @@ import { join, resolve } from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import { createServer } from "node:http";
 import { createPlugin } from "../plugin/mcp.mjs";
+import { FrameRelay } from "../plugin/frame-relay.mjs";
 import { PluginBackend } from "../plugin/backend.mjs";
 import { createSession } from "../skills/scribble/scripts/lib/store.mjs";
 import { startServer } from "../skills/scribble/scripts/lib/app.mjs";
@@ -14,6 +16,47 @@ import { VERSION } from "../skills/scribble/scripts/lib/version.mjs";
 
 const png =
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=";
+
+test("idle simulator frames keep the relay alive without sending duplicate image payloads", async (t) => {
+  const frame = Buffer.from(png, "base64");
+  const changed = Buffer.from("next frame");
+  const write = (res, bytes) => {
+    res.write(`--frame\r\nContent-Length: ${bytes.length}\r\n\r\n`);
+    res.write(bytes);
+    res.write("\r\n");
+  };
+  let stream;
+  const server = createServer((req, res) => {
+    stream = res;
+    write(res, frame);
+  });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const relay = new FrameRelay({
+    authorize: async () => {},
+    connection: async () => ({
+      origin: `http://127.0.0.1:${server.address().port}`,
+    }),
+  });
+  t.after(() => {
+    relay.close();
+    server.closeAllConnections();
+    return new Promise((resolve) => server.close(resolve));
+  });
+  const next = (after) =>
+    relay.next("canvas", "fixture", "simulator", 1, after);
+  const first = await next(0);
+  assert.equal(first.frame, png);
+  write(stream, frame);
+  const idle = await next(first.sequence);
+  assert.equal(idle.frame, null);
+  assert.equal(idle.sequence, first.sequence);
+  assert.ok(idle.received > first.received);
+  write(stream, changed);
+  const current = await next(idle.sequence);
+  assert.equal(current.frame, changed.toString("base64"));
+  assert.equal(current.sequence, first.sequence + 1);
+});
+
 test("MCP canvas isolation, feedback delivery, original images, and new rounds", async (t) => {
   const project = await mkdtemp(join(tmpdir(), "scribble-plugin-"));
   const root = join(project, ".scribble");

@@ -92,15 +92,18 @@ export function createEditorHost(
     images,
     async *frames(kind, generation, signal) {
       let after = 0;
+      let received = 0;
       while (true) {
         signal.throwIfAborted();
-        const result = await call<{ sequence: number; frame: string | null }>(
-          "live_frame",
-          { kind, generation, after },
-          signal,
-        );
+        const result = await call<{
+          sequence: number;
+          received: number;
+          frame: string | null;
+        }>("live_frame", { kind, generation, after }, signal);
         after = result.sequence;
         if (result.frame) yield decode(result.frame);
+        else if (result.received !== received) yield null;
+        received = result.received;
         // Bound IPC traffic even when the source produces 60 frames/sec.
         await new Promise((resolve) => setTimeout(resolve, 150));
       }

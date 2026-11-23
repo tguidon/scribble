@@ -12,6 +12,7 @@ export class FrameRelay {
     const key = `${id}:${kind}:${generation}`;
     let stream = this.streams.get(key);
     if (!stream) {
+      after = 0;
       for (const [oldKey, old] of this.streams) {
         if (oldKey.startsWith(`${id}:${kind}:`)) {
           old.abort.abort();
@@ -21,6 +22,7 @@ export class FrameRelay {
       stream = {
         abort: new AbortController(),
         sequence: 0,
+        received: 0,
         frame: null,
         error: null,
         touched: Date.now(),
@@ -36,7 +38,7 @@ export class FrameRelay {
       );
     }
     stream.touched = Date.now();
-    if (stream.sequence <= after && !stream.error) {
+    if (!stream.error && (!stream.frame || stream.sequence === after)) {
       await new Promise((resolve) => {
         const finish = () => {
           clearTimeout(timer);
@@ -48,12 +50,16 @@ export class FrameRelay {
       });
     }
     if (stream.error) {
-      this.streams.delete(key);
+      if (this.streams.get(key) === stream) this.streams.delete(key);
       throw new Error(stream.error);
     }
     return {
       sequence: stream.sequence,
-      frame: stream.sequence > after ? stream.frame : null,
+      received: stream.received,
+      frame:
+        stream.sequence !== after
+          ? (stream.frame?.toString("base64") ?? null)
+          : null,
     };
   }
   async consume(stream, key, id, token, kind, generation) {
@@ -78,7 +84,14 @@ export class FrameRelay {
       );
       if (!response.ok) throw new Error((await response.json()).error);
       for await (const bytes of readMultipartFrames(response.body)) {
-        stream.frame = Buffer.from(bytes).toString("base64");
+        stream.received++;
+        const frame = Buffer.from(
+          bytes.buffer,
+          bytes.byteOffset,
+          bytes.byteLength,
+        );
+        if (kind === "simulator" && stream.frame?.equals(frame)) continue;
+        stream.frame = frame;
         stream.sequence++;
         for (const wake of stream.waiters) wake();
       }

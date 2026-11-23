@@ -24,7 +24,7 @@ export type EditorHost = FeedbackDelivery & {
     kind: CaptureKind,
     generation: number,
     signal: AbortSignal,
-  ): AsyncIterable<Uint8Array>;
+  ): AsyncIterable<Uint8Array | null>;
   newCanvas(url: string): void;
   expand?: () => Promise<void>;
 };
