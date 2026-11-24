@@ -520,6 +520,9 @@ test("simulator selection captures into the same editor and supports disconnect"
       "Xcode Device Hub has disabled touch input. Capture still works.",
     ),
   ).toBeVisible();
+  await expect(
+    page.getByText(/Click or tap the screen to interact/),
+  ).toHaveCount(0);
   await expect(page.getByRole("button", { name: /repair/i })).toHaveCount(0);
   await page.getByText("Type or paste text", { exact: true }).click();
   await expect(page.getByLabel("Text to type in the app")).toBeDisabled();

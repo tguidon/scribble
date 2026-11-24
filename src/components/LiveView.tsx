@@ -355,11 +355,6 @@ export function LiveView({
         </button>
       </div>
 
-      {inputWarning && (
-        <p className="capture-hint" role="status">
-          {inputWarning}
-        </p>
-      )}
       {kind === "web" && viewport && (
         <ViewportPicker
           viewport={viewport}
@@ -370,9 +365,9 @@ export function LiveView({
       <div
         className={`live-screen live-screen-${kind}`}
         ref={surface}
-        tabIndex={0}
-        role="application"
-        aria-label={`Interactive ${kind === "web" ? "webpage" : "simulator"} screen`}
+        tabIndex={inputWarning ? -1 : 0}
+        role={inputWarning ? "group" : "application"}
+        aria-label={`${inputWarning ? "Preview of" : "Interactive"} ${kind === "web" ? "webpage" : "simulator"} screen`}
         aria-describedby="live-help"
         onKeyDown={(event) => {
           if (event.key === "Escape") {
@@ -453,8 +448,8 @@ export function LiveView({
         )}
       </div>
       <p id="live-help" className="capture-hint">
-        Click or tap the screen to interact. Scroll or drag to move. Type while
-        the screen is focused; Escape leaves it.
+        {inputWarning ||
+          "Click or tap the screen to interact. Scroll or drag to move. Type while the screen is focused. Escape leaves it."}
       </p>
       <details className="live-type-disclosure">
         <summary>Type or paste text</summary>

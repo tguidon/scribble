@@ -304,6 +304,9 @@ test("simulator attach uses the embedding API and reuses its helper on reconnect
       simulator: {
         devices: async () => [device],
         inputShadowed: async () => true,
+        deviceHubInput: async () => {
+          throw new Error("test helper unavailable");
+        },
       },
     },
   });
@@ -775,4 +778,58 @@ test("shared frames validate actual dimensions and retain source metadata across
   });
   assert.equal(submit.status, 200);
   assert.equal((await post(endpoint)).status, 409);
+});
+
+test("Device Hub input scopes completed gestures and keyboard commands to the selected simulator", async () => {
+  const { DeviceHubInput } =
+    await import("../skills/scribble/scripts/lib/capture/device-hub-input.mjs");
+  const input = new DeviceHubInput("axe", "selected-device");
+  const commands = [];
+  input.screen = async () => ({ width: 401, height: 801 });
+  input.run = async (args) => {
+    commands.push(args);
+  };
+  const point = (phase, x, y) => input.input({ type: "pointer", phase, x, y });
+  await point("down", 0.5, 0.25);
+  input.release();
+  await point("up", 0.5, 0.25);
+  assert.equal(commands.length, 0);
+  await point("down", 0.5, 0.25);
+  await point("up", 0.5, 0.25);
+  await point("down", 0.2, 0.3);
+  await point("move", 0.3, 0.4);
+  await point("up", 0.4, 0.5);
+  await input.input({ type: "key", key: "A", meta: true });
+  await input.input({ type: "text", text: "--help" });
+  assert.deepEqual(commands[0], [
+    "tap",
+    "-x",
+    200,
+    "-y",
+    200,
+    "--udid",
+    "selected-device",
+  ]);
+  assert.deepEqual(commands[1].slice(0, 4), [
+    "draw",
+    "80,240",
+    "120,320",
+    "160,400",
+  ]);
+  assert.deepEqual(commands[2], [
+    "key-combo",
+    "--modifiers",
+    "225,227",
+    "--key",
+    4,
+    "--udid",
+    "selected-device",
+  ]);
+  assert.deepEqual(commands[3], [
+    "type",
+    "--udid",
+    "selected-device",
+    "--",
+    "--help",
+  ]);
 });

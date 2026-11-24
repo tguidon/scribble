@@ -5,6 +5,7 @@ import { simCommand } from "./runtime.mjs";
 import { localUrl, imageDimensions, captureError } from "./common.mjs";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
+import { DeviceHubInput } from "./device-hub-input.mjs";
 import { SimulatorInput } from "./sim-input.mjs";
 import { validateInput } from "./contracts.mjs";
 const exec = promisify(execFile);
@@ -103,13 +104,23 @@ export class SimulatorCapture {
       );
     }
   }
-  async refreshInputWarning(deviceId) {
-    const checkInput =
+  async connectInput(deviceId, wsUrl) {
+    this.inputWarning = undefined;
+    const check =
       this.options.inputShadowed ||
       (this.options.command ? () => false : deviceHubShadowsInput);
-    this.inputWarning = (await checkInput(deviceId))
-      ? "Use Device Hub to tap and type. You can capture and annotate the simulator screen here."
-      : undefined;
+    if (!(await check(deviceId))) return new SimulatorInput(wsUrl);
+    try {
+      return await (this.options.deviceHubInput || DeviceHubInput.open)(
+        this.root,
+        deviceId,
+      );
+    } catch (error) {
+      console.warn("Scribble Device Hub input setup:", error.message);
+      this.inputWarning =
+        "Simulator controls are unavailable. Use Device Hub to interact, or reconnect to retry input setup. Capture is still available.";
+      return null;
+    }
   }
   async open(input) {
     if (
@@ -138,13 +149,12 @@ export class SimulatorCapture {
     preview.searchParams.set("device", device.id);
     const wsUrl =
       result.wsUrl || new URL("ws", stream).href.replace(/^http/, "ws");
-    this.controls = new SimulatorInput(wsUrl);
+    this.controls = await this.connectInput(device.id, wsUrl);
     this.connection = {
       device,
       streamUrl: stream.href,
       previewUrl: preview.href,
     };
-    await this.refreshInputWarning(device.id);
     return this.state();
   }
   async capture() {
@@ -246,8 +256,8 @@ export class SimulatorCapture {
     const input = validateInput(raw);
     if (!this.connection)
       throw captureError("Reconnect the simulator to interact with it.", 409);
-    if (this.inputWarning && !["home", "release"].includes(input.type))
-      throw captureError(this.inputWarning, 409);
+    if (!this.controls && input.type === "release") return this.state();
+    if (!this.controls) throw captureError(this.inputWarning, 409);
     await this.controls.input(input);
     return this.state();
   }
