@@ -112,6 +112,19 @@ export class PluginBackend {
       );
     return record;
   }
+  // The Claude mod links a canvas to its chat after open_canvas returns. The
+  // first link wins, so a stray call cannot move a canvas to another chat.
+  async bindDelivery(id, token, chatId) {
+    const { root } = await this.authorize(id, token);
+    const target = await readJson(
+      join(sessionDir(root, id), "agent-target.json"),
+    ).catch(() => null);
+    if (!target)
+      await bindAgentDelivery(root, id, { chatId, directory: this.directory });
+    else if (target.chatId !== chatId || target.directory !== this.directory)
+      throw new Error("This canvas is already linked to another chat.");
+    return { sessionId: id, chatId };
+  }
   async request(id, token, path, method = "GET", data, binary = false) {
     const { root } = await this.authorize(id, token);
     const url = new URL(path, "http://scribble.invalid");

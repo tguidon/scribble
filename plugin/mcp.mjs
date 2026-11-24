@@ -12,6 +12,8 @@ import {
 } from "../skills/scribble/scripts/lib/agent-delivery.mjs";
 
 const RESOURCE = "ui://scribble/editor.html";
+const CLAUDE_OPEN =
+  "Open browserUrl for the user now. In the Claude desktop app, open it in the built-in browser pane (preview_start with this url). In a terminal session, open it in the default browser (for example `open` on macOS). Tell the user to finish feedback and choose Send to this chat, then end your turn. Do not poll.";
 export function createPlugin(options = {}) {
   const backend = options.backend || new PluginBackend(options);
   const frames = new FrameRelay(backend);
@@ -78,11 +80,6 @@ export function createPlugin(options = {}) {
       inputSchema: {
         projectPath: z.string().min(1),
         title: z.string().max(120).default("A little visual direction"),
-        deliveryChatId: id
-          .optional()
-          .describe(
-            "Set by the Claude Code mod to bind delivery to this chat.",
-          ),
       },
       annotations: {
         readOnlyHint: false,
@@ -91,17 +88,17 @@ export function createPlugin(options = {}) {
       },
       _meta: { ui: { resourceUri: RESOURCE } },
     },
-    guarded(async ({ projectPath, title, deliveryChatId }) => {
-      const connection = await backend.open(
-        projectPath,
-        title,
-        claude ? deliveryChatId : undefined,
-      );
+    // The Claude mod binds the chat after this call returns, through
+    // bind_delivery. It never rewrites this input: auto mode reviews the call
+    // as the model wrote it, and a rewrite leaves that review without a verdict.
+    guarded(async ({ projectPath, title }) => {
+      const connection = await backend.open(projectPath, title);
       return {
         ...result({
           sessionId: connection.sessionId,
           title,
           browserUrl: connection.url,
+          ...(claude && { next: CLAUDE_OPEN }),
         }),
         _meta: { scribble: connection },
       };
@@ -229,6 +226,23 @@ export function createPlugin(options = {}) {
   // reach them. The mod hides them from the model with a `tool.offer` hook.
   if (claude) {
     const owner = { chatId: id, consumer: id };
+    server.registerTool(
+      "bind_delivery",
+      {
+        description:
+          "Internal to the Scribble Claude Code mod. Never call this tool: it links a new canvas to the chat that opened it.",
+        inputSchema: { ...auth, chatId: id },
+        annotations: {
+          readOnlyHint: false,
+          destructiveHint: false,
+          idempotentHint: true,
+          openWorldHint: false,
+        },
+      },
+      guarded(async ({ sessionId, token, chatId }) =>
+        result(await backend.bindDelivery(sessionId, token, chatId)),
+      ),
+    );
     server.registerTool(
       "poll_delivery",
       {

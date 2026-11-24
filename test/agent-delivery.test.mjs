@@ -49,7 +49,7 @@ test("the Claude mod delivers and records feedback through the existing MCP conn
   const tools = await client.listTools();
   // Claude Code drops app-only tools from the session, so `$.mcp.call` could
   // not reach them. The mod hides these tools from the model instead.
-  for (const name of ["poll_delivery", "settle_delivery"])
+  for (const name of ["bind_delivery", "poll_delivery", "settle_delivery"])
     assert.equal(
       tools.tools.find((tool) => tool.name === name)._meta?.ui?.visibility,
       undefined,
@@ -80,21 +80,36 @@ test("the Claude mod delivers and records feedback through the existing MCP conn
   register((event, handler) => handlers.set(event, handler));
   const next = (event) => event;
   await handlers.get("session.start")($, {}, next);
-  const input = await handlers.get("tool.call")(
-    $,
-    {
-      tool: "mcp__plugin_scribble_scribble__open_canvas",
-      projectPath: project,
-    },
-    next,
-  );
-  const { tool, ...args } = input;
-  const opened = await client.callTool({
-    name: "open_canvas",
-    arguments: args,
+  // The host runs the model's unchanged input. The mod links the chat after
+  // the tool answers, from the browser URL in the model-visible text.
+  let opened;
+  const launch = {
+    tool: "mcp__plugin_scribble_scribble__open_canvas",
+    projectPath: project,
+  };
+  await handlers.get("tool.call")($, launch, async (input) => {
+    assert.equal(input, launch);
+    const { tool, ...args } = input;
+    opened = await client.callTool({ name: "open_canvas", arguments: args });
+    return { result: opened, text: opened.content[0].text };
   });
   assert.ok(!opened.isError, JSON.stringify(opened));
+  assert.match(JSON.parse(opened.content[0].text).next, /built-in browser/);
   const canvas = opened._meta.scribble;
+  assert.equal(
+    (await agentDeliveryStatus(root, canvas.sessionId)).available,
+    true,
+  );
+  const relink = await client.callTool({
+    name: "bind_delivery",
+    arguments: { ...canvas, chatId: "chat-two" },
+  });
+  assert.match(relink.content[0].text, /already linked to another chat/);
+  const forged = await client.callTool({
+    name: "bind_delivery",
+    arguments: { ...canvas, token: "b".repeat(64), chatId: "chat-one" },
+  });
+  assert.match(forged.content[0].text, /connection is invalid/);
   await finish(canvas);
   await call(canvas, "/delivery", "POST", {});
   await timer();

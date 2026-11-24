@@ -118,13 +118,37 @@ async function tick($, controller) {
 
 // The delivery control tools must stay in the session's tool pool so that
 // `$.mcp.call` can reach them. Keep them away from every model loop instead.
+const SERVERS = ["plugin_scribble_scribble", "scribble"];
 const CONTROL_TOOLS = new Set(
-  ["plugin_scribble_scribble", "scribble"].flatMap((server) =>
-    ["poll_delivery", "settle_delivery"].map(
+  SERVERS.flatMap((server) =>
+    ["bind_delivery", "poll_delivery", "settle_delivery"].map(
       (tool) => `mcp__${server}__${tool}`,
     ),
   ),
 );
+const OPEN_TOOLS = new Map(
+  SERVERS.map((server) => [`mcp__${server}__open_canvas`, server]),
+);
+
+// Link a canvas to this chat once open_canvas has answered. The canvas token
+// is in the browser URL that the tool returned to the model.
+async function bind($, controller, outcome) {
+  if (!outcome || outcome.isError || outcome.deny || !outcome.text) return;
+  try {
+    const { sessionId, browserUrl } = JSON.parse(outcome.text);
+    const token = new URLSearchParams(new URL(browserUrl).hash.slice(1)).get(
+      "token",
+    );
+    await call($, controller, "bind_delivery", {
+      chatId: await $.session.id(),
+      sessionId,
+      token,
+    });
+  } catch (error) {
+    // The canvas still opens. Without a link, Send offers the copied handoff.
+    report($, controller, error);
+  }
+}
 
 export function register(on) {
   let controller;
@@ -142,17 +166,15 @@ export function register(on) {
     return next(e);
   });
   on("tool.call", async ($, e, next) => {
-    if (
-      e.tool !== "mcp__plugin_scribble_scribble__open_canvas" &&
-      e.tool !== "mcp__scribble__open_canvas"
-    )
-      return next(e);
+    const server = OPEN_TOOLS.get(e.tool);
+    if (!server) return next(e);
     if (!controller) controller = start($);
-    controller.server =
-      e.tool === "mcp__scribble__open_canvas"
-        ? "scribble"
-        : "plugin_scribble_scribble";
-    return next({ ...e, deliveryChatId: await $.session.id() });
+    controller.server = server;
+    // Never rewrite this input. Auto mode reviews the call as the model wrote
+    // it, and a changed input leaves that review without a verdict.
+    const outcome = await next(e);
+    await bind($, controller, outcome);
+    return outcome;
   });
   on("turn.complete", ($, e, next) => {
     if (!e.agentId && !e.isAborted && !controller) controller = start($);

@@ -9,7 +9,8 @@ async function setup() {
   );
   const handlers = new Map();
   const submitted = [],
-    settled = [];
+    settled = [],
+    bound = [];
   let timer,
     pending,
     messages = [],
@@ -33,7 +34,8 @@ async function setup() {
     mcp: {
       call: async (server, tool, request) => {
         assert.equal(server, "plugin_scribble_scribble");
-        if (tool === "settle_delivery") {
+        if (tool === "bind_delivery") bound.push(request);
+        else if (tool === "settle_delivery") {
           settled.push(request);
           await settle(request);
           if (pending?.requestId === request.item.requestId)
@@ -75,6 +77,7 @@ async function setup() {
     tick,
     submitted,
     settled,
+    bound,
     queue(value) {
       pending = value;
     },
@@ -102,7 +105,7 @@ const item = {
 test("mod hides its delivery control tools from the model and passes others through", async () => {
   const f = await setup();
   for (const server of ["plugin_scribble_scribble", "scribble"])
-    for (const tool of ["poll_delivery", "settle_delivery"])
+    for (const tool of ["bind_delivery", "poll_delivery", "settle_delivery"])
       assert.deepEqual(
         await f.fire("tool.offer", { tool: `mcp__${server}__${tool}` }, () =>
           assert.fail("control tools must not reach the model"),
@@ -122,20 +125,42 @@ test("mod hides its delivery control tools from the model and passes others thro
 
 test("mod binds only Scribble launches and renews delivery while a prompt waits for idle", async () => {
   const f = await setup();
+  const call = {
+    tool: "mcp__plugin_scribble_scribble__open_canvas",
+    projectPath: "/project",
+  };
+  const opened = {
+    result: {},
+    text: JSON.stringify({
+      sessionId: "canvas-one",
+      browserUrl: `http://127.0.0.1:1/#token=${"a".repeat(64)}&session=canvas-one`,
+    }),
+  };
+  // Auto mode reviews the input as the model wrote it, so the mod must pass
+  // the call through unchanged and return the tool's own outcome.
   assert.equal(
-    (
-      await f.fire("tool.call", {
-        tool: "mcp__plugin_scribble_scribble__open_canvas",
-        projectPath: "/project",
-      })
-    ).deliveryChatId,
-    "chat-one",
+    await f.fire("tool.call", call, async (input) => {
+      assert.equal(input, call);
+      return opened;
+    }),
+    opened,
   );
+  assert.deepEqual(f.bound, [
+    {
+      chatId: "chat-one",
+      consumer: f.bound[0].consumer,
+      sessionId: "canvas-one",
+      token: "a".repeat(64),
+    },
+  ]);
+  for (const outcome of [{ isError: true, text: "No project" }, { deny: "No" }])
+    await f.fire("tool.call", call, async () => outcome);
+  const other = { tool: "mcp__other__open_canvas" };
   assert.equal(
-    (await f.fire("tool.call", { tool: "mcp__other__open_canvas" }))
-      .deliveryChatId,
-    undefined,
+    await f.fire("tool.call", other, async (input) => input),
+    other,
   );
+  assert.equal(f.bound.length, 1);
   f.queue(item);
   await f.tick();
   assert.equal(f.submitted.length, 1);

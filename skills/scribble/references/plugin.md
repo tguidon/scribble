@@ -1,6 +1,6 @@
 # Plugin feedback
 
-The plugin shares one editor and MCP runtime across Codex and Claude Code. Codex opens an embedded editor; Claude Code uses the browser editor and a mod to deliver feedback. Only use plugin tools when they are available in this chat. The standalone skill works without a plugin.
+The plugin shares one editor and MCP runtime across Codex and Claude Code. Codex opens an embedded editor. Claude Code uses the browser editor, in the built-in browser pane of the Claude desktop app or the default browser in a terminal, and a mod to deliver feedback. Only use plugin tools when they are available in this chat. The standalone skill works without a plugin.
 
 ## Receiving feedback
 

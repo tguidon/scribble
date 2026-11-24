@@ -89,7 +89,7 @@ test("MCP canvas isolation, feedback delivery, original images, and new rounds",
   const tools = await client.listTools();
   assert.ok(
     !tools.tools.some((tool) =>
-      ["poll_delivery", "settle_delivery"].includes(tool.name),
+      ["bind_delivery", "poll_delivery", "settle_delivery"].includes(tool.name),
     ),
   );
   assert.deepEqual(
