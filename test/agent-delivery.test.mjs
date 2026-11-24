@@ -47,10 +47,12 @@ test("the Claude mod delivers and records feedback through the existing MCP conn
     await plugin.close();
   });
   const tools = await client.listTools();
+  // Claude Code drops app-only tools from the session, so `$.mcp.call` could
+  // not reach them. The mod hides these tools from the model instead.
   for (const name of ["poll_delivery", "settle_delivery"])
-    assert.deepEqual(
-      tools.tools.find((tool) => tool.name === name)._meta.ui.visibility,
-      ["app"],
+    assert.equal(
+      tools.tools.find((tool) => tool.name === name)._meta?.ui?.visibility,
+      undefined,
     );
   const handlers = new Map();
   let timer;

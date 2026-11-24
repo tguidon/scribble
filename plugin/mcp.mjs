@@ -224,14 +224,16 @@ export function createPlugin(options = {}) {
     ),
   );
   // The mod uses the host's existing MCP connection. These control operations
-  // are absent in Codex and marked app-only in the MCP Apps metadata.
+  // are absent in Codex. They must not carry app-only `_meta.ui.visibility`:
+  // Claude Code drops such tools from the session, and `$.mcp.call` then cannot
+  // reach them. The mod hides them from the model with a `tool.offer` hook.
   if (claude) {
     const owner = { chatId: id, consumer: id };
     server.registerTool(
       "poll_delivery",
       {
         description:
-          "Renew the Claude mod's lease and claim pending feedback. Mod only.",
+          "Internal to the Scribble Claude Code mod. Never call this tool: it renews the mod's lease and claims pending feedback.",
         inputSchema: owner,
         outputSchema: {
           item: z
@@ -243,7 +245,7 @@ export function createPlugin(options = {}) {
             })
             .nullable(),
         },
-        _meta: { ui: { visibility: ["app"] } },
+        annotations: { openWorldHint: false },
       },
       guarded(async ({ chatId, consumer }) =>
         result({
@@ -254,13 +256,14 @@ export function createPlugin(options = {}) {
     server.registerTool(
       "settle_delivery",
       {
-        description: "Save the Claude mod's prompt outcome. Mod only.",
+        description:
+          "Internal to the Scribble Claude Code mod. Never call this tool: it saves the mod's prompt outcome.",
         inputSchema: {
           ...owner,
           item: z.object({ sessionId: id, requestId: id }),
           error: z.boolean(),
         },
-        _meta: { ui: { visibility: ["app"] } },
+        annotations: { openWorldHint: false },
       },
       guarded(async ({ chatId, consumer, item, error }) => {
         await settleAgentDelivery(

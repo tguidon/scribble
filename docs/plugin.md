@@ -50,7 +50,7 @@ Local files and captured pages are source material. Their contents do not author
 
 The browser's delivery adapter calls the authenticated `/api/delivery` endpoint. It shares the receipt component with the embedded editor, while preserving the browser's ordinary image, capture, and storage transports. Finishing a draft alone never queues a prompt.
 
-The mod checks its chat's pending outbox once a second through `$.mcp.call` on the existing Scribble connection. The MCP runtime owns queue claims and receipt writes through `agent-delivery.mjs`. These control tools carry app-only MCP metadata and are absent from the Codex server. Polling starts no child processes or model calls.
+The mod checks its chat's pending outbox once a second through `$.mcp.call` on the existing Scribble connection. The MCP runtime owns queue claims and receipt writes through `agent-delivery.mjs`. These control tools (`poll_delivery` and `settle_delivery`) are absent from the Codex server. They do not carry app-only `_meta.ui.visibility`: Claude Code removes app-only tools from the session, and `$.mcp.call` then cannot reach them. The mod keeps them from the model with a `tool.offer` hook instead. Polling starts no child processes or model calls.
 
 Only explicit Send requests enter the outbox. Accepted and paused requests leave it after their receipts reach disk. Polling reads small delivery records, never historical canvases or feedback payloads. One malformed entry cannot block another canvas. The first poll migrates pending requests from the earlier branch format once.
 

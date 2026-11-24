@@ -99,6 +99,27 @@ const item = {
   text: "Apply feedback\n\nScribble canvas: canvas-one",
 };
 
+test("mod hides its delivery control tools from the model and passes others through", async () => {
+  const f = await setup();
+  for (const server of ["plugin_scribble_scribble", "scribble"])
+    for (const tool of ["poll_delivery", "settle_delivery"])
+      assert.deepEqual(
+        await f.fire("tool.offer", { tool: `mcp__${server}__${tool}` }, () =>
+          assert.fail("control tools must not reach the model"),
+        ),
+        { isOffered: false },
+      );
+  for (const tool of [
+    "mcp__plugin_scribble_scribble__open_canvas",
+    "mcp__plugin_scribble_scribble__read_feedback",
+    "mcp__other__poll_delivery",
+  ])
+    assert.deepEqual(
+      await f.fire("tool.offer", { tool }, async () => ({ isOffered: true })),
+      { isOffered: true },
+    );
+});
+
 test("mod binds only Scribble launches and renews delivery while a prompt waits for idle", async () => {
   const f = await setup();
   assert.equal(

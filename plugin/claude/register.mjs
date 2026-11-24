@@ -116,8 +116,21 @@ async function tick($, controller) {
   }
 }
 
+// The delivery control tools must stay in the session's tool pool so that
+// `$.mcp.call` can reach them. Keep them away from every model loop instead.
+const CONTROL_TOOLS = new Set(
+  ["plugin_scribble_scribble", "scribble"].flatMap((server) =>
+    ["poll_delivery", "settle_delivery"].map(
+      (tool) => `mcp__${server}__${tool}`,
+    ),
+  ),
+);
+
 export function register(on) {
   let controller;
+  on("tool.offer", ($, e, next) =>
+    CONTROL_TOOLS.has(e.tool) ? { isOffered: false } : next(e),
+  );
   on("session.start", ($, e, next) => {
     dispose(controller);
     controller = start($);
