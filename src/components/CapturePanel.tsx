@@ -7,6 +7,7 @@ import {
   AlertCircle,
   MonitorUp,
   Settings2,
+  X,
 } from "lucide-react";
 import { captureCommand, checkCaptureRuntime, request } from "../api";
 import { SharedTabView } from "./SharedTabView";
@@ -59,6 +60,12 @@ export function CapturePanel({
   const [error, setError] = useState("");
   const heading = useRef<HTMLHeadingElement>(null);
   const workspace = useRef<HTMLElement>(null);
+  const settings = useRef<HTMLDetailsElement>(null);
+  const closeSettings = () => {
+    if (!settings.current?.open) return;
+    settings.current.open = false;
+    settings.current.querySelector("summary")?.focus();
+  };
   const connection = status?.[kind];
   const shared = kind === "web" && webMode === "shared";
   const connected = shared ? !!share.stream : !!connection?.connected;
@@ -293,6 +300,20 @@ export function CapturePanel({
           <div className="capture-layout">
             <details
               className="capture-settings"
+              ref={settings}
+              onKeyDown={(event) => {
+                if (
+                  kind === "simulator" &&
+                  connected &&
+                  settings.current?.open &&
+                  event.key === "Escape" &&
+                  !event.defaultPrevented
+                ) {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  closeSettings();
+                }
+              }}
               open={!connection?.connected}
               key={`${kind}-${!!connection?.connected}`}
             >
@@ -309,6 +330,16 @@ export function CapturePanel({
                   <span className="capture-source-label">{connection.url}</span>
                 )}
               </summary>
+              {kind === "simulator" && connected && (
+                <button
+                  type="button"
+                  className="text-button simulator-settings-close"
+                  aria-label="Close simulator settings"
+                  onClick={closeSettings}
+                >
+                  <X size={16} aria-hidden="true" /> Close
+                </button>
+              )}
               {kind === "web" ? (
                 <form
                   onSubmit={(event) => {

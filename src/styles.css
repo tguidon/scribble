@@ -2410,6 +2410,18 @@ kbd {
   gap: 7px;
   justify-content: flex-end;
 }
+.simulator-workspace .capture-settings[open] > summary {
+  justify-content: flex-start;
+  margin-right: 76px;
+  min-height: 44px;
+}
+.simulator-settings-close {
+  position: absolute;
+  top: 0;
+  right: 8px;
+  min-height: 44px;
+  padding-inline: 10px;
+}
 .simulator-workspace .capture-settings summary::-webkit-details-marker {
   display: none;
 }

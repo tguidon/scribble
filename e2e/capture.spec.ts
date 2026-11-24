@@ -546,10 +546,30 @@ test("simulator selection captures into the same editor and supports disconnect"
     page.getByRole("button", { name: "Capture & annotate" }),
   ).toBeEnabled();
   expect(subscriptions).toBeGreaterThan(1);
+  const settings = page.locator(".capture-settings > summary");
+  const closeSettings = page.getByRole("button", {
+    name: "Close simulator settings",
+  });
+  await settings.click();
+  await closeSettings.click();
+  await expect(closeSettings).toBeHidden();
+  await expect(settings).toBeFocused();
+  await settings.click();
+  await closeSettings.focus();
+  await page.keyboard.press("Escape");
+  await expect(closeSettings).toBeHidden();
+  await expect(settings).toBeFocused();
+
   const phases: string[] = [];
+  let acknowledge: (() => void) | undefined;
+  let holdDown = true;
   await page.route("**/api/capture/input", async (route) => {
     const input = route.request().postDataJSON();
     phases.push(input.phase || input.type);
+    if (holdDown && input.phase === "down")
+      await new Promise<void>((resolve) => {
+        acknowledge = resolve;
+      });
     await route.fulfill({ json: {} });
   });
   const display = page.getByRole("img", { name: "Live simulator screen" });
@@ -574,6 +594,18 @@ test("simulator selection captures into the same editor and supports disconnect"
     bubbles: true,
     cancelable: true,
   });
+  await expect.poll(() => phases).toEqual(["down"]);
+  const toolbar = page.locator(".live-toolbar");
+  await expect(
+    toolbar.getByRole("button", { name: "Simulator home" }),
+  ).toBeEnabled();
+  await expect(
+    toolbar.getByRole("button", { name: "Reconnect simulator" }),
+  ).toBeEnabled();
+  await expect(
+    toolbar.getByRole("button", { name: "Capture & annotate" }),
+  ).toBeEnabled();
+  acknowledge!();
   await expect.poll(() => phases).toEqual(["down", "move", "up"]);
   await page.screenshot({
     path: ".impeccable/review/simulator-desktop.png",
@@ -605,10 +637,20 @@ test("simulator selection captures into the same editor and supports disconnect"
     }),
   ).toBe(true);
   await page.setViewportSize({ width: 1440, height: 1000 });
+  await display.click();
+  await expect.poll(() => phases.at(-1)).toBe("down");
+  let capturePhases: string[] = [];
+  page.on("request", (req) => {
+    if (new URL(req.url()).pathname === "/api/capture/snapshot")
+      capturePhases = [...phases];
+  });
   await page.getByRole("button", { name: "Capture & annotate" }).click();
+  holdDown = false;
+  acknowledge!();
   await expect(
     page.getByRole("button", { name: "Open Review iPhone.jpg" }),
   ).toBeVisible();
+  expect(capturePhases.slice(-2)).toEqual(["down", "up"]);
   await page.getByRole("button", { name: "Resume live capture" }).click();
   await page.getByRole("button", { name: "Disconnect simulator" }).click();
   await expect(

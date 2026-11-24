@@ -157,7 +157,7 @@ export function LiveView({
   const lastPoint = useRef({ x: 0.5, y: 0.5 });
   const wheelEnd = useRef<(() => void) | null>(null);
   const queue = useRef<Input[]>([]);
-  const running = useRef(false);
+  const running = useRef<Promise<void> | null>(null);
   const inputFailed = useRef(false);
   const mounted = useRef(true);
   const errorHandler = useRef(onError);
@@ -185,9 +185,8 @@ export function LiveView({
         queue.current.push(input);
       }
       if (running.current) return;
-      running.current = true;
-      if (mounted.current) setPending(true);
-      void (async () => {
+      if (kind === "web" && mounted.current) setPending(true);
+      running.current = (async () => {
         try {
           while (queue.current.length) {
             const next = queue.current.shift()!;
@@ -220,8 +219,8 @@ export function LiveView({
           ).catch(() => {});
           if (mounted.current) errorHandler.current((error as Error).message);
         } finally {
-          running.current = false;
-          if (mounted.current) setPending(false);
+          running.current = null;
+          if (kind === "web" && mounted.current) setPending(false);
         }
       })();
     },
@@ -255,6 +254,7 @@ export function LiveView({
       }
     };
   }, [release, send]);
+  const simulatorActionPending = kind === "simulator" && pending;
   useEffect(() => {
     const node = surface.current;
     let contact: { x: number; y: number } | undefined;
@@ -269,7 +269,15 @@ export function LiveView({
     };
     wheelEnd.current = end;
     const wheel = (event: WheelEvent) => {
-      if (!ready || failed || busy || inputWarning || !node) return;
+      if (
+        !ready ||
+        failed ||
+        busy ||
+        inputWarning ||
+        !node ||
+        simulatorActionPending
+      )
+        return;
       event.preventDefault();
       const scale =
         event.deltaMode === 1
@@ -341,7 +349,7 @@ export function LiveView({
       end();
       wheelEnd.current = null;
     };
-  }, [kind, send, ready, failed, busy, inputWarning]);
+  }, [kind, send, ready, failed, busy, inputWarning, simulatorActionPending]);
   const point = (event: PointerEvent<HTMLElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
     return {
@@ -349,8 +357,21 @@ export function LiveView({
       y: Math.max(0, Math.min(1, (event.clientY - rect.top) / rect.height)),
     };
   };
+  async function afterSimulatorGesture(action: () => Promise<void>) {
+    if (kind !== "simulator") return action();
+    wheelEnd.current?.();
+    release();
+    setPending(true);
+    try {
+      const drain = running.current;
+      if (drain) await drain;
+      if (mounted.current) await action();
+    } finally {
+      if (mounted.current) setPending(false);
+    }
+  }
   const available = ready && !failed && !busy;
-  const enabled = available && !inputWarning;
+  const enabled = available && !inputWarning && !simulatorActionPending;
   const pointerHandlers = {
     onPointerDown(event: PointerEvent<HTMLElement>) {
       if (!enabled || event.button !== 0 || pointer.current !== null) return;
@@ -413,7 +434,11 @@ export function LiveView({
                 className="icon-button"
                 aria-label="Simulator home"
                 disabled={!enabled || pending}
-                onClick={() => send({ type: "home" })}
+                onClick={() => {
+                  wheelEnd.current?.();
+                  release();
+                  send({ type: "home" });
+                }}
               >
                 <Home size={19} />
               </button>
@@ -426,7 +451,7 @@ export function LiveView({
             aria-label={onReconnect ? "Reconnect simulator" : "Reconnect view"}
             onClick={() => {
               if (onReconnect) {
-                void onReconnect();
+                void afterSimulatorGesture(onReconnect);
                 return;
               }
               release();
@@ -453,7 +478,7 @@ export function LiveView({
           className="primary capture-submit"
           aria-label="Capture & annotate"
           disabled={!available || pending}
-          onClick={() => void onCapture()}
+          onClick={() => void afterSimulatorGesture(onCapture)}
         >
           <Camera size={18} />
           <span>
