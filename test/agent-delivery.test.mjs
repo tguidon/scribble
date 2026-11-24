@@ -47,6 +47,13 @@ test("the Claude mod delivers and records feedback through the existing MCP conn
     await plugin.close();
   });
   const tools = await client.listTools();
+  // Claude Desktop cannot connect an embedded editor to its tools, so Claude
+  // gets no widget for open_canvas and uses the browser editor instead.
+  assert.equal(
+    tools.tools.find((tool) => tool.name === "open_canvas")._meta?.ui
+      ?.resourceUri,
+    undefined,
+  );
   // Claude Code drops app-only tools from the session, so `$.mcp.call` could
   // not reach them. The mod hides these tools from the model instead.
   for (const name of ["bind_delivery", "poll_delivery", "settle_delivery"])

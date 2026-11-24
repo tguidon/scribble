@@ -92,6 +92,10 @@ test("MCP canvas isolation, feedback delivery, original images, and new rounds",
       ["bind_delivery", "poll_delivery", "settle_delivery"].includes(tool.name),
     ),
   );
+  assert.equal(
+    tools.tools.find((t) => t.name === "open_canvas")._meta.ui.resourceUri,
+    "ui://scribble/editor.html",
+  );
   assert.deepEqual(
     tools.tools.find((t) => t.name === "editor_request")._meta.ui.visibility,
     ["app"],

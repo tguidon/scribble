@@ -86,7 +86,9 @@ export function createPlugin(options = {}) {
         destructiveHint: false,
         openWorldHint: false,
       },
-      _meta: { ui: { resourceUri: RESOURCE } },
+      // Claude Desktop draws MCP Apps but gives them no server tools, so the
+      // embedded editor could only show its fallback. Claude uses the browser.
+      ...(!claude && { _meta: { ui: { resourceUri: RESOURCE } } }),
     },
     // The Claude mod binds the chat after this call returns, through
     // bind_delivery. It never rewrites this input: auto mode reviews the call
