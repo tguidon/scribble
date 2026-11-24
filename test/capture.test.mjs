@@ -1,13 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import {
-  appendFile,
-  mkdir,
-  mkdtemp,
-  rm,
-  writeFile,
-  readFile,
-} from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createServer } from "node:http";
@@ -280,104 +273,6 @@ test("full-page capture loads lower content at the selected viewport and restore
   assert.equal(await web.page.evaluate(() => scrollY), 100);
 });
 
-test("Device Hub input repair is explicit, scoped to the connected device, and reconnects the helper", async (t) => {
-  const root = await temp(t);
-  const device = {
-    id: "00000000-0000-0000-0000-000000000001",
-    name: "Test iPhone",
-  };
-  const command = join(root, "serve-sim.mjs");
-  const log = join(root, "commands.jsonl");
-  const repaired = join(root, "repaired");
-  const skipRepair = join(root, "skip-repair");
-  await writeFile(
-    command,
-    `
-    import { appendFileSync, existsSync, writeFileSync } from "node:fs";
-    const args = process.argv.slice(2);
-    appendFileSync(${JSON.stringify(log)}, JSON.stringify(args) + "\\n");
-    if (args[0] === "repair-input") {
-      writeFileSync(${JSON.stringify(repaired)}, "yes");
-      console.log(existsSync(${JSON.stringify(skipRepair)})
-        ? "Input is not shadowed by Device Hub; no restart needed."
-        : "Input repaired.");
-    } else {
-      console.log(JSON.stringify(${JSON.stringify({
-        device: device.id,
-        url: "http://127.0.0.1:3100",
-        streamUrl: "http://127.0.0.1:3100/helper/stream.mjpeg",
-      })}));
-    }
-  `,
-  );
-  const session = await createSession(root);
-  const instance = await startServer({
-    root,
-    session,
-    captureOptions: {
-      simulator: {
-        devices: async () => [device],
-        command: { file: process.execPath, args: [command] },
-        inputShadowed: async () =>
-          !(await readFile(repaired).catch(() => null)),
-        backboardPid: async () => 123,
-        waitForReady: (id, previousPid) =>
-          appendFile(log, JSON.stringify(["ready", id, previousPid]) + "\n"),
-      },
-    },
-  });
-  t.after(() => instance.close());
-  const origin = new URL(instance.url).origin;
-  const call = (action, data) =>
-    fetch(`${origin}/api/capture/${action}`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${session.token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ kind: "simulator", ...data }),
-    });
-  const open = await call("open", { deviceId: device.id });
-  assert.equal(open.status, 200);
-  const { generation, inputWarning } = await open.json();
-  assert.match(inputWarning, /Device Hub/);
-  const repair = (currentGeneration) =>
-    call("repair-input", { generation: currentGeneration });
-  assert.equal((await repair(generation - 1)).status, 409);
-  const recovered = await repair(generation);
-  assert.equal(recovered.status, 200);
-  const state = await recovered.json();
-  assert.equal(state.generation, generation + 1);
-  assert.equal(state.inputWarning, undefined);
-  assert.equal((await repair(state.generation)).status, 409);
-  assert.deepEqual(
-    (await readFile(log, "utf8")).trim().split("\n").map(JSON.parse),
-    [
-      ["--detach", "-q", device.id],
-      ["repair-input", "-d", device.id],
-      ["ready", device.id, 123],
-      ["--kill", device.id],
-      ["--detach", "-q", device.id],
-    ],
-  );
-  await rm(repaired);
-  await writeFile(skipRepair, "");
-  const beforeNoop = await (await call("open", { deviceId: device.id })).json();
-  assert.match(beforeNoop.inputWarning, /Device Hub/);
-  const noOp = await repair(beforeNoop.generation);
-  assert.equal(noOp.status, 200);
-  const unchanged = await noOp.json();
-  assert.equal(unchanged.generation, beforeNoop.generation);
-  assert.equal(unchanged.inputWarning, undefined);
-  assert.deepEqual(
-    (await readFile(log, "utf8")).trim().split("\n").map(JSON.parse).slice(5),
-    [
-      ["--detach", "-q", device.id],
-      ["repair-input", "-d", device.id],
-    ],
-  );
-});
-
 test("simulator attach uses the embedding API and reuses its helper on reconnect", async (t) => {
   const root = await temp(t);
   const device = {
@@ -408,7 +303,7 @@ test("simulator attach uses the embedding API and reuses its helper on reconnect
     captureOptions: {
       simulator: {
         devices: async () => [device],
-        inputShadowed: async () => false,
+        inputShadowed: async () => true,
       },
     },
   });
@@ -424,6 +319,7 @@ test("simulator attach uses the embedding API and reuses its helper on reconnect
     });
     assert.equal(response.status, 200);
     const state = await response.json();
+    assert.match(state.inputWarning, /Device Hub/);
     const config = await fetch(
       new URL(`/helper/${device.id}/config`, state.previewUrl),
     );
@@ -432,6 +328,19 @@ test("simulator attach uses the embedding API and reuses its helper on reconnect
   const first = await connect();
   assert.equal(first.device, device.id);
   assert.notEqual(first.pid, process.pid);
+  // An older open canvas can still send the removed repair action.
+  const legacyRepair = await fetch(
+    new URL("/api/capture/repair-input", instance.url),
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${session.token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ kind: "simulator", generation: 1 }),
+    },
+  );
+  assert.equal(legacyRepair.status, 404);
   assert.deepEqual(await connect(), first);
 });
 

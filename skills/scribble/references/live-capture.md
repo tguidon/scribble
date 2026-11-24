@@ -22,4 +22,4 @@ If capture reports an old or mismatched server, run the launcher again and reloa
 
 ### Xcode 27 input recovery
 
-If Scribble reports that Device Hub is blocking simulator input, streams and screenshots still work. Select **Repair simulator input**, then **Repair and reconnect**. If repair is needed, it restarts the selected simulator’s system UI and closes its running apps. Scribble waits for the simulator’s UI services and display, then reconnects to a fresh serve-sim helper. Reopen your app after the repair. If Device Hub takes over input again, close that simulator’s Device Hub window before repairing. On Xcode 27 runtimes that require Device Hub for keyboard forwarding, serve-sim also supports typing through the focused Device Hub window when the host app has macOS Accessibility permission.
+When Device Hub handles simulator input, use its window to tap and type. Keep Scribble open to capture and annotate each screen. Reconnect refreshes the preview and checks input availability again.

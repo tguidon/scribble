@@ -468,22 +468,6 @@ export function CapturePanel({
                       ? connection.inputWarning
                       : undefined
                   }
-                  onRepairInput={
-                    connection.kind === "simulator" && connection.inputWarning
-                      ? () =>
-                          perform("Repairing simulator input…", async () => {
-                            try {
-                              await captureCommand({
-                                action: "repair-input",
-                                kind: "simulator",
-                                generation: connection.generation,
-                              });
-                            } finally {
-                              await refresh();
-                            }
-                          })
-                      : undefined
-                  }
                   onReconnect={
                     connection.kind === "simulator"
                       ? () =>

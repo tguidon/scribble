@@ -208,7 +208,7 @@ Direct webpage and simulator views pause when the Scribble tab is hidden and sto
 
 ### Simulator input with Xcode 27
 
-Device Hub can disable the legacy input path used by serve-sim. Scribble detects this state and keeps capture available while disabling touch and keyboard controls. The repair closes running simulator apps, so the agent must ask before running it. After repair and relaunching your app, select **Reconnect**.
+When Device Hub handles simulator input, use its window to tap and type. Keep Scribble open to capture and annotate each screen. Reconnect refreshes the preview and checks input availability again.
 
 ### Continue a review
 

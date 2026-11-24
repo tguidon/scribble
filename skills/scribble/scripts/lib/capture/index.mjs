@@ -131,14 +131,11 @@ export function createCaptures(root, options = {}) {
             return source.open(input);
           case "input":
           case "resize":
-          case "repair-input":
             if (input.generation !== source.state().generation)
               throw captureError(
                 "The source changed. Reconnect the live view.",
                 409,
               );
-            if (input.action === "repair-input")
-              return sources.simulator.repairInput();
             return input.action === "input"
               ? source.input(input)
               : source.resize(input);

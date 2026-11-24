@@ -1865,16 +1865,6 @@ kbd {
   flex-shrink: 0;
   margin-top: 3px;
 }
-.simulator-input-warning {
-  align-items: center;
-  flex-wrap: wrap;
-  justify-content: space-between;
-}
-.simulator-input-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
 .capture-sheet-live {
   width: 100%;
 }

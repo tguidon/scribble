@@ -154,10 +154,6 @@ export function validateCaptureCommand(action, input) {
         ...event,
       };
     }
-    case "repair-input":
-      if (kind !== "simulator")
-        throw captureError("Input repair is only available for simulators.");
-      return { action, kind, generation: generation(input.generation) };
     case "focus":
       if (kind !== "web") throw captureError("Only webpages can be focused.");
       return { action, kind };
