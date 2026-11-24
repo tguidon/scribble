@@ -83,15 +83,27 @@ export class FrameRelay {
         },
       );
       if (!response.ok) throw new Error((await response.json()).error);
-      for await (const bytes of readMultipartFrames(response.body)) {
+      // Assemble the next frame separately so a poll during a partial read
+      // always sees a complete image. Swap buffers only when publishing.
+      let incoming = Buffer.alloc(0);
+      let published = Buffer.alloc(0);
+      const writableFrame = (length) => {
+        const capacity = Math.ceil(length / 4096) * 4096;
+        if (
+          incoming.length < length ||
+          incoming.length > Math.max(capacity * 4, 65536)
+        )
+          incoming = Buffer.allocUnsafeSlow(capacity);
+        return incoming.subarray(0, length);
+      };
+      for await (const bytes of readMultipartFrames(
+        response.body,
+        writableFrame,
+      )) {
         stream.received++;
-        const frame = Buffer.from(
-          bytes.buffer,
-          bytes.byteOffset,
-          bytes.byteLength,
-        );
-        if (kind === "simulator" && stream.frame?.equals(frame)) continue;
-        stream.frame = frame;
+        if (kind === "simulator" && stream.frame?.equals(bytes)) continue;
+        stream.frame = bytes;
+        [incoming, published] = [published, incoming];
         stream.sequence++;
         for (const wake of stream.waiters) wake();
       }

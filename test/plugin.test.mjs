@@ -55,6 +55,19 @@ test("idle simulator frames keep the relay alive without sending duplicate image
   const current = await next(idle.sequence);
   assert.equal(current.frame, changed.toString("base64"));
   assert.equal(current.sequence, first.sequence + 1);
+  // Alternate new and duplicate frames across both reusable buffers. A
+  // partial replacement must leave the last complete frame readable.
+  write(stream, changed);
+  const again = await next(current.sequence);
+  assert.equal(again.frame, null);
+  stream.write(`--frame\r\nContent-Length: ${frame.length}\r\n\r\n`);
+  stream.write(frame.subarray(0, 4));
+  const partial = await next(current.sequence);
+  assert.equal(partial.frame, null);
+  assert.equal((await next(0)).frame, current.frame);
+  stream.write(frame.subarray(4));
+  stream.write("\r\n");
+  assert.equal((await next(current.sequence)).frame, png);
 });
 
 test("MCP canvas isolation, feedback delivery, original images, and new rounds", async (t) => {

@@ -24,6 +24,17 @@ SCRIBBLE_TEST_CHANNEL=chrome npm run test:e2e -- --grep 'a near-limit draft'
 
 This override selects Chrome for the editor under test. The server's capture tests still use the dedicated headless browser. Run this command in an environment that permits browser processes and local servers.
 
+## Embedded preview memory
+
+To measure the embedded editor with a changing 1206 × 2622 simulator preview, build the plugin and run the extended browser test.
+
+```sh
+npm run build
+SCRIBBLE_SOAK_FRAMES=3000 npm run test:e2e -- --grep 'changing simulator frames'
+```
+
+The test counts painted frames and samples the isolated editor’s JavaScript heap after garbage collection. It checks that the console receives zero frame payloads and that retained heap growth stays below 16 MiB for this fixture. The heap measurement excludes the rest of Codex, simulator services, and graphics memory.
+
 ## Resolved draft timeout
 
 The failing fixture contained 450 annotations with nearly 4 MB of comment text. Most comments contained 10,000 characters without spaces. Chrome 156 spent about 22.6 seconds calculating the page layout each time it opened this draft.

@@ -3,8 +3,14 @@
 export const MAX_FRAME_BYTES = 20 * 1024 * 1024;
 const MAX_HEADER_BYTES = 8192;
 
-/** @param {ReadableStream<Uint8Array>} body */
-export async function* readMultipartFrames(body) {
+/**
+ * @param {ReadableStream<Uint8Array>} body
+ * @param {(length: number) => Uint8Array} allocate Returns a writable view of exactly length bytes.
+ */
+export async function* readMultipartFrames(
+  body,
+  allocate = (length) => new Uint8Array(length),
+) {
   const reader = body.getReader();
   const decoder = new TextDecoder();
   const header = new Uint8Array(MAX_HEADER_BYTES);
@@ -42,7 +48,7 @@ export async function* readMultipartFrames(body) {
             length > MAX_FRAME_BYTES
           )
             throw new Error("Invalid or oversized live frame length.");
-          frame = new Uint8Array(length);
+          frame = allocate(length);
           filled = 0;
           headerSize = 0;
         }

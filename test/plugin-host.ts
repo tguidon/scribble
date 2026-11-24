@@ -84,4 +84,8 @@ bridge.oninitialized = async () => {
 await bridge.connect(
   new PostMessageTransport(frame.contentWindow!, frame.contentWindow!),
 );
-frame.src = "/editor";
+// Use a separate renderer for memory measurements, like the desktop panel.
+const editorUrl = new URL("/editor", location.href);
+if (new URLSearchParams(location.search).has("isolated-editor"))
+  editorUrl.hostname = "localhost";
+frame.src = editorUrl.href;

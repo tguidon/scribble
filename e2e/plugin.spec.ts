@@ -10,6 +10,9 @@ import { createPlugin } from "../plugin/mcp.mjs";
 import { createSession } from "../skills/scribble/scripts/lib/store.mjs";
 import { startServer } from "../skills/scribble/scripts/lib/app.mjs";
 
+if (process.env.SCRIBBLE_SOAK_FRAMES)
+  test.use({ launchOptions: { args: ["--site-per-process"] } });
+
 let project: string, origin: string, result: any, messages: any[];
 let calls: string[];
 let simulatorFrame: Buffer;
@@ -945,4 +948,94 @@ test("accepted delivery retries receipt storage without sending again", async ({
     ui.getByRole("status").filter({ hasText: "Message accepted" }),
   ).toBeVisible();
   expect(messages).toHaveLength(1);
+});
+
+test("changing simulator frames stay out of the embedded renderer console", async ({
+  page,
+}) => {
+  // Match an animated full-size preview. Vary a trailer on each JPEG so the
+  // relay delivers a new frame even when the scene has the same dimensions.
+  const frames = Number(process.env.SCRIBBLE_SOAK_FRAMES || 12);
+  test.setTimeout(30000 + frames * 1500);
+  await page.goto(origin + "/host?isolated-editor");
+  const ui = page.frameLocator("iframe");
+  await ui
+    .getByRole("button", { name: "Capture a webpage or simulator" })
+    .click();
+  await ui.getByRole("button", { name: "Simulator", exact: true }).click();
+  const editor = page
+    .frames()
+    .find((frame) => frame.url().endsWith("/editor"))!;
+  const measureHeap = async (phase: string) => {
+    if (!process.env.SCRIBBLE_SOAK_FRAMES) return;
+    const session = await page.context().newCDPSession(editor);
+    try {
+      await session.send("HeapProfiler.collectGarbage");
+      const memory = await session.send("Runtime.getHeapUsage");
+      console.log(phase, memory);
+      return memory.usedSize;
+    } finally {
+      await session.detach();
+    }
+  };
+  const jpg = await page.evaluate(() => {
+    const canvas = document.createElement("canvas");
+    canvas.width = 1206;
+    canvas.height = 2622;
+    const ctx = canvas.getContext("2d")!;
+    for (let i = 0; i < 4200; i++) {
+      ctx.fillStyle = `hsl(${(i * 73) % 360} 55% 50%)`;
+      ctx.fillRect((i * 17) % 1206, (i * 29) % 2622, 65, 31);
+    }
+    return canvas.toDataURL("image/jpeg", 0.8).split(",")[1];
+  });
+  simulatorFrame = Buffer.concat([Buffer.from(jpg, "base64"), Buffer.alloc(4)]);
+  // Observe only the editor. The host is an independent application.
+  await editor.evaluate(() => {
+    const original = console.debug;
+    Object.assign(window, { frameLogBytes: 0, previewPaints: 0 });
+    const drawImage = CanvasRenderingContext2D.prototype.drawImage;
+    CanvasRenderingContext2D.prototype.drawImage = function (...args) {
+      if (this.canvas.closest(".live-screen")) (window as any).previewPaints++;
+      return Reflect.apply(drawImage, this, args);
+    };
+    console.debug = (...args) => {
+      const frame = args[1]?.result?._meta?.scribble?.frame;
+      if (typeof frame === "string")
+        (window as any).frameLogBytes += frame.length;
+      original(...args);
+    };
+  });
+  const before = await measureHeap("before preview");
+  let tick = 0;
+  const timer = setInterval(
+    () => simulatorFrame.writeUInt32BE(++tick, simulatorFrame.length - 4),
+    40,
+  );
+  try {
+    await ui.getByRole("button", { name: "Connect simulator" }).click();
+    await expect(
+      ui.getByRole("button", { name: "Capture & annotate" }),
+    ).toBeEnabled();
+    const waitForPaints = (count: number) =>
+      expect
+        .poll(() => editor.evaluate(() => (window as any).previewPaints), {
+          timeout: frames * 1500,
+        })
+        .toBeGreaterThanOrEqual(count);
+    if (frames > 120) {
+      await waitForPaints(120);
+      await measureHeap("after 120 paints");
+    }
+    await waitForPaints(frames);
+    const after = await measureHeap("after preview");
+    if (before !== undefined && after !== undefined) {
+      // One 1206 × 2622 preview, measured after GC. Allow startup overhead
+      // but fail well before retaining one compressed payload per frame.
+      expect(after - before).toBeLessThan(16 * 1024 * 1024);
+    }
+    expect(await editor.evaluate(() => (window as any).frameLogBytes)).toBe(0);
+  } finally {
+    clearInterval(timer);
+  }
 });

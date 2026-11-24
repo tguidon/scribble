@@ -11,8 +11,18 @@ export const app = new App(
   { availableDisplayModes: ["inline", "fullscreen"] },
   { autoResize: false },
 );
-const decode = (base64: string) =>
-  Uint8Array.from(atob(base64), (value) => value.charCodeAt(0));
+function decode(base64: string): Uint8Array<ArrayBuffer> {
+  // Avoid expanding a full frame into an intermediate array of characters.
+  if ("fromBase64" in Uint8Array) {
+    return (Uint8Array.fromBase64 as (s: string) => Uint8Array<ArrayBuffer>)(
+      base64,
+    );
+  }
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+}
 async function encode(blob: Blob) {
   return await new Promise<string>((resolve, reject) => {
     const reader = new FileReader();

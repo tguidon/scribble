@@ -111,6 +111,9 @@ const ui = await build({
   bundle: true,
   format: "iife",
   platform: "browser",
+  // The MCP Apps transport debugs complete messages, including base64 frames.
+  // Chromium can retain logged objects after the preview has drawn them.
+  pure: ["console.debug"],
   target: "es2022",
   minify: true,
   write: false,
