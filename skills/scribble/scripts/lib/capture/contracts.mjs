@@ -18,7 +18,7 @@ import { captureError } from "./common.mjs";
  * | {action: "open", kind: "simulator", deviceId: string}
  * | ({action: "resize", kind: "web", generation: number} & Viewport)
  * | ({action: "input", kind: CaptureKind, generation: number} & CaptureInput)
- * | {action: "repair-input", kind: "simulator", generation: number}
+ * | {action: "connect-input", kind: "simulator", generation: number}
  * | {action: "focus", kind: "web"}
  * | {action: "disconnect", kind: CaptureKind}
  * | ({action: "snapshot"} & CaptureSnapshot)} CaptureCommand */
@@ -131,6 +131,9 @@ export function validateCaptureCommand(action, input) {
       )
         throw captureError("Choose a booted simulator.");
       return { action, kind, deviceId: input.deviceId };
+    case "connect-input":
+      if (kind !== "simulator") throw captureError("Choose a simulator.");
+      return { action, kind, generation: generation(input.generation) };
     case "resize":
       if (kind !== "web")
         throw captureError("Viewport resizing is only available for webpages.");

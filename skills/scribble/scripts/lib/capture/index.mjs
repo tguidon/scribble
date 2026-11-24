@@ -130,12 +130,17 @@ export function createCaptures(root, options = {}) {
               await ensureCapture(root, input.kind);
             return source.open(input);
           case "input":
+          case "connect-input":
           case "resize":
             if (input.generation !== source.state().generation)
               throw captureError(
                 "The source changed. Reconnect the live view.",
                 409,
               );
+            if (input.action === "connect-input") {
+              if (!source.controls) await source.bindControls();
+              return source.state();
+            }
             return input.action === "input"
               ? source.input(input)
               : source.resize(input);

@@ -70,7 +70,14 @@ export function createEditorHost(
       );
     return result as T;
   }
+  let lastSimulatorInput = -Infinity;
   async function request(path: string, options: RequestInit = {}) {
+    if (
+      path === "/capture/input" &&
+      typeof options.body === "string" &&
+      JSON.parse(options.body).kind === "simulator"
+    )
+      lastSimulatorInput = performance.now();
     const binary = options.body instanceof Blob;
     if (options.body && !binary && typeof options.body !== "string")
       throw new Error("Unsupported editor request body.");
@@ -115,7 +122,15 @@ export function createEditorHost(
         else if (result.received !== received) yield null;
         received = result.received;
         // Bound IPC traffic even when the source produces 60 frames/sec.
-        await new Promise((resolve) => setTimeout(resolve, 150));
+        await new Promise((resolve) =>
+          setTimeout(
+            resolve,
+            kind === "simulator" &&
+              performance.now() - lastSimulatorInput < 1500
+              ? 24
+              : 150,
+          ),
+        );
       }
     },
     newCanvas(url) {

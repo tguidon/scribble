@@ -104,12 +104,17 @@ export class SimulatorCapture {
       );
     }
   }
-  async connectInput(deviceId, wsUrl) {
-    this.inputWarning = undefined;
+  checkRoute(deviceId) {
     const check =
       this.options.inputShadowed ||
       (this.options.command ? () => false : deviceHubShadowsInput);
-    if (!(await check(deviceId))) return new SimulatorInput(wsUrl);
+    return check(deviceId);
+  }
+  async connectInput(deviceId, wsUrl) {
+    this.inputWarning = undefined;
+    this.shadowed = await this.checkRoute(deviceId);
+    this.routeChecked = Date.now();
+    if (!this.shadowed) return new SimulatorInput(wsUrl);
     try {
       return await (this.options.deviceHubInput || DeviceHubInput.open)(
         this.root,
@@ -118,8 +123,16 @@ export class SimulatorCapture {
     } catch (error) {
       console.warn("Scribble Device Hub input setup:", error.message);
       this.inputWarning =
-        "Simulator controls are unavailable. Use Device Hub to interact, or reconnect to retry input setup. Capture is still available.";
+        "Connecting Device Hub controls. You can capture the screen while Scribble retries.";
       return null;
+    }
+  }
+  async startHelper(deviceId) {
+    try {
+      return await this.options.helpers.start(deviceId);
+    } catch {
+      await new Promise((resolve) => setTimeout(resolve, 350));
+      return this.options.helpers.start(deviceId);
     }
   }
   async open(input) {
@@ -134,11 +147,9 @@ export class SimulatorCapture {
         "That simulator is no longer booted. Refresh the device list.",
         409,
       );
-    await this.close();
-    this.generation = this.generation + 1;
     const result = this.options.command
       ? await this.run(["--detach", "-q", device.id])
-      : await this.options.helpers.start(device.id);
+      : await this.startHelper(device.id);
     if (result.device !== device.id || !result.streamUrl || !result.url)
       throw captureError(
         "serve-sim returned a different device or no stream. Update serve-sim and try again.",
@@ -149,13 +160,32 @@ export class SimulatorCapture {
     preview.searchParams.set("device", device.id);
     const wsUrl =
       result.wsUrl || new URL("ws", stream).href.replace(/^http/, "ws");
-    this.controls = await this.connectInput(device.id, wsUrl);
+    await this.close();
+    this.generation++;
     this.connection = {
       device,
       streamUrl: stream.href,
       previewUrl: preview.href,
+      wsUrl,
     };
+    await this.bindControls();
     return this.state();
+  }
+  async bindControls() {
+    const { device, wsUrl, streamUrl } = this.connection;
+    this.controls?.close();
+    this.controls = await this.connectInput(device.id, wsUrl);
+    if (this.controls instanceof DeviceHubInput) {
+      this.controls.orientation = async () => {
+        const response = await fetch(new URL("config", streamUrl), {
+          signal: AbortSignal.timeout(2000),
+          redirect: "error",
+        });
+        if (!response.ok)
+          throw captureError("The simulator display is unavailable.", 502);
+        return (await response.json()).orientation;
+      };
+    }
   }
   async capture() {
     if (!this.connection)
@@ -210,6 +240,21 @@ export class SimulatorCapture {
   async stream(res) {
     if (!this.connection)
       throw captureError("Connect a simulator before viewing it.", 409);
+    // The helper may have exited during a device reboot. Reattach the same
+    // preview generation to its replacement without reopening the host app.
+    if (!this.options.command) {
+      const result = await this.options.helpers.start(
+        this.connection.device.id,
+      );
+      if (result.streamUrl !== this.connection.streamUrl) {
+        this.connection.streamUrl = localUrl(result.streamUrl).href;
+        this.connection.wsUrl = result.wsUrl;
+        const preview = localUrl(result.url);
+        preview.searchParams.set("device", this.connection.device.id);
+        this.connection.previewUrl = preview.href;
+        await this.bindControls();
+      }
+    }
     this.stopStream?.();
     const abort = new AbortController();
     const stop = () => {
@@ -256,17 +301,30 @@ export class SimulatorCapture {
     const input = validateInput(raw);
     if (!this.connection)
       throw captureError("Reconnect the simulator to interact with it.", 409);
+    if (
+      input.type !== "release" &&
+      (input.type !== "pointer" || input.phase === "down") &&
+      Date.now() - this.routeChecked > 3000
+    ) {
+      this.routeChecked = Date.now();
+      if (
+        !this.controls ||
+        (await this.checkRoute(this.connection.device.id)) !== this.shadowed
+      )
+        await this.bindControls();
+    }
     if (!this.controls && input.type === "release") return this.state();
     if (!this.controls) throw captureError(this.inputWarning, 409);
     await this.controls.input(input);
     return this.state();
   }
   async release() {
-    this.controls?.release();
+    await this.controls?.release();
   }
   async close() {
     this.stopStream?.();
     this.controls?.close();
+    this.controls = null;
     this.connection = null;
   }
 }

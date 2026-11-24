@@ -508,6 +508,15 @@ test("simulator selection captures into the same editor and supports disconnect"
         "Xcode Device Hub has disabled touch input. Capture still works.";
     await route.fulfill({ response, json: status });
   });
+  let subscriptions = 0;
+  await page.route("**/api/capture/stream?*", async (route) => {
+    if (++subscriptions === 1)
+      await route.fulfill({
+        status: 502,
+        json: { error: "Temporary stream interruption" },
+      });
+    else await route.continue();
+  });
   await page.getByRole("button", { name: "Connect simulator" }).click();
   await expect(
     page.getByRole("img", { name: "Live simulator screen" }),
@@ -526,14 +535,8 @@ test("simulator selection captures into the same editor and supports disconnect"
   await expect(page.getByRole("button", { name: /repair/i })).toHaveCount(0);
   await page.getByText("Type or paste text", { exact: true }).click();
   await expect(page.getByLabel("Text to type in the app")).toBeDisabled();
-  const previousFrame = await page
-    .getByRole("img", { name: "Live simulator screen" })
-    .getAttribute("src");
   await page.unroute("**/api/capture/status");
-  await page.getByRole("button", { name: "Reconnect simulator" }).click();
-  await expect(
-    page.getByRole("img", { name: "Live simulator screen" }),
-  ).not.toHaveAttribute("src", previousFrame!);
+  // Input availability recovers on the current stream generation.
   await expect(
     page.getByText(
       "Xcode Device Hub has disabled touch input. Capture still works.",
@@ -542,6 +545,36 @@ test("simulator selection captures into the same editor and supports disconnect"
   await expect(
     page.getByRole("button", { name: "Capture & annotate" }),
   ).toBeEnabled();
+  expect(subscriptions).toBeGreaterThan(1);
+  const phases: string[] = [];
+  await page.route("**/api/capture/input", async (route) => {
+    const input = route.request().postDataJSON();
+    phases.push(input.phase || input.type);
+    await route.fulfill({ json: {} });
+  });
+  const display = page.getByRole("img", { name: "Live simulator screen" });
+  await display.evaluate((el) => {
+    const { x, y, width, height } = el.getBoundingClientRect();
+    for (const dy of [0.25, 4, 6, 3, 0.5])
+      el.dispatchEvent(
+        new WheelEvent("wheel", {
+          bubbles: true,
+          cancelable: true,
+          clientX: x + width / 2,
+          clientY: y + height / 2,
+          deltaY: dy / 100,
+        }),
+      );
+    // Below-threshold deltas must not tap the screen. Then exercise a real scroll.
+  });
+  await page.waitForTimeout(150);
+  expect(phases).toEqual([]);
+  await display.dispatchEvent("wheel", {
+    deltaY: 8,
+    bubbles: true,
+    cancelable: true,
+  });
+  await expect.poll(() => phases).toEqual(["down", "move", "up"]);
   await page.screenshot({
     path: ".impeccable/review/simulator-desktop.png",
     fullPage: true,
@@ -558,9 +591,18 @@ test("simulator selection captures into the same editor and supports disconnect"
     fullPage: true,
   });
   expect(
-    await page.evaluate(
-      () => document.documentElement.scrollWidth <= innerWidth,
-    ),
+    await page.evaluate(() => {
+      const preview = document.querySelector(".live-screen-simulator")!;
+      const bounds = preview.getBoundingClientRect();
+      const main = preview.closest("main")!;
+      return (
+        document.documentElement.scrollWidth <= innerWidth &&
+        document.documentElement.scrollHeight <= innerHeight + 1 &&
+        main.scrollHeight <= main.clientHeight + 1 &&
+        bounds.top >= 0 &&
+        bounds.bottom <= innerHeight
+      );
+    }),
   ).toBe(true);
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.getByRole("button", { name: "Capture & annotate" }).click();

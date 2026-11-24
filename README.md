@@ -208,7 +208,7 @@ Direct webpage and simulator views pause when the Scribble tab is hidden and sto
 
 ### Simulator input with Xcode 27
 
-When Device Hub handles simulator input, Scribble downloads the pinned AXe 2.1.1 helper on first connection and verifies its checksum. Tap, drag, scroll, or type in the preview. Drags are sent when you release the pointer. If the helper is unavailable, capture stays available and Reconnect retries setup.
+On first use with Device Hub, Scribble builds a small touch helper with the selected Xcode toolchain. It keeps one connection to the selected simulator and forwards movement as you drag or scroll. Keyboard input and the Home button use AXe 2.1.1, downloaded and checksum-verified on demand. If the stream or input service is interrupted, Scribble retries automatically.
 
 ### Continue a review
 

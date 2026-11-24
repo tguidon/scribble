@@ -6,6 +6,7 @@ import {
   RefreshCw,
   AlertCircle,
   MonitorUp,
+  Settings2,
 } from "lucide-react";
 import { captureCommand, checkCaptureRuntime, request } from "../api";
 import { SharedTabView } from "./SharedTabView";
@@ -153,46 +154,112 @@ export function CapturePanel({
     heading.current?.focus();
     void perform("Checking sources…", refresh);
   }, [refresh]);
+  const retryInput =
+    connection?.kind === "simulator" &&
+    connection.connected &&
+    connection.inputWarning;
+  useEffect(() => {
+    if (
+      !retryInput ||
+      busy ||
+      !connection?.connected ||
+      connection.kind !== "simulator"
+    )
+      return;
+    let timer = 0;
+    let delay = 1000;
+    const abort = new AbortController();
+    const retry = async () => {
+      if (!document.hidden) {
+        try {
+          const next = await captureCommand(
+            {
+              action: "connect-input",
+              kind: "simulator",
+              generation: connection.generation,
+            },
+            { signal: abort.signal },
+          );
+          if (abort.signal.aborted) return;
+          if (next.connected && !next.inputWarning) {
+            setStatus((current) =>
+              current?.simulator.connected &&
+              current.simulator.generation === next.generation
+                ? {
+                    ...current,
+                    simulator: {
+                      ...current.simulator,
+                      ...next,
+                      inputWarning: undefined,
+                    },
+                  }
+                : current,
+            );
+            return;
+          }
+        } catch {
+          /* A booting device may temporarily have no input service. */
+        }
+      }
+      if (!abort.signal.aborted) {
+        delay = Math.min(10000, delay * 2);
+        timer = window.setTimeout(retry, delay);
+      }
+    };
+    timer = window.setTimeout(retry, delay);
+    return () => {
+      abort.abort();
+      clearTimeout(timer);
+    };
+  }, [retryInput, busy, connection]);
   return (
     <main
       ref={workspace}
-      className={`capture-workspace ${connected ? "capture-workspace-live" : ""}`}
+      className={`capture-workspace ${connected ? "capture-workspace-live" : ""} ${connected && kind === "simulator" ? "simulator-workspace" : ""}`}
     >
       <div className={`capture-sheet ${connected ? "capture-sheet-live" : ""}`}>
-        <button
-          className="text-button capture-back"
-          onClick={onBack}
-          disabled={!!busy}
-        >
-          <ArrowLeft size={17} /> Back to annotations
-        </button>
-        <h1 tabIndex={-1} ref={heading}>
-          Bring a live screen into focus.
-        </h1>
-        <p className="capture-intro">
-          Navigate your app, then capture the moment you want to mark up.
-        </p>
-        <div className="capture-tabs" role="group" aria-label="Capture source">
+        <div className="capture-navigation">
           <button
-            aria-pressed={kind === "web"}
-            onClick={() => {
-              setKind("web");
-              setError("");
-            }}
+            className="text-button capture-back"
+            aria-label="Back to annotations"
+            title="Back to annotations"
+            onClick={onBack}
             disabled={!!busy}
           >
-            <Globe size={19} /> Webpage
+            <ArrowLeft size={17} /> <span>Back to annotations</span>
           </button>
-          <button
-            aria-pressed={kind === "simulator"}
-            onClick={() => {
-              setKind("simulator");
-              setError("");
-            }}
-            disabled={!!busy}
+          <h1 tabIndex={-1} ref={heading}>
+            Bring a live screen into focus.
+          </h1>
+          <p className="capture-intro">
+            Navigate your app, then capture the moment you want to mark up.
+          </p>
+          <div
+            className="capture-tabs"
+            role="group"
+            aria-label="Capture source"
           >
-            <Smartphone size={19} /> Simulator
-          </button>
+            <button
+              aria-pressed={kind === "web"}
+              onClick={() => {
+                setKind("web");
+                setError("");
+              }}
+              disabled={!!busy}
+            >
+              <Globe size={19} /> Webpage
+            </button>
+            <button
+              aria-pressed={kind === "simulator"}
+              onClick={() => {
+                setKind("simulator");
+                setError("");
+              }}
+              disabled={!!busy}
+            >
+              <Smartphone size={19} /> Simulator
+            </button>
+          </div>
         </div>
         {error && (
           <div className="capture-error" role="alert">
@@ -229,7 +296,12 @@ export function CapturePanel({
               open={!connection?.connected}
               key={`${kind}-${!!connection?.connected}`}
             >
-              <summary>
+              <summary
+                aria-label={
+                  kind === "web" ? "Webpage settings" : "Simulator settings"
+                }
+              >
+                {connected && kind === "simulator" && <Settings2 size={16} />}
                 <span>
                   {kind === "web" ? "Webpage settings" : "Simulator settings"}
                 </span>

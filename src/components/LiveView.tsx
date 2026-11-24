@@ -38,6 +38,7 @@ export function LiveView({
   viewport,
   onViewportChange,
 }: Props) {
+  const retries = useRef(0);
   const [attempt, setAttempt] = useState(0);
   const [frameUrl, setFrameUrl] = useState<string>();
   const frameCanvas = useRef<HTMLCanvasElement>(null);
@@ -60,8 +61,21 @@ export function LiveView({
     const abort = new AbortController();
     let currentUrl = "",
       previousUrl = "",
-      lastFrame = 0,
+      lastFrame = -Infinity,
       active = true;
+    let retryTimer: number | undefined;
+    function interrupted(error: Error) {
+      if (!active) return;
+      clearTimeout(watchdog);
+      setReady(false);
+      setFailed(true);
+      if (kind === "simulator") {
+        retryTimer = window.setTimeout(
+          () => setAttempt((n) => n + 1),
+          Math.min(5000, 300 * 2 ** Math.min(5, retries.current++)),
+        );
+      } else errorHandler.current(error.message);
+    }
     let watchdog = window.setTimeout(
       () =>
         abort.abort(
@@ -82,9 +96,12 @@ export function LiveView({
         );
         if (
           !bytes ||
-          (kind === "simulator" && performance.now() - lastFrame < 65)
+          (kind === "simulator" &&
+            !useCanvas &&
+            performance.now() - lastFrame < 32)
         )
           continue;
+        retries.current = 0;
         lastFrame = performance.now();
         const mime = bytes[0] === 0x89 ? "image/png" : "image/jpeg";
         if (canvas && context) {
@@ -111,16 +128,16 @@ export function LiveView({
         currentUrl = createImageSource(bytes, mime);
         setFrameUrl(currentUrl);
       }
+      interrupted(new Error("The live stream ended."));
     })().catch((error) => {
       if (!active) return;
       if (abort.signal.aborted && abort.signal.reason?.name === "AbortError")
         return;
-      setFailed(true);
-      setReady(false);
-      errorHandler.current((abort.signal.reason || error).message);
+      interrupted(abort.signal.reason || error);
     });
     return () => {
       active = false;
+      clearTimeout(retryTimer);
       abort.abort();
       clearTimeout(watchdog);
       releaseImageSource(currentUrl);
@@ -138,8 +155,10 @@ export function LiveView({
   const surface = useRef<HTMLDivElement>(null);
   const pointer = useRef<number | null>(null);
   const lastPoint = useRef({ x: 0.5, y: 0.5 });
+  const wheelEnd = useRef<(() => void) | null>(null);
   const queue = useRef<Input[]>([]);
   const running = useRef(false);
+  const inputFailed = useRef(false);
   const mounted = useRef(true);
   const errorHandler = useRef(onError);
   errorHandler.current = onError;
@@ -182,7 +201,12 @@ export function LiveView({
               { signal: AbortSignal.timeout(20000) },
             );
           }
+          if (mounted.current && inputFailed.current) {
+            inputFailed.current = false;
+            errorHandler.current("");
+          }
         } catch (error) {
+          inputFailed.current = true;
           queue.current = [];
           // A failed up request must never leave a mouse button or touch held.
           void captureCommand(
@@ -210,9 +234,12 @@ export function LiveView({
   }, [send]);
   useEffect(() => {
     mounted.current = true;
-    const blur = () => release();
+    const blur = () => {
+      wheelEnd.current?.();
+      release();
+    };
     const visibility = () => {
-      if (document.hidden) release();
+      if (document.hidden) blur();
     };
     window.addEventListener("blur", blur);
     document.addEventListener("visibilitychange", visibility);
@@ -221,25 +248,100 @@ export function LiveView({
       queue.current = [];
       window.removeEventListener("blur", blur);
       document.removeEventListener("visibilitychange", visibility);
-      release();
+      // An up sample can still be queued after the DOM pointer was released.
+      if (pointer.current !== null || running.current) {
+        pointer.current = null;
+        send({ type: "release" });
+      }
     };
-  }, [release]);
+  }, [release, send]);
   useEffect(() => {
     const node = surface.current;
+    let contact: { x: number; y: number } | undefined;
+    let wheelTimer: number;
+    let residualX = 0,
+      residualY = 0;
+    const end = () => {
+      clearTimeout(wheelTimer);
+      if (contact) send({ type: "pointer", phase: "up", ...contact });
+      contact = undefined;
+      residualX = residualY = 0;
+    };
+    wheelEnd.current = end;
     const wheel = (event: WheelEvent) => {
-      if (!ready || failed || busy || inputWarning) return;
+      if (!ready || failed || busy || inputWarning || !node) return;
       event.preventDefault();
       const scale =
-        event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? 500 : 1;
-      send({
-        type: "wheel",
-        dx: Math.max(-2000, Math.min(2000, event.deltaX * scale)),
-        dy: Math.max(-2000, Math.min(2000, event.deltaY * scale)),
-      });
+        event.deltaMode === 1
+          ? 16
+          : event.deltaMode === 2
+            ? node.clientHeight
+            : 1;
+      const dx = event.deltaX * scale,
+        dy = event.deltaY * scale;
+      if (kind === "web") {
+        send({
+          type: "wheel",
+          dx: Math.max(-2000, Math.min(2000, dx)),
+          dy: Math.max(-2000, Math.min(2000, dy)),
+        });
+        return;
+      }
+      if (
+        pointer.current !== null ||
+        !(
+          event.target instanceof HTMLCanvasElement ||
+          event.target instanceof HTMLImageElement
+        )
+      )
+        return;
+      const rect = event.target.getBoundingClientRect();
+      clearTimeout(wheelTimer);
+      wheelTimer = window.setTimeout(end, 100);
+      residualX += dx;
+      residualY += dy;
+      // Ignore a trackpad's subpixel tail. A stationary down/up would be a tap.
+      if (!contact && Math.hypot(residualX, residualY) < 3) return;
+      const clamp = (value: number) => Math.min(0.995, Math.max(0.005, value));
+      if (
+        contact &&
+        ((contact.y <= 0.005 && dy > 0) ||
+          (contact.y >= 0.995 && dy < 0) ||
+          (contact.x <= 0.005 && dx > 0) ||
+          (contact.x >= 0.995 && dx < 0))
+      ) {
+        send({ type: "pointer", phase: "up", ...contact });
+        contact = undefined;
+      }
+      if (!contact) {
+        // Leave enough room for a pan to be recognized even near the bezel.
+        const anchor = (position: number, delta: number) =>
+          delta > 0
+            ? Math.max(0.12, clamp(position))
+            : delta < 0
+              ? Math.min(0.88, clamp(position))
+              : clamp(position);
+        contact = {
+          x: anchor((event.clientX - rect.left) / rect.width, residualX),
+          y: anchor((event.clientY - rect.top) / rect.height, residualY),
+        };
+        send({ type: "pointer", phase: "down", ...contact });
+      }
+      const from = contact;
+      contact = {
+        x: clamp(from.x - residualX / rect.width),
+        y: clamp(from.y - residualY / rect.height),
+      };
+      residualX = residualY = 0;
+      send({ type: "pointer", phase: "move", ...contact });
     };
     node?.addEventListener("wheel", wheel, { passive: false });
-    return () => node?.removeEventListener("wheel", wheel);
-  }, [send, ready, failed, busy, inputWarning]);
+    return () => {
+      node?.removeEventListener("wheel", wheel);
+      end();
+      wheelEnd.current = null;
+    };
+  }, [kind, send, ready, failed, busy, inputWarning]);
   const point = (event: PointerEvent<HTMLElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
     return {
@@ -253,6 +355,7 @@ export function LiveView({
     onPointerDown(event: PointerEvent<HTMLElement>) {
       if (!enabled || event.button !== 0 || pointer.current !== null) return;
       event.preventDefault();
+      wheelEnd.current?.();
       surface.current?.focus({ preventScroll: true });
       pointer.current = event.pointerId;
       event.currentTarget.setPointerCapture(event.pointerId);
@@ -317,7 +420,8 @@ export function LiveView({
             </>
           )}
           <button
-            className="text-button"
+            className={kind === "simulator" ? "icon-button" : "text-button"}
+            title={kind === "simulator" ? "Reconnect simulator" : undefined}
             disabled={busy || pending}
             aria-label={onReconnect ? "Reconnect simulator" : "Reconnect view"}
             onClick={() => {
@@ -332,7 +436,7 @@ export function LiveView({
               setAttempt((n) => n + 1);
             }}
           >
-            Reconnect
+            {kind === "simulator" ? <RefreshCw size={17} /> : "Reconnect"}
           </button>
         </div>
         {kind === "web" && (
@@ -347,11 +451,15 @@ export function LiveView({
         )}
         <button
           className="primary capture-submit"
+          aria-label="Capture & annotate"
           disabled={!available || pending}
           onClick={() => void onCapture()}
         >
           <Camera size={18} />
-          Capture & annotate
+          <span>
+            Capture
+            <span className="capture-action-suffix"> &amp; annotate</span>
+          </span>
         </button>
       </div>
 
@@ -414,8 +522,13 @@ export function LiveView({
           </p>
         )}
         {failed && (
-          <p className="live-placeholder" role="alert">
-            The live view disconnected. Choose Reconnect to try again.
+          <p
+            className="live-placeholder"
+            role={kind === "simulator" ? "status" : "alert"}
+          >
+            {kind === "simulator"
+              ? "Reconnecting to the simulator…"
+              : "The live view disconnected. Choose Reconnect to try again."}
           </p>
         )}
         {useCanvas ? (
@@ -447,7 +560,12 @@ export function LiveView({
           />
         )}
       </div>
-      <p id="live-help" className="capture-hint">
+      <p
+        id="live-help"
+        className={
+          kind === "simulator" && !inputWarning ? "sr-only" : "capture-hint"
+        }
+      >
         {inputWarning ||
           "Click or tap the screen to interact. Scroll or drag to move. Type while the screen is focused. Escape leaves it."}
       </p>

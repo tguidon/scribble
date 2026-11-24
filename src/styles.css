@@ -2279,3 +2279,153 @@ kbd {
   font-size: var(--text-body);
   line-height: 1.6;
 }
+
+.capture-navigation {
+  display: contents;
+}
+.app:has(.simulator-workspace) {
+  height: 100dvh;
+  min-height: 0;
+}
+.app:has(.simulator-workspace) .app-footer {
+  display: none;
+}
+.simulator-workspace {
+  overflow: hidden;
+  padding: 8px clamp(10px, 2vw, 24px);
+}
+.simulator-workspace
+  :is(.capture-sheet, .capture-layout, .capture-preview, .live-view) {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+.simulator-workspace .capture-sheet {
+  position: relative;
+  height: 100%;
+}
+.simulator-workspace .capture-navigation {
+  padding-right: 150px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  column-gap: 16px;
+  border-bottom: 1px solid var(--line);
+}
+.simulator-workspace .capture-navigation :is(.capture-tabs, .capture-back) {
+  margin: 0;
+}
+.capture-sheet-live .capture-navigation h1 {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+.simulator-workspace .capture-tabs {
+  border: 0;
+}
+.simulator-workspace .capture-layout {
+  gap: 0;
+}
+.simulator-workspace .capture-settings {
+  position: absolute;
+  inset: 2px 0 auto auto;
+  z-index: 3;
+  border: 0;
+}
+.simulator-workspace .capture-settings[open] {
+  width: min(100%, 420px);
+  max-height: 100%;
+  overflow: auto;
+  padding: 0 16px 12px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.simulator-workspace .live-toolbar {
+  margin: 8px 0;
+}
+.simulator-workspace .live-screen {
+  flex: 1;
+  min-height: 0;
+  container-type: size;
+  overscroll-behavior: contain;
+  border-radius: 8px;
+}
+.simulator-workspace .live-screen :is(img, canvas) {
+  max-width: 100cqw;
+  max-height: 100cqh;
+  cursor: default;
+}
+.simulator-workspace .capture-preview {
+  position: relative;
+}
+.simulator-workspace .live-type-disclosure {
+  margin: 0;
+  padding: 4px 0;
+}
+.simulator-workspace .live-type-disclosure summary {
+  width: fit-content;
+  align-content: center;
+}
+.simulator-workspace .capture-disconnect {
+  align-self: flex-end;
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  margin: 0;
+}
+.simulator-workspace .live-type-disclosure[open] {
+  padding-bottom: 40px;
+}
+.simulator-workspace .live-toolbar .capture-submit {
+  width: auto;
+}
+@media (max-width: 620px) {
+  .simulator-workspace .capture-action-suffix {
+    display: none;
+  }
+  .simulator-workspace .capture-navigation {
+    padding-right: 42px;
+    flex-wrap: nowrap;
+    gap: 0;
+  }
+  .simulator-workspace .capture-tabs button {
+    padding-inline: 9px;
+  }
+  .simulator-workspace .live-toolbar h2 {
+    font-size: 1rem;
+  }
+  .simulator-workspace .live-toolbar .capture-submit {
+    padding-inline: 10px;
+  }
+}
+
+.simulator-workspace .capture-settings summary {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  justify-content: flex-end;
+}
+.simulator-workspace .capture-settings summary::-webkit-details-marker {
+  display: none;
+}
+.app:has(.simulator-workspace) .app-header {
+  height: 54px;
+}
+@media (max-width: 620px) {
+  .simulator-workspace .capture-back {
+    width: 36px;
+    justify-content: center;
+  }
+  .simulator-workspace .capture-back span,
+  .simulator-workspace .capture-settings:not([open]) summary span {
+    display: none;
+  }
+  .simulator-workspace .capture-settings summary {
+    padding-inline: 10px;
+  }
+}

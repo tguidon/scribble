@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { promisify } from "node:util";
 import { withLock } from "../lock.mjs";
 import { captureError } from "./common.mjs";
+import { TouchChannel } from "./touch-channel.mjs";
 import { simKey } from "./sim-input.mjs";
 
 const exec = promisify(execFile);
@@ -62,15 +63,16 @@ async function installedAxe(root) {
 
 export class DeviceHubInput {
   static async open(root, device) {
-    const input = new DeviceHubInput(await installedAxe(root), device);
-    await input.screen();
+    const input = new DeviceHubInput(root, device);
+    input.channel = await TouchChannel.open(root, device);
     return input;
   }
-  constructor(binary, device) {
-    this.binary = binary;
+  constructor(root, device) {
+    this.root = root;
     this.device = device;
   }
   async run(args) {
+    this.binary ??= await installedAxe(this.root);
     try {
       const { stdout } = await exec(
         this.binary,
@@ -80,7 +82,9 @@ export class DeviceHubInput {
       return JSON.parse(stdout);
     } catch {
       throw captureError(
-        "Device Hub input failed. Check that the selected simulator is available and the text uses its keyboard layout.",
+        args[0] === "type"
+          ? "The simulator could not type that text with its current keyboard layout."
+          : "The simulator could not complete the " + args[0] + " command.",
         502,
       );
     }
@@ -130,73 +134,49 @@ export class DeviceHubInput {
         y = height / 2;
       const dx = Math.max(-x + 2, Math.min(x - 2, event.dx));
       const dy = Math.max(-y + 2, Math.min(y - 2, event.dy));
-      return this.command(
-        "swipe",
-        "--start-x",
-        x,
-        "--start-y",
-        y,
-        "--end-x",
-        x - dx,
-        "--end-y",
-        y - dy,
-        "--duration",
-        0.15,
-      );
+      // Older open editors send one wheel distance rather than pointer phases.
+      if (Math.hypot(dx, dy) < 1) return;
+      await this.input({ type: "pointer", phase: "down", x: 0.5, y: 0.5 });
+      try {
+        await this.input({
+          type: "pointer",
+          phase: "move",
+          x: (x - dx) / width,
+          y: (y - dy) / height,
+        });
+      } finally {
+        await this.release();
+      }
     }
     if (event.type !== "pointer")
       throw captureError("Unsupported simulator input.");
-    // Submit one complete gesture so a lost connection cannot leave a finger down.
     if (event.phase === "down") {
-      this.stroke = { start: Date.now(), points: [event] };
-      return;
+      await this.release();
+      // Resolve orientation at gesture boundaries, never halfway through a drag.
+      this.rotation = await this.orientation?.();
+      this.started = performance.now();
+    } else if (!this.contact) return;
+    let { x, y } = event;
+    if (this.rotation === "landscape_left") [x, y] = [1 - y, x];
+    if (this.rotation === "landscape_right") [x, y] = [y, 1 - x];
+    if (this.rotation === "portrait_upside_down") [x, y] = [1 - x, 1 - y];
+    const phase = { down: "d", move: "m", up: "u" }[event.phase];
+    if (phase === "u") {
+      const remaining = 18 - (performance.now() - this.started);
+      if (remaining > 0)
+        await new Promise((resolve) => setTimeout(resolve, remaining));
     }
-    const stroke = this.stroke;
-    if (!stroke) return;
-    const previous = stroke.points.at(-1);
-    if (event.x !== previous.x || event.y !== previous.y) {
-      if (stroke.points.length === 1000) stroke.points.splice(1, 1);
-      stroke.points.push(event);
-    }
-    if (event.phase !== "up") return;
-    this.release();
-    const duration = Math.max(
-      0.04,
-      Math.min(10, (Date.now() - stroke.start) / 1000),
-    );
-    const { width, height } = await this.screen();
-    const points = stroke.points.map(({ x, y }) => [
-      Math.round(x * (width - 1)),
-      Math.round(y * (height - 1)),
-    ]);
-    const [x, y] = points[0];
-    if (
-      points.every(([px, py]) => Math.abs(px - x) < 3 && Math.abs(py - y) < 3)
-    )
-      return duration < 0.45
-        ? this.command("tap", "-x", x, "-y", y)
-        : this.command(
-            "touch",
-            "-x",
-            x,
-            "-y",
-            y,
-            "--down",
-            "--up",
-            "--delay",
-            duration,
-          );
-    return this.command(
-      "draw",
-      ...points.map((point) => point.join(",")),
-      "--duration",
-      duration,
-    );
+    this.contact = [x, y];
+    await this.channel.send(phase, x, y);
+    if (phase === "u") this.contact = null;
   }
-  release() {
-    this.stroke = null;
+  async release() {
+    const point = this.contact;
+    this.contact = null;
+    if (point) await this.channel.send("u", ...point);
   }
   close() {
-    this.release();
+    this.contact = null;
+    this.channel?.close();
   }
 }
