@@ -207,7 +207,7 @@ For iOS, Scribble reuses or starts serve-sim for the selected device and embeds 
 
 Click the embedded screen before typing, or expand **Type or paste text**. Press Escape to return keyboard control to Scribble. Simulator text input supports US keyboard characters; use the simulator’s on-screen keyboard for other text.
 
-Direct webpage and simulator views pause when the Scribble tab is hidden and stop when you return to annotations. **Reconnect** restores the selected live view. The stream and input requests use the same session authentication as saved feedback.
+Direct webpage and simulator views pause when the Scribble tab is hidden and stop when you return to annotations. Codex keeps a focused preview live. When the panel loses focus, Scribble suspends frame requests after 15 seconds and keeps the last image visible. Returning to the panel wakes the same source automatically. **Reconnect** restores the selected live view. The stream and input requests use the same session authentication as saved feedback.
 
 ### Simulator input with Xcode 27
 

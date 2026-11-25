@@ -7,8 +7,9 @@ export class FrameRelay {
     this.backend = backend;
     this.streams = new Map();
   }
-  async next(id, token, kind, generation, after = 0) {
+  async next(id, token, kind, generation, after = 0, signal) {
     await this.backend.authorize(id, token);
+    signal?.throwIfAborted();
     const key = `${id}:${kind}:${generation}`;
     let stream = this.streams.get(key);
     if (!stream) {
@@ -43,16 +44,20 @@ export class FrameRelay {
         const finish = () => {
           clearTimeout(timer);
           stream.waiters.delete(finish);
+          signal?.removeEventListener("abort", finish);
           resolve();
         };
-        const timer = setTimeout(finish, 1000);
+        const timer = setTimeout(finish, 12000);
         stream.waiters.add(finish);
+        signal?.addEventListener("abort", finish, { once: true });
       });
     }
+    signal?.throwIfAborted();
     if (stream.error) {
       if (this.streams.get(key) === stream) this.streams.delete(key);
       throw new Error(stream.error);
     }
+    stream.touched = Date.now();
     return {
       sequence: stream.sequence,
       received: stream.received,
@@ -64,7 +69,7 @@ export class FrameRelay {
   }
   async consume(stream, key, id, token, kind, generation) {
     const timer = setInterval(() => {
-      if (Date.now() - stream.touched > 10000) {
+      if (!stream.waiters.size && Date.now() - stream.touched > 10000) {
         stream.abort.abort();
         if (this.streams.get(key) === stream) this.streams.delete(key);
       }
@@ -101,7 +106,7 @@ export class FrameRelay {
         writableFrame,
       )) {
         stream.received++;
-        if (kind === "simulator" && stream.frame?.equals(bytes)) continue;
+        if (stream.frame?.equals(bytes)) continue;
         stream.frame = bytes;
         [incoming, published] = [published, incoming];
         stream.sequence++;

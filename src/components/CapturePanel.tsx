@@ -12,6 +12,7 @@ import {
 import { captureCommand, checkCaptureRuntime, request } from "../api";
 import { SharedTabView } from "./SharedTabView";
 import type { TabShare, SharedSurface } from "../useTabShare";
+import { getEditorHost } from "../editorHost";
 import { LiveView } from "./LiveView";
 import { ViewportPicker, type Viewport } from "./ViewportPicker";
 import type { CaptureEntry, CaptureKind } from "../types";
@@ -74,6 +75,53 @@ export function CapturePanel({
     connection.device.id.startsWith("emulator-");
   const shared = kind === "web" && webMode === "shared";
   const connected = shared ? !!share.stream : !!connection?.connected;
+  const embeddedSource =
+    getEditorHost() && !shared && connection?.connected
+      ? `${kind}-${connection.generation}`
+      : undefined;
+  const [pausedSource, setPausedSource] = useState<string>();
+  const previewPaused = !!embeddedSource && pausedSource === embeddedSource;
+  useEffect(() => {
+    const panel = workspace.current;
+    if (!embeddedSource || !panel) return;
+    let timer: number;
+    const suspend = () => setPausedSource(embeddedSource);
+    const gracePeriod = () => {
+      clearTimeout(timer);
+      timer = window.setTimeout(suspend, 15_000);
+    };
+    const wake = () => {
+      clearTimeout(timer);
+      if (document.hidden) return suspend();
+      setPausedSource(undefined);
+      // Hovering a panel does not necessarily give its iframe keyboard focus.
+      if (!document.hasFocus()) gracePeriod();
+    };
+    const events = [
+      "pointerenter",
+      "pointermove",
+      "pointerdown",
+      "wheel",
+      "keydown",
+      "focusin",
+      "input",
+    ] as const;
+    for (const event of events)
+      panel.addEventListener(event, wake, { capture: true, passive: true });
+    window.addEventListener("focus", wake);
+    window.addEventListener("blur", gracePeriod);
+    window.addEventListener("pageshow", wake);
+    document.addEventListener("visibilitychange", wake);
+    wake();
+    return () => {
+      clearTimeout(timer);
+      for (const event of events) panel.removeEventListener(event, wake, true);
+      window.removeEventListener("focus", wake);
+      window.removeEventListener("blur", gracePeriod);
+      window.removeEventListener("pageshow", wake);
+      document.removeEventListener("visibilitychange", wake);
+    };
+  }, [embeddedSource]);
   useEffect(() => {
     if (connected) {
       workspace.current?.scrollTo({ top: 0 });
@@ -167,6 +215,7 @@ export function CapturePanel({
     void perform("Checking sources…", refresh);
   }, [refresh]);
   const retryInput =
+    !previewPaused &&
     connection?.kind === "simulator" &&
     connection.connected &&
     connection.inputWarning;
@@ -579,6 +628,7 @@ export function CapturePanel({
                       ? connection.inputWarning
                       : undefined
                   }
+                  paused={previewPaused}
                   android={connectedAndroid}
                   onReconnect={
                     connection.kind === "simulator"

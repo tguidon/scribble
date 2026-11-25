@@ -17,6 +17,7 @@ type Props = {
   kind: CaptureKind;
   title: string;
   android?: boolean;
+  paused: boolean;
   generation: number;
   inputWarning?: string;
   onReconnect?: () => Promise<void>;
@@ -31,6 +32,7 @@ export function LiveView({
   kind,
   title,
   android,
+  paused,
   busy,
   onCapture,
   onError,
@@ -52,10 +54,13 @@ export function LiveView({
     return () => document.removeEventListener("visibilitychange", visibility);
   }, []);
   useEffect(() => {
-    // The embedded host can return the same data URL after reconnect. Clear
-    // the previous source so the first frame triggers onLoad again.
-    setFrameUrl(undefined);
-    setReady(false);
+    // Keep the last embedded frame and its input surface across suspension.
+    // A returning tap or capture can use the existing source immediately.
+    if (paused) return;
+    if (!getEditorHost()) {
+      setFrameUrl(undefined);
+      setReady(false);
+    }
     setFailed(false);
     if (!visible) return;
     const canvas = frameCanvas.current;
@@ -144,12 +149,8 @@ export function LiveView({
       clearTimeout(watchdog);
       releaseImageSource(currentUrl);
       releaseImageSource(previousUrl);
-      if (canvas) {
-        canvas.width = 0;
-        canvas.height = 0;
-      }
     };
-  }, [kind, generation, attempt, visible, useCanvas]);
+  }, [kind, generation, attempt, visible, paused, useCanvas]);
   const [ready, setReady] = useState(false);
   const [failed, setFailed] = useState(false);
   const [pending, setPending] = useState(false);
@@ -372,6 +373,12 @@ export function LiveView({
       if (mounted.current) setPending(false);
     }
   }
+  useEffect(() => {
+    if (paused) {
+      wheelEnd.current?.();
+      release();
+    }
+  }, [paused, release]);
   const available = ready && !failed && !busy;
   const enabled = available && !inputWarning && !simulatorActionPending;
   const pointerHandlers = {
@@ -468,6 +475,7 @@ export function LiveView({
               }
               release();
               errorHandler.current("");
+              setFrameUrl(undefined);
               setReady(false);
               setFailed(false);
               setAttempt((n) => n + 1);
@@ -551,14 +559,14 @@ export function LiveView({
         }}
         onBlur={release}
       >
-        {!ready && !failed && (
+        {!paused && !ready && !failed && (
           <p className="live-placeholder" role="status">
             {visible
               ? "Connecting live screen…"
               : "Live view paused while this tab is hidden."}
           </p>
         )}
-        {failed && (
+        {!paused && failed && (
           <p
             className="live-placeholder"
             role={kind === "simulator" ? "status" : "alert"}

@@ -185,9 +185,9 @@ export function createPlugin(options = {}) {
       annotations: { readOnlyHint: true, openWorldHint: false },
       _meta: { ui: { visibility: ["app"] } },
     },
-    guarded(async ({ sessionId, token, kind, generation, after }) =>
+    guarded(async ({ sessionId, token, kind, generation, after }, { signal }) =>
       privateResult(
-        await frames.next(sessionId, token, kind, generation, after),
+        await frames.next(sessionId, token, kind, generation, after, signal),
       ),
     ),
   );

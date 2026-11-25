@@ -32,6 +32,10 @@ The browser suite exercises Android capture with a simulated ADB response. To ru
 SCRIBBLE_TEST_EMULATOR=emulator-5554 npm run test:e2e -- --grep 'Android emulator captures'
 ```
 
+## Unattended Codex panels
+
+The browser test named `an unattended visible plugin panel` keeps the embedded simulator on screen. It counts frame requests for a focused static screen, moves focus outside the iframe, and waits for the real backend stream to close. It advances the browser clock by eight hours, checks that the editor made zero additional tool calls, and returns focus to a text field. A changed simulator frame must appear automatically before the test captures from the original connection. The eight-hour interval uses a simulated clock. The backend teardown and capture run in real time.
+
 ## Embedded preview memory
 
 To measure the embedded editor with a changing 1206 × 2622 simulator preview, build the plugin and run the extended browser test.

@@ -16,6 +16,7 @@ if (process.env.SCRIBBLE_SOAK_FRAMES)
 let project: string, origin: string, result: any, messages: any[];
 let calls: string[];
 let simulatorFrame: Buffer;
+let openSimulatorStreams: number;
 // Visibility alone does not prove that an SVG image decoded; broken images
 // still occupy their full canvas rectangle.
 async function expectDecodedScreenshot(image: Locator) {
@@ -35,6 +36,7 @@ let http: Awaited<ReturnType<typeof startServer>>,
   host: ReturnType<typeof createServer>,
   client: Client;
 test.beforeEach(async () => {
+  openSimulatorStreams = 0;
   simulatorFrame = Buffer.from(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGNgYPgPAAEDAQAIicLsAAAAAElFTkSuQmCC",
     "base64",
@@ -107,7 +109,11 @@ test.beforeEach(async () => {
         };
         sendFrame();
         const repeat = setInterval(sendFrame, 50);
-        res.once("close", () => clearInterval(repeat));
+        openSimulatorStreams++;
+        res.once("close", () => {
+          clearInterval(repeat);
+          openSimulatorStreams--;
+        });
       } else if (req.url === "/host" || req.url?.startsWith("/host?")) {
         const params = new URL(req.url, "http://fixture").searchParams;
         res.setHeader("Content-Type", "text/html");
@@ -952,6 +958,55 @@ test("accepted delivery retries receipt storage without sending again", async ({
     ui.getByRole("status").filter({ hasText: "Message accepted" }),
   ).toBeVisible();
   expect(messages).toHaveLength(1);
+});
+
+test("an unattended visible plugin panel stops polling and resumes the same simulator after a workday", async ({
+  page,
+}) => {
+  await page.clock.install();
+  await page.goto(origin + "/host");
+  const ui = page.frameLocator("iframe");
+  await ui
+    .getByRole("button", { name: "Capture a webpage or simulator" })
+    .click();
+  await ui.getByRole("button", { name: "Simulator / Emulator" }).click();
+  await ui.getByRole("button", { name: "Connect simulator" }).click();
+  const capture = ui.getByRole("button", { name: "Capture & annotate" });
+  await expect(capture).toBeEnabled();
+  await ui.getByText("Type or paste text", { exact: true }).click();
+  const text = ui.getByLabel("Text to type in the app");
+  await text.fill("Keep this pending text");
+  // Leave the focused, static preview on screen for several old poll cycles.
+  const frames = () =>
+    calls.filter((call) => call.startsWith("live_frame ")).length;
+  const initial = frames();
+  await new Promise((resolve) => setTimeout(resolve, 3200));
+  expect(frames() - initial).toBeLessThanOrEqual(1);
+  // Move real keyboard focus out of the iframe while leaving it visible.
+  await page.evaluate(() => {
+    document.body.tabIndex = -1;
+    document.body.focus();
+  });
+  await page.clock.fastForward("00:16");
+  await expect(ui.locator(".live-screen canvas")).toHaveAttribute("width", "1");
+  await expect(capture).toBeEnabled();
+  await expect.poll(() => openSimulatorStreams, { timeout: 32000 }).toBe(0);
+  const before = calls.length;
+  await page.clock.fastForward("08:00:00");
+  expect(calls.length).toBe(before);
+  // Returning focus alone must acquire a fresh frame of the same source.
+  simulatorFrame = Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAIAAAABCAIAAAB7QOjdAAAADUlEQVR4nGP4z8AARAAI/gH/xp559wAAAABJRU5ErkJggg==",
+    "base64",
+  );
+  await text.focus();
+  await expect(ui.locator(".live-screen canvas")).toHaveAttribute("width", "2");
+  await expect(text).toHaveValue("Keep this pending text");
+  expect(calls.filter((call) => call.endsWith(" /capture/open"))).toHaveLength(
+    1,
+  );
+  await capture.click();
+  await expect(ui.locator(".image-stage")).toBeVisible();
 });
 
 test("changing simulator frames stay out of the embedded renderer console", async ({
