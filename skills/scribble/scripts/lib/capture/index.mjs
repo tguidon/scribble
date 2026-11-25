@@ -1,6 +1,7 @@
-import { validateCaptureCommand } from "./contracts.mjs";
+import { AndroidCapture, androidDevices, findAdb } from "./android.mjs";
+import { emulatorId, validateCaptureCommand } from "./contracts.mjs";
 import { WebCapture } from "./web.mjs";
-import { SimulatorCapture } from "./simulator.mjs";
+import { bootedDevices, SimulatorCapture } from "./simulator.mjs";
 import { SimulatorHelpers } from "./simulator-helper.mjs";
 import {
   playwright,
@@ -14,6 +15,12 @@ export function createCaptures(root, options = {}) {
   const sessions = new Map(),
     queues = new Map();
   const helpers = new SimulatorHelpers(root);
+  const iosSupported =
+    !!options.simulator?.devices ||
+    (process.platform === "darwin" && process.arch === "arm64");
+  const androidSupported = () => !!(options.android?.run || findAdb());
+  const iosCapture = () =>
+    new SimulatorCapture(root, { helpers, ...options.simulator });
   let closed = false;
   const sources = (id) => {
     if (closed)
@@ -24,10 +31,7 @@ export function createCaptures(root, options = {}) {
     if (!sessions.has(id))
       sessions.set(id, {
         web: new WebCapture(root, options.web),
-        simulator: new SimulatorCapture(root, {
-          helpers,
-          ...options.simulator,
-        }),
+        simulator: iosCapture(),
       });
     return sessions.get(id);
   };
@@ -98,13 +102,28 @@ export function createCaptures(root, options = {}) {
         },
         simulator: {
           available: simulatorAvailable,
-          supported: process.platform === "darwin" && process.arch === "arm64",
+          supported: iosSupported || androidSupported(),
           ...current.simulator.state(),
           setupCommand: setupCommand(root, "simulator"),
         },
       };
     },
-    devices: (id) => run(id, (s) => s.simulator.devices()),
+    devices: (id) =>
+      run(id, async () => {
+        const providers = [];
+        if (iosSupported)
+          providers.push((options.simulator?.devices || bootedDevices)());
+        if (androidSupported())
+          providers.push(androidDevices(options.android?.run));
+        const results = await Promise.allSettled(providers);
+        const devices = results.flatMap((result) =>
+          result.status === "fulfilled" ? result.value : [],
+        );
+        const failure = results.find((result) => result.status === "rejected");
+        if (failure && results.every((result) => result.status === "rejected"))
+          throw failure.reason;
+        return devices;
+      }),
     stream(id, kind, res, generation) {
       if (!["web", "simulator"].includes(kind))
         throw captureError("Choose a webpage or simulator.");
@@ -126,8 +145,27 @@ export function createCaptures(root, options = {}) {
         const source = sources[input.kind];
         switch (input.action) {
           case "open":
-            if (!(input.kind === "simulator" && options.simulator?.command))
-              await ensureCapture(root, input.kind);
+            if (input.kind === "simulator") {
+              const android = emulatorId.test(input.deviceId);
+              if (!android && !options.simulator?.command)
+                await ensureCapture(root, "simulator");
+              if (!android && source instanceof SimulatorCapture)
+                return source.open(input);
+              const next = android
+                ? new AndroidCapture(options.android?.run)
+                : iosCapture();
+              next.generation = source.generation;
+              try {
+                const state = await next.open(input);
+                await source.close();
+                sources.simulator = next;
+                return state;
+              } catch (error) {
+                await next.close();
+                throw error;
+              }
+            }
+            await ensureCapture(root, "web");
             return source.open(input);
           case "input":
           case "connect-input":
@@ -138,7 +176,7 @@ export function createCaptures(root, options = {}) {
                 409,
               );
             if (input.action === "connect-input") {
-              if (!source.controls) await source.bindControls();
+              if (!source.controls) await source.bindControls?.();
               return source.state();
             }
             return input.action === "input"

@@ -154,7 +154,8 @@ node bin/scribble.mjs setup simulator
 For an installed skill, replace `bin/scribble.mjs` with the absolute path to its `scripts/scribble.mjs` file. If you use custom storage, pass the same `--dir PATH` to setup and startup.
 
 - **Webpage:** Setup installs Playwright and downloads Chromium. The browser runs in the background and streams its viewport into Scribble.
-- **Simulator:** Setup installs serve-sim. Capture requires an Apple Silicon Mac, Xcode, and a booted simulator. Scribble also accepts serve-sim on `PATH`.
+- **Android emulator:** Install Android SDK Platform-Tools and start an AVD in Android Studio. Scribble finds `adb` on your PATH or in the Android SDK. Choose **Simulator / Emulator**, select the running emulator, and connect.
+- **iOS simulator:** Setup installs serve-sim. Capture requires an Apple Silicon Mac, Xcode, and a booted simulator. Scribble also accepts serve-sim on `PATH`.
 
 The optional packages live in `.scribble/capture-runtime/`. Chromium uses Playwright’s browser cache. Setup requires internet access. Scribble stores captured images and feedback locally.
 
@@ -192,15 +193,17 @@ Sharing stays active while you annotate. Use **Return to shared tab** for anothe
 
 If you select a window or screen instead of a tab, Scribble labels it accordingly. Shared captures record the surface type, dimensions, and capture time. The browser does not provide the website URL or scroll position through this flow.
 
-### Capture a simulator
+### Capture an iOS simulator or Android emulator
 
-1. Launch your app in Simulator.
-2. Select **Capture live app**, then **Simulator**.
-3. Choose a booted device and select **Connect simulator**.
+1. Launch your app in the iOS Simulator or a running Android AVD.
+2. Select **Capture live app**, then **Simulator / Emulator**.
+3. Choose a booted device and select **Connect simulator** or **Connect emulator**.
 4. Tap or drag directly on the simulator screen inside Scribble.
 5. Select **Capture & annotate**.
 
-Scribble reuses or starts serve-sim for the selected device and embeds only its screen. The Home control returns to the simulator home screen. Each capture records the device, orientation, capture time, and app identifier when available.
+Android uses ADB for live preview, touch, keyboard, Home, Back, and PNG captures. Disconnecting leaves the emulator running.
+
+For iOS, Scribble reuses or starts serve-sim for the selected device and embeds only its screen. The Home control returns to the simulator home screen. Each capture records the device, orientation, capture time, and app identifier when available.
 
 Click the embedded screen before typing, or expand **Type or paste text**. Press Escape to return keyboard control to Scribble. Simulator text input supports US keyboard characters; use the simulator’s on-screen keyboard for other text.
 

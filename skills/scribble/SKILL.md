@@ -39,6 +39,6 @@ Keep the working directory fixed. Use the same `--dir PATH` on every command if 
 ## Open and hand back to the user
 
 1. Open the exact returned `url` in the available browser and share the link immediately. Preserve its token fragment.
-2. Tell the user: **Add screenshots, marks, and comments. Choose Finish feedback, then Copy for agent, and paste the handoff into this chat.** They can also choose **Capture live app**; read [live capture](references/live-capture.md) only when helping with webpage, shared-tab, or simulator capture.
+2. Tell the user: **Add screenshots, marks, and comments. Choose Finish feedback, then Copy for agent, and paste the handoff into this chat.** They can also choose **Capture live app**; read [live capture](references/live-capture.md) only when helping with webpage, shared-tab, iOS simulator, or Android emulator capture.
 3. End your turn after sharing the URL and instructions. The user controls delivery by pasting the handoff. Do not poll, wait for a submission, or automatically read saved feedback. The editor's **New canvas** button starts another round without invoking the skill again.
 4. When the user pastes a handoff, read [the feedback workflow](references/feedback.md) and use the exact files it names. A new launch only opens the editor; it does not authorize applying earlier feedback.

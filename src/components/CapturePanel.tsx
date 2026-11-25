@@ -67,6 +67,11 @@ export function CapturePanel({
     settings.current.querySelector("summary")?.focus();
   };
   const connection = status?.[kind];
+  const selectedAndroid = deviceId.startsWith("emulator-");
+  const connectedAndroid =
+    connection?.kind === "simulator" &&
+    connection.connected &&
+    connection.device.id.startsWith("emulator-");
   const shared = kind === "web" && webMode === "shared";
   const connected = shared ? !!share.stream : !!connection?.connected;
   useEffect(() => {
@@ -264,7 +269,7 @@ export function CapturePanel({
               }}
               disabled={!!busy}
             >
-              <Smartphone size={19} /> Simulator
+              <Smartphone size={19} /> Simulator / Emulator
             </button>
           </div>
         </div>
@@ -487,7 +492,7 @@ export function CapturePanel({
               ) : (
                 <div className="simulator-settings-body">
                   <label className="capture-field">
-                    Booted simulator
+                    Booted simulator or emulator
                     <select
                       value={deviceId}
                       onChange={(event) => setDeviceId(event.target.value)}
@@ -496,7 +501,7 @@ export function CapturePanel({
                       <option value="">
                         {devices.length
                           ? "Choose a device"
-                          : "No booted simulators"}
+                          : "No running devices"}
                       </option>
                       {devices.map((device) => (
                         <option key={device.id} value={device.id}>
@@ -509,8 +514,8 @@ export function CapturePanel({
                     {status?.simulator.supported
                       ? devices.length
                         ? "Choose a device to navigate and capture its screen here."
-                        : "Open Simulator and boot a device, then refresh this list."
-                      : "Simulator capture requires an Apple Silicon Mac with Xcode."}
+                        : "Start an Android emulator or iOS simulator, then refresh this list."
+                      : "Install Android SDK Platform-Tools and start an emulator, then refresh. iOS capture requires an Apple Silicon Mac with Xcode."}
                   </p>
                   <button
                     className="secondary capture-open"
@@ -519,9 +524,11 @@ export function CapturePanel({
                     }
                     onClick={() =>
                       void perform(
-                        connection?.available
-                          ? "Connecting simulator…"
-                          : "Installing serve-sim and connecting…",
+                        selectedAndroid
+                          ? "Connecting emulator…"
+                          : connection?.available
+                            ? "Connecting simulator…"
+                            : "Installing serve-sim and connecting…",
                         async () => {
                           await captureCommand({
                             action: "open",
@@ -534,12 +541,13 @@ export function CapturePanel({
                     }
                   >
                     <Smartphone size={17} />
-                    Connect simulator
+                    {selectedAndroid ? "Connect emulator" : "Connect simulator"}
                   </button>
                 </div>
               )}
               {connection &&
                 !connection.available &&
+                (kind === "web" || (!!deviceId && !selectedAndroid)) &&
                 (connection.kind === "web" || status.simulator.supported) && (
                   <p className="capture-hint">
                     First use installs{" "}
@@ -571,6 +579,7 @@ export function CapturePanel({
                       ? connection.inputWarning
                       : undefined
                   }
+                  android={connectedAndroid}
                   onReconnect={
                     connection.kind === "simulator"
                       ? () =>
@@ -611,7 +620,11 @@ export function CapturePanel({
                     })
                   }
                 >
-                  {kind === "web" ? "Close webpage" : "Disconnect simulator"}
+                  {kind === "web"
+                    ? "Close webpage"
+                    : connectedAndroid
+                      ? "Disconnect emulator"
+                      : "Disconnect simulator"}
                 </button>
               </div>
             )}

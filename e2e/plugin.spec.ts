@@ -525,7 +525,9 @@ for (const kind of ["web", "simulator"])
         .getByRole("button", { name: "Open webpage", exact: true })
         .click();
     } else {
-      await ui.getByRole("button", { name: "Simulator", exact: true }).click();
+      await ui
+        .getByRole("button", { name: "Simulator / Emulator", exact: true })
+        .click();
       await ui.getByRole("button", { name: "Connect simulator" }).click();
     }
     await expect(
@@ -682,7 +684,9 @@ for (const width of [1440, 390])
       await ui.getByRole("button", { name: "Capture live app" }).click();
       await expect(ui.getByRole("textbox", { name: /URL/ })).toBeVisible();
       await capture("web");
-      await ui.getByRole("button", { name: "Simulator", exact: true }).click();
+      await ui
+        .getByRole("button", { name: "Simulator / Emulator", exact: true })
+        .click();
       await capture("simulator");
       await ui.getByRole("button", { name: "Back to annotations" }).click();
       await ui.getByRole("button", { name: "Try an example" }).click();
@@ -962,7 +966,9 @@ test("changing simulator frames stay out of the embedded renderer console", asyn
   await ui
     .getByRole("button", { name: "Capture a webpage or simulator" })
     .click();
-  await ui.getByRole("button", { name: "Simulator", exact: true }).click();
+  await ui
+    .getByRole("button", { name: "Simulator / Emulator", exact: true })
+    .click();
   const editor = page
     .frames()
     .find((frame) => frame.url().endsWith("/editor"))!;

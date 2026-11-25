@@ -24,6 +24,14 @@ SCRIBBLE_TEST_CHANNEL=chrome npm run test:e2e -- --grep 'a near-limit draft'
 
 This override selects Chrome for the editor under test. The server's capture tests still use the dedicated headless browser. Run this command in an environment that permits browser processes and local servers.
 
+## Android emulator capture
+
+The browser suite exercises Android capture with a simulated ADB response. To run the same test on a running AVD, use its serial from `adb devices`. The test sends Android Back and captures the current screen.
+
+```sh
+SCRIBBLE_TEST_EMULATOR=emulator-5554 npm run test:e2e -- --grep 'Android emulator captures'
+```
+
 ## Embedded preview memory
 
 To measure the embedded editor with a changing 1206 × 2622 simulator preview, build the plugin and run the extended browser test.

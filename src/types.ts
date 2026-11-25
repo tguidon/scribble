@@ -43,7 +43,8 @@ export type CaptureSource = {
   | { kind: "shared"; displaySurface: "browser" | "window" | "monitor" }
   | {
       kind: "simulator";
-      provider: "serve-sim";
+      provider: "serve-sim" | "adb";
+      appPackage?: string;
       device: { id: string; name: string };
       orientation: string;
       appBundleId?: string;

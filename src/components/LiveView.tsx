@@ -16,6 +16,7 @@ import type { CaptureInput as Input } from "../../skills/scribble/scripts/lib/ca
 type Props = {
   kind: CaptureKind;
   title: string;
+  android?: boolean;
   generation: number;
   inputWarning?: string;
   onReconnect?: () => Promise<void>;
@@ -29,6 +30,7 @@ type Props = {
 export function LiveView({
   kind,
   title,
+  android,
   busy,
   onCapture,
   onError,
@@ -430,6 +432,16 @@ export function LiveView({
             </>
           ) : (
             <>
+              {android && (
+                <button
+                  className="icon-button"
+                  aria-label="Android back"
+                  disabled={!enabled || pending}
+                  onClick={() => send({ type: "key", key: "Escape" })}
+                >
+                  <ArrowLeft size={19} />
+                </button>
+              )}
               <button
                 className="icon-button"
                 aria-label="Simulator home"

@@ -1,5 +1,7 @@
 import { captureError } from "./common.mjs";
 
+export const emulatorId = /^emulator-\d+$/;
+
 /** @typedef {"web" | "simulator"} CaptureKind */
 /** @typedef {{width: number, height: number}} Viewport */
 /** @typedef {{id: string, name: string}} SimulatorDevice */
@@ -10,7 +12,7 @@ import { captureError } from "./common.mjs";
  * | {type: "text", text: string}
  * | {type: "release" | "back" | "reload" | "home"}} CaptureInput */
 /** @typedef {{kind: "web"} & ({connected: false} | {connected: true, generation: number, url: string, viewport: Viewport})} WebConnection */
-/** @typedef {{kind: "simulator"} & ({connected: false} | {connected: true, generation: number, device: SimulatorDevice, previewUrl: string, inputWarning?: string})} SimulatorConnection */
+/** @typedef {{kind: "simulator"} & ({connected: false} | {connected: true, generation: number, device: SimulatorDevice, previewUrl?: string, inputWarning?: string})} SimulatorConnection */
 /** @typedef {{available: boolean, setupCommand: string}} Availability */
 /** @typedef {{web: WebConnection & Availability, simulator: SimulatorConnection & Availability & {supported: boolean}}} CaptureStatus */
 /** @typedef {{kind: "web", fullPage?: boolean} | {kind: "simulator"}} CaptureSnapshot */
@@ -127,7 +129,8 @@ export function validateCaptureCommand(action, input) {
       }
       if (
         typeof input.deviceId !== "string" ||
-        !/^[a-f\d-]{36}$/i.test(input.deviceId)
+        (!/^[a-f\d-]{36}$/i.test(input.deviceId) &&
+          !emulatorId.test(input.deviceId))
       )
         throw captureError("Choose a booted simulator.");
       return { action, kind, deviceId: input.deviceId };

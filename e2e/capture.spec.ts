@@ -77,6 +77,19 @@ test.beforeEach(async ({ page }) => {
           `p123\ncnode\nn127.0.0.1:${new URL(sourceUrl).port}\n`,
       },
       web: { headless: true },
+      android: process.env.SCRIBBLE_TEST_EMULATOR
+        ? undefined
+        : {
+            run: async (args: string[]) => {
+              if (args[0] === "devices")
+                return Buffer.from(
+                  "emulator-5554 device model:Pixel\nemulator-5556 offline\nphone123 device",
+                );
+              if (args[2] === "emu") return Buffer.from("Pixel_Test\nOK");
+              if (args[2] === "exec-out") return png;
+              return Buffer.alloc(0);
+            },
+          },
       simulator: {
         devices: async () => [device],
         command: { file: process.execPath, args: [command] },
@@ -488,14 +501,58 @@ test("full-page capture uses the selected viewport, recovers from failure, and a
   expect(bundle.images[1].annotations[0].points[0].y).toBeGreaterThan(15000);
 });
 
+test("Android emulator captures, annotates, resumes, and disconnects", async ({
+  page,
+}) => {
+  const serial = process.env.SCRIBBLE_TEST_EMULATOR || "emulator-5554";
+  await page.getByRole("button", { name: "Capture live app" }).click();
+  await page.getByRole("button", { name: "Simulator / Emulator" }).click();
+  const picker = page.getByLabel("Booted simulator or emulator");
+  await picker.selectOption(serial);
+  if (!process.env.SCRIBBLE_TEST_EMULATOR)
+    await expect(
+      picker.locator('option[value="phone123"], option[value="emulator-5556"]'),
+    ).toHaveCount(0);
+  await page.getByRole("button", { name: "Connect emulator" }).click();
+  const back = page.getByRole("button", { name: "Android back" });
+  await expect(back).toBeEnabled();
+  const input = page.waitForResponse(
+    (response) =>
+      response.url().endsWith("/api/capture/input") && response.ok(),
+  );
+  await back.click();
+  await input;
+  const capture = page.waitForResponse(
+    (response) =>
+      response.url().endsWith("/api/capture/snapshot") && response.ok(),
+  );
+  await page.getByRole("button", { name: "Capture & annotate" }).click();
+  const { images } = await (await capture).json();
+  expect(images[0]).toMatchObject({
+    mime: "image/png",
+    source: { kind: "simulator", provider: "adb", device: { id: serial } },
+  });
+  await page.locator(".image-stage").focus();
+  await page.keyboard.press("Enter");
+  await page.getByLabel("Comment for mark 1").fill("Review the Android screen");
+  await page.getByRole("button", { name: "Resume live capture" }).click();
+  await expect(back).toBeEnabled();
+  await page.getByRole("button", { name: "Disconnect emulator" }).click();
+  await expect(
+    page.getByRole("button", { name: "Connect emulator" }),
+  ).toBeEnabled();
+});
+
 test("simulator selection captures into the same editor and supports disconnect", async ({
   page,
 }) => {
   await page.getByRole("button", { name: "Capture live app" }).click();
   await expect(
-    page.getByRole("button", { name: "Simulator", exact: true }),
+    page.getByRole("button", { name: "Simulator / Emulator", exact: true }),
   ).toBeEnabled();
-  await page.getByRole("button", { name: "Simulator", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Simulator / Emulator", exact: true })
+    .click();
   await expect(
     page.getByRole("button", { name: "Capture full page & annotate" }),
   ).toHaveCount(0);
@@ -1169,7 +1226,9 @@ test("capture setup and live controls fit split-view widths", async ({
       });
     }
     await page.getByRole("button", { name: /Use a webpage URL/ }).click();
-    await page.getByRole("button", { name: "Simulator", exact: true }).click();
+    await page
+      .getByRole("button", { name: "Simulator / Emulator", exact: true })
+      .click();
     await expect(
       page.getByRole("button", { name: "Connect simulator", exact: true }),
     ).toBeVisible();

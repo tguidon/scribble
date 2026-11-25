@@ -269,7 +269,9 @@ export function Canvas({
                   : "Web capture"
                 : image.source.kind === "shared"
                   ? "Shared screen capture"
-                  : "Simulator capture"}
+                  : image.source.provider === "adb"
+                    ? "Android emulator capture"
+                    : "Simulator capture"}
             </span>
           )}
         </span>
